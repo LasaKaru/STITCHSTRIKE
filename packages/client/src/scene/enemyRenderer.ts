@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { ENEMIES, EnemyType } from '@stitchstrike/shared';
 import { bruteOptions, gruntOptions, heldBlaster, spawnFigure } from '../figures/cast.ts';
 import { createMoth, createScuttler, poseMoth, poseScuttler } from '../figures/creatures.ts';
+import { createBoss, createDrone, createSnip, createTeeth, createTop, poseDrone, poseSnip, poseTeeth, poseTop, soldierOptions } from '../figures/invaders.ts';
 import { poseHumanoid } from '../figures/humanoid.ts';
 import type { FigureInstance } from '../figures/rig.ts';
 
@@ -74,8 +75,8 @@ export class EnemyRenderer {
     this.bars.frustumCulled = false;
     this.bars.renderOrder = 20;
     scene.add(this.bars);
-    // Knit the templates up front so the first wave doesn't hitch.
-    for (const type of [EnemyType.Grunt, EnemyType.Scuttler, EnemyType.Moth, EnemyType.Brute]) this.release(this.make(type));
+    // Knit the common templates up front so the first waves don't hitch (the boss knits on arrival).
+    for (const type of [EnemyType.Grunt, EnemyType.Scuttler, EnemyType.Moth, EnemyType.Brute, EnemyType.Teeth, EnemyType.Top, EnemyType.Soldier, EnemyType.Drone, EnemyType.Snip]) this.release(this.make(type));
   }
 
   private make(type: number): Pooled {
@@ -89,8 +90,22 @@ export class EnemyRenderer {
       figure = spawnFigure(bruteOptions());
     } else if (type === EnemyType.Scuttler) {
       figure = createScuttler();
-    } else {
+    } else if (type === EnemyType.Moth) {
       figure = createMoth();
+    } else if (type === EnemyType.Teeth) {
+      figure = createTeeth();
+    } else if (type === EnemyType.Top) {
+      figure = createTop();
+    } else if (type === EnemyType.Soldier) {
+      figure = spawnFigure(soldierOptions());
+      gun = heldBlaster(0x6a6a74, true, 0.9);
+      figure.root.add(gun);
+    } else if (type === EnemyType.Drone) {
+      figure = createDrone();
+    } else if (type === EnemyType.Snip) {
+      figure = createSnip();
+    } else {
+      figure = createBoss();
     }
     const body = new THREE.Group();
     body.add(figure.root);
@@ -139,8 +154,27 @@ export class EnemyRenderer {
         case EnemyType.Scuttler:
           poseScuttler(p.figure, t, e.phase * 1.6, Math.max(0.15, speed));
           break;
-        default:
+        case EnemyType.Moth:
           poseMoth(p.figure, t, e.id);
+          break;
+        case EnemyType.Teeth:
+          poseTeeth(p.figure, t + e.id, e.phase * 1.5, Math.max(0.2, speed));
+          break;
+        case EnemyType.Top:
+          poseTop(p.figure, t, e.id);
+          break;
+        case EnemyType.Soldier:
+          // Tin soldiers stand and aim when they have a target (stopped), else march.
+          poseHumanoid(p.figure, { t: t + e.id, speed, phase: e.phase, pitch: -0.05, crouch: speed < 0.1 ? 0.5 : 0, airborne: false, aiming: true }, 0.9, p.gun);
+          break;
+        case EnemyType.Drone:
+          poseDrone(p.figure, t + e.id, speed, 0);
+          break;
+        case EnemyType.Snip:
+          poseSnip(p.figure, t + e.id, e.phase * 1.4, Math.max(0.2, speed), speed < 0.1);
+          break;
+        default:
+          poseHumanoid(p.figure, { t: t + e.id, speed: speed * 0.7, phase: e.phase, pitch: 0, crouch: 0, airborne: false, aiming: false, hunch: 0.25 }, 3.05);
       }
     }
     for (const [id, p] of this.live) {

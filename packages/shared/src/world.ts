@@ -1,3 +1,5 @@
+import type { PickupSpot } from './pickups.ts';
+
 export type Vec3 = [number, number, number];
 
 export interface Box {
@@ -27,7 +29,15 @@ export interface World {
   /** Bot navigation waypoints at floor level or on reachable tops. */
   waypoints: Vec3[];
   coop: CoopLayout;
+  /** Static pickup spots (health, armour, power), respawning on a timer. */
+  pickups: PickupSpot[];
+  /** Map jump pads: stand on one and it launches you (y is the surface height). */
+  jumpPads: JumpPad[];
+  /** Built spring pads (co-op), kept in sync by the room; also launch toys. Floor level. */
+  springs?: { x: number; z: number; r: number; launch: number }[];
 }
+
+export interface JumpPad { x: number; y: number; z: number; r: number; launch: number }
 
 export interface BuildPad {
   pos: Vec3;
@@ -165,7 +175,12 @@ export function createBedroom(): World {
     playerSpawns: [[-1, 0, 0.5], [-3.5, 0, 1.5], [5, 0, 0], [4, 0, 8], [-8, 0, 2], [10, 0, 2]],
   };
 
-  return { id: 'bedroom', name: 'Sunbeam Bedroom', bounds: { min: [-19, -17], max: [19, 17] }, outdoor: false, boxes, spawns, waypoints, coop };
+  const pickups: PickupSpot[] = [
+    { pos: [-14, 0, 12], kind: 0 }, { pos: [15, 0, 14], kind: 0 }, { pos: [3, 0, -12], kind: 0 },
+    // Rewards for climbing: armour on the bed, power on the top shelf, armour on the desk.
+    { pos: [-15, 5, -8], kind: 1 }, { pos: [18, 16, 8], kind: 2 }, { pos: [16, 7.5, -13], kind: 1 },
+  ];
+  return { id: 'bedroom', name: 'Sunbeam Bedroom', bounds: { min: [-19, -17], max: [19, 17] }, outdoor: false, boxes, spawns, waypoints, coop, pickups, jumpPads: [] };
 }
 
 export function createWorld(map: MapId = 'bedroom'): World {

@@ -7,7 +7,36 @@ import type { MapId, Vec3 } from './world.ts';
  * messages (hello, roster, events, ping) are JSON text frames.
  */
 
-export type GameMode = 'coop' | 'pvp';
+export type GameMode = 'coop' | 'pvp' | 'tdm';
+
+/**
+ * A toy's cosmetic look: small indices into the client's cosmetics catalogue
+ * (heads, hats, knit patterns, yarn colours, packaging). Purely visual, so
+ * the server only clamps it and passes it along.
+ */
+export interface Look {
+  head: number;
+  hat: number;
+  beard: number;
+  glasses: number;
+  pattern: number;
+  skin: number;
+  jacket: number;
+  pants: number;
+  packaging: number;
+}
+export const LOOK_KEYS: (keyof Look)[] = ['head', 'hat', 'beard', 'glasses', 'pattern', 'skin', 'jacket', 'pants', 'packaging'];
+
+export function sanitizeLook(raw: unknown): Look | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const o = raw as Record<string, unknown>;
+  const look = {} as Look;
+  for (const k of LOOK_KEYS) {
+    const v = Number(o[k]);
+    look[k] = Number.isFinite(v) ? Math.max(0, Math.min(63, Math.floor(v))) : 0;
+  }
+  return look;
+}
 
 export const MSG_INPUT = 1;
 export const MSG_SNAPSHOT = 2;
@@ -17,6 +46,9 @@ export interface RosterEntry {
   name: string;
   color: number;
   bot: boolean;
+  /** Team Deathmatch side (0 or 1); 0 elsewhere. */
+  team: number;
+  look?: Look;
 }
 
 /** Rare, reliable events go as JSON. Shots/hits are frequent, so they ride in the binary snapshot. */
@@ -25,16 +57,23 @@ export type GameEvent =
   | { type: 'ko'; attacker: number; victim: number; enemyType?: number }
   | { type: 'spawn'; id: number }
   | { type: 'phase'; phase: number; wave: number }
-  | { type: 'built'; pad: number; kind: number; by: number }
+  | { type: 'built'; pad: number; kind: number; by: number; tier: number }
   | { type: 'coreDown'; core: number }
-  | { type: 'kill'; by: number; enemyType: number; reward: number };
+  | { type: 'kill'; by: number; enemyType: number; reward: number }
+  /** Co-op: a toy is knocked down / re-stitched by a teammate. */
+  | { type: 'downed'; id: number }
+  | { type: 'revived'; id: number; by: number }
+  | { type: 'pickup'; id: number; kind: number }
+  | { type: 'boss'; state: 'arrive' | 'down' }
+  | { type: 'stomp'; x: number; z: number }
+  | { type: 'snap'; pad: number };
 
 export type ClientText =
-  | { t: 'hello'; name: string }
+  | { t: 'hello'; name: string; look?: Look }
   | { t: 'ping'; c: number };
 
 export type ServerText =
-  | { t: 'welcome'; id: number; tick: number; room: string; mode: GameMode; map: MapId }
+  | { t: 'welcome'; id: number; tick: number; room: string; mode: GameMode; map: MapId; waves: number; difficulty: number }
   | { t: 'roster'; players: RosterEntry[] }
   | { t: 'events'; tick: number; list: GameEvent[] }
   | { t: 'pong'; c: number; tick: number }
@@ -65,7 +104,7 @@ function dequantAngle(q: number): number {
 
 // ---------------------------------------------------------------- inputs
 
-const INPUT_BYTES = 18;
+const INPUT_BYTES = 20;
 
 export function encodeInputs(cmds: InputCmd[]): Uint8Array {
   const buf = new Uint8Array(2 + cmds.length * INPUT_BYTES);
@@ -79,6 +118,8 @@ export function encodeInputs(cmds: InputCmd[]): Uint8Array {
     v.setFloat32(o + 6, c.yaw, true);
     v.setFloat32(o + 10, c.pitch, true);
     v.setFloat32(o + 14, c.renderTick, true);
+    v.setUint8(o + 18, c.weapon);
+    v.setUint8(o + 19, c.action);
     o += INPUT_BYTES;
   }
   return buf;
@@ -99,6 +140,8 @@ export function decodeInputs(buf: Uint8Array): InputCmd[] | null {
       yaw: v.getFloat32(o + 6, true),
       pitch: v.getFloat32(o + 10, true),
       renderTick: v.getFloat32(o + 14, true),
+      weapon: v.getUint8(o + 18),
+      action: v.getUint8(o + 19),
     };
     if (!Number.isFinite(cmd.yaw) || !Number.isFinite(cmd.pitch) || !Number.isFinite(cmd.renderTick)) return null;
     out.push(cmd);
@@ -117,8 +160,15 @@ export interface NetPlayer {
   yaw: number;
   pitch: number;
   health: number;
+  armor: number;
   alive: boolean;
   crouch: boolean;
+  /** Co-op: knocked down, waiting to be re-stitched. */
+  downed: boolean;
+  /** Power Pom active. */
+  powered: boolean;
+  /** 0..1 re-stitch progress while downed. */
+  revive: number;
   weapon: number;
   kos: number;
   deaths: number;
@@ -133,7 +183,27 @@ export interface Shot {
   head: boolean;
   /** True when the shot hit an enemy toy. */
   enemy: boolean;
+  /** ShotKind: 0 hitscan, 1 yarn-ball blast, 2 zapper arc, 3 invader fire. */
+  kind: number;
+  /** Start point for zaps and invader fire (others start at the shooter). */
+  from?: Vec3;
   to: Vec3;
+}
+
+/** A lobbed yarn ball in flight. */
+export interface NetProjectile {
+  owner: number;
+  x: number;
+  y: number;
+  z: number;
+}
+
+/** A stuffing tuft dropped by an invader. */
+export interface NetDrop {
+  kind: number;
+  x: number;
+  y: number;
+  z: number;
 }
 
 export interface NetEnemy {
@@ -155,7 +225,10 @@ export interface CoopState {
   buttons: number;
   ready: number;
   cores: { health: number; shield: number }[];
-  pads: { kind: number; health: number }[];
+  pads: { kind: number; tier: number; health: number }[];
+  difficulty: number;
+  /** 0..1 boss health, or -1 when no boss is on the field. */
+  boss: number;
   /** Enemies ride on every other snapshot (10 Hz) to fit the co-op bandwidth budget; null when omitted. */
   enemies: NetEnemy[] | null;
 }
@@ -170,11 +243,15 @@ export interface Snapshot {
   respawn: number;
   players: NetPlayer[];
   shots: Shot[];
+  projectiles: NetProjectile[];
+  /** Bit i set = static pickup spot i is available. */
+  pickups: number;
+  drops: NetDrop[];
   coop: CoopState | null;
 }
 
-/** Bytes per record, for bandwidth maths: own state 91, player 18, shot 9, enemy 9. */
-const ENEMY_BYTES = 9;
+/** Bytes per record, for bandwidth maths: player 21, shot 9 (15 with a start point), enemy 8, projectile 7. */
+const ENEMY_BYTES = 8;
 const MAX_SHOTS = 255;
 const MAX_ENEMIES = 255;
 
@@ -224,13 +301,13 @@ export function encodeSnapshot(s: Snapshot): Uint8Array {
   if (s.self) {
     const p = s.self;
     for (const n of [p.x, p.y, p.z, p.vx, p.vy, p.vz]) w.f64(n);
-    w.u8(p.onGround ? 1 : 0);
+    w.u8((p.onGround ? 1 : 0) | (p.downed ? 2 : 0));
     w.u8(p.airJumps);
     w.u16(p.buttons);
     w.f64(p.cooldown);
     w.u8(p.weapon);
-    w.u8(p.ammo);
-    w.u8(p.ammoB);
+    w.u8(p.mags.length);
+    for (const m of p.mags) w.u8(m);
     w.f64(p.reload);
     w.f32(p.yaw);
     w.f32(p.pitch);
@@ -242,7 +319,9 @@ export function encodeSnapshot(s: Snapshot): Uint8Array {
     w.u16(quantAngle(p.yaw));
     w.i16(Math.round((p.pitch / (Math.PI / 2)) * 32767));
     w.u8(Math.max(0, Math.min(255, Math.ceil(p.health))));
-    w.u8((p.alive ? 1 : 0) | (p.crouch ? 2 : 0));
+    w.u8(Math.max(0, Math.min(255, Math.ceil(p.armor))));
+    w.u8((p.alive ? 1 : 0) | (p.crouch ? 2 : 0) | (p.downed ? 4 : 0) | (p.powered ? 8 : 0));
+    w.u8(pct(p.revive));
     w.u8(p.weapon);
     w.u16(p.kos);
     w.u16(p.deaths);
@@ -252,8 +331,23 @@ export function encodeSnapshot(s: Snapshot): Uint8Array {
   for (const sh of shots) {
     w.u8(sh.id);
     w.u8(sh.hit);
-    w.u8((sh.head ? 1 : 0) | (sh.enemy ? 2 : 0));
+    const from = sh.from !== undefined;
+    w.u8((sh.head ? 1 : 0) | (sh.enemy ? 2 : 0) | (from ? 4 : 0) | ((sh.kind & 7) << 3));
     w.u16(quantPos(sh.to[0], 0)); w.u16(quantPos(sh.to[1], 1)); w.u16(quantPos(sh.to[2], 2));
+    if (sh.from) { w.u16(quantPos(sh.from[0], 0)); w.u16(quantPos(sh.from[1], 1)); w.u16(quantPos(sh.from[2], 2)); }
+  }
+  const projectiles = s.projectiles.slice(0, 32);
+  w.u8(projectiles.length);
+  for (const pr of projectiles) {
+    w.u8(pr.owner);
+    w.u16(quantPos(pr.x, 0)); w.u16(quantPos(pr.y, 1)); w.u16(quantPos(pr.z, 2));
+  }
+  w.u32(s.pickups);
+  const drops = s.drops.slice(0, 16);
+  w.u8(drops.length);
+  for (const d of drops) {
+    w.u8(d.kind);
+    w.u16(quantPos(d.x, 0)); w.u16(quantPos(d.y, 1)); w.u16(quantPos(d.z, 2));
   }
   w.u8(s.coop ? 1 : 0);
   if (s.coop) {
@@ -267,17 +361,18 @@ export function encodeSnapshot(s: Snapshot): Uint8Array {
     w.u8(c.cores.length);
     for (const k of c.cores) { w.u8(pct(k.health)); w.u8(pct(k.shield)); }
     w.u8(c.pads.length);
-    for (const p of c.pads) w.u8((p.kind << 6) | Math.round(Math.max(0, Math.min(1, p.health)) * 63));
+    for (const p of c.pads) w.u16(((p.kind & 15) << 12) | ((p.tier & 3) << 10) | Math.round(Math.max(0, Math.min(1, p.health)) * 1023));
+    w.u8(c.difficulty);
+    w.u8(c.boss < 0 ? 255 : Math.min(254, Math.round(c.boss * 254)));
     w.u8(c.enemies ? 1 : 0);
     const enemies = !c.enemies ? [] : c.enemies.length > MAX_ENEMIES ? c.enemies.slice(0, MAX_ENEMIES) : c.enemies;
     if (c.enemies) w.u8(enemies.length);
     for (const e of enemies) {
       w.u16(e.id);
-      w.u8(e.type);
+      w.u8(((e.type & 15) << 4) | Math.max(0, Math.min(15, Math.ceil(e.health * 15))));
       w.u16(quantPos(e.x, 0));
       w.u16(quantPos(e.z, 2));
       w.u8(Math.max(0, Math.min(255, Math.round(e.y * 20))));
-      w.u8(pct(e.health));
     }
   }
   return w.done();
@@ -294,17 +389,20 @@ export function decodeSnapshot(buf: Uint8Array): Snapshot | null {
     let self: PlayerState | null = null;
     if (r.u8() === 1) {
       const f = [r.f64(), r.f64(), r.f64(), r.f64(), r.f64(), r.f64()];
-      const onGround = r.u8() === 1;
+      const flags = r.u8();
       const airJumps = r.u8();
       const buttons = r.u16();
       const cooldown = r.f64();
       const weapon = r.u8();
-      const ammo = r.u8();
-      const ammoB = r.u8();
+      const mags: number[] = [];
+      for (let i = 0, n = r.u8(); i < n; i++) mags.push(r.u8());
       const reload = r.f64();
       const yaw = r.f32();
       const pitch = r.f32();
-      self = { x: f[0], y: f[1], z: f[2], vx: f[3], vy: f[4], vz: f[5], onGround, airJumps, buttons, cooldown, weapon, ammo, ammoB, reload, yaw, pitch };
+      self = {
+        x: f[0], y: f[1], z: f[2], vx: f[3], vy: f[4], vz: f[5], onGround: (flags & 1) !== 0, downed: (flags & 2) !== 0,
+        airJumps, buttons, cooldown, weapon, mags, reload, yaw, pitch,
+      };
     }
     const players: NetPlayer[] = [];
     for (let i = 0, n = r.u8(); i < n; i++) {
@@ -313,14 +411,31 @@ export function decodeSnapshot(buf: Uint8Array): Snapshot | null {
       const yaw = dequantAngle(r.u16());
       const pitch = (r.i16() / 32767) * (Math.PI / 2);
       const health = r.u8();
+      const armor = r.u8();
       const flags = r.u8();
+      const revive = r.u8() / 255;
       const weapon = r.u8();
-      players.push({ id, x, y, z, yaw, pitch, health, alive: (flags & 1) !== 0, crouch: (flags & 2) !== 0, weapon, kos: r.u16(), deaths: r.u16() });
+      players.push({
+        id, x, y, z, yaw, pitch, health, armor, alive: (flags & 1) !== 0, crouch: (flags & 2) !== 0, downed: (flags & 4) !== 0,
+        powered: (flags & 8) !== 0, revive, weapon, kos: r.u16(), deaths: r.u16(),
+      });
     }
     const shots: Shot[] = [];
     for (let i = 0, n = r.u8(); i < n; i++) {
       const id = r.u8(), hit = r.u8(), flags = r.u8();
-      shots.push({ id, hit, head: (flags & 1) !== 0, enemy: (flags & 2) !== 0, to: [dequantPos(r.u16(), 0), dequantPos(r.u16(), 1), dequantPos(r.u16(), 2)] });
+      const to: Vec3 = [dequantPos(r.u16(), 0), dequantPos(r.u16(), 1), dequantPos(r.u16(), 2)];
+      const shot: Shot = { id, hit, head: (flags & 1) !== 0, enemy: (flags & 2) !== 0, kind: (flags >> 3) & 7, to };
+      if (flags & 4) shot.from = [dequantPos(r.u16(), 0), dequantPos(r.u16(), 1), dequantPos(r.u16(), 2)];
+      shots.push(shot);
+    }
+    const projectiles: NetProjectile[] = [];
+    for (let i = 0, n = r.u8(); i < n; i++) {
+      projectiles.push({ owner: r.u8(), x: dequantPos(r.u16(), 0), y: dequantPos(r.u16(), 1), z: dequantPos(r.u16(), 2) });
+    }
+    const pickups = r.u32();
+    const drops: NetDrop[] = [];
+    for (let i = 0, n = r.u8(); i < n; i++) {
+      drops.push({ kind: r.u8(), x: dequantPos(r.u16(), 0), y: dequantPos(r.u16(), 1), z: dequantPos(r.u16(), 2) });
     }
     let coop: CoopState | null = null;
     if (r.left > 0 && r.u8() === 1) {
@@ -331,19 +446,22 @@ export function decodeSnapshot(buf: Uint8Array): Snapshot | null {
       const cores = [];
       for (let i = 0, n = r.u8(); i < n; i++) cores.push({ health: r.u8() / 255, shield: r.u8() / 255 });
       const pads = [];
-      for (let i = 0, n = r.u8(); i < n; i++) { const b = r.u8(); pads.push({ kind: b >> 6, health: (b & 63) / 63 }); }
+      for (let i = 0, n = r.u8(); i < n; i++) { const b = r.u16(); pads.push({ kind: b >> 12, tier: (b >> 10) & 3, health: (b & 1023) / 1023 }); }
+      const difficulty = r.u8();
+      const bossByte = r.u8();
+      const boss = bossByte === 255 ? -1 : bossByte / 254;
       let enemies: NetEnemy[] | null = null;
       const hasEnemies = r.u8() === 1;
       if (hasEnemies) enemies = [];
       for (let i = 0, n = hasEnemies ? r.u8() : 0; i < n; i++) {
-        const id = r.u16(), type = r.u8();
+        const id = r.u16(), th = r.u8();
         const x = dequantPos(r.u16(), 0), z = dequantPos(r.u16(), 2);
         const y = r.u8() / 20;
-        enemies!.push({ id, type, x, y, z, health: r.u8() / 255 });
+        enemies!.push({ id, type: th >> 4, x, y, z, health: (th & 15) / 15 });
       }
-      coop = { phase, wave, totalWaves, timer, buttons, ready, cores, pads, enemies };
+      coop = { phase, wave, totalWaves, timer, buttons, ready, cores, pads, difficulty, boss, enemies };
     }
-    return { tick, ack, self, respawn, players, shots, coop };
+    return { tick, ack, self, respawn, players, shots, projectiles, pickups, drops, coop };
   } catch {
     return null;
   }

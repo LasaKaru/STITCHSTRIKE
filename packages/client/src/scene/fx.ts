@@ -7,6 +7,8 @@ import * as THREE from 'three';
 
 interface Projectile { mesh: THREE.Mesh; from: THREE.Vector3; to: THREE.Vector3; t: number; dur: number; spin: number }
 interface Puff { mesh: THREE.Mesh; t: number; life: number }
+interface Arc { line: THREE.Line; t: number; life: number }
+interface Ring { mesh: THREE.Mesh; t: number; life: number; size: number }
 
 const FLUFF = 1500;
 
@@ -23,6 +25,11 @@ export class Fx {
   private fluffLife = new Float32Array(FLUFF);
   private fluffNext = 0;
   private fluff: THREE.Points;
+  private arcs: Arc[] = [];
+  private rings: Ring[] = [];
+  private ringGeo = new THREE.RingGeometry(0.8, 1, 40);
+  /** Camera shake amount (decays); read by the arena. */
+  shake = 0;
 
   constructor(private scene: THREE.Scene) {
     const geo = new THREE.BufferGeometry();
@@ -95,7 +102,58 @@ export class Fx {
     }
   }
 
+  /** A jagged electric arc (battery zapper). */
+  zap(from: THREE.Vector3, to: THREE.Vector3, color = 0x9ad8ff): void {
+    const pts: THREE.Vector3[] = [];
+    const n = 7;
+    for (let i = 0; i <= n; i++) {
+      const p = from.clone().lerp(to, i / n);
+      if (i > 0 && i < n) p.add(new THREE.Vector3((Math.random() - 0.5) * 0.35, (Math.random() - 0.5) * 0.35, (Math.random() - 0.5) * 0.35));
+      pts.push(p);
+    }
+    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: new THREE.Color(color).multiplyScalar(2.5), transparent: true }));
+    this.scene.add(line);
+    this.arcs.push({ line, t: 0, life: 0.14 });
+  }
+
+  /** A yarn-ball burst: a big fluff cloud and a shockwave ring on the ground. */
+  blast(at: THREE.Vector3, color: number, radius = 3.2): void {
+    this.fluffBurst(at, color, 120, 5);
+    this.fluffBurst(at, 0xfff2e0, 40, 3);
+    this.puff(at, 0xfff2e0, 4);
+    const mesh = new THREE.Mesh(this.ringGeo, new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(1.4), transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false }));
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(at.x, Math.max(0.05, at.y - 0.5), at.z);
+    this.scene.add(mesh);
+    this.rings.push({ mesh, t: 0, life: 0.4, size: radius });
+  }
+
+  /** A shockwave from a boss stomp. */
+  stomp(at: THREE.Vector3): void {
+    const mesh = new THREE.Mesh(this.ringGeo, new THREE.MeshBasicMaterial({ color: 0xffe0b0, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }));
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(at.x, 0.08, at.z);
+    this.scene.add(mesh);
+    this.rings.push({ mesh, t: 0, life: 0.6, size: 5 });
+    this.fluffBurst(new THREE.Vector3(at.x, 0.3, at.z), 0xb89878, 80, 6);
+  }
+
   update(dt: number): void {
+    this.shake = Math.max(0, this.shake - dt * 2.5);
+    for (let i = this.arcs.length - 1; i >= 0; i--) {
+      const a = this.arcs[i];
+      a.t += dt;
+      (a.line.material as THREE.LineBasicMaterial).opacity = 1 - a.t / a.life;
+      if (a.t > a.life) { this.scene.remove(a.line); a.line.geometry.dispose(); (a.line.material as THREE.Material).dispose(); this.arcs.splice(i, 1); }
+    }
+    for (let i = this.rings.length - 1; i >= 0; i--) {
+      const r = this.rings[i];
+      r.t += dt;
+      const k = r.t / r.life;
+      r.mesh.scale.setScalar(0.2 + k * r.size);
+      (r.mesh.material as THREE.MeshBasicMaterial).opacity = 0.8 * (1 - k);
+      if (k >= 1) { this.scene.remove(r.mesh); (r.mesh.material as THREE.Material).dispose(); this.rings.splice(i, 1); }
+    }
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const p = this.projectiles[i];
       p.t += dt;

@@ -87,5 +87,11 @@ export function createGarden(): World {
   return {
     id: 'garden', name: 'Back Garden', bounds: { min: [-44, -39], max: [44, 44] }, outdoor: true,
     boxes, spawns, waypoints, coop,
+    pickups: [
+      { pos: [-20, 0, 2], kind: 0 }, { pos: [18, 0, -4], kind: 0 }, { pos: [-2, 0, 30], kind: 0 }, { pos: [36, 0, 26], kind: 0 },
+      // Climb rewards: armour on the deck and in the shed, power up in the treehouse.
+      { pos: [-24, 3, -36], kind: 1 }, { pos: [36, 0, -34], kind: 1 }, { pos: [-36, 12.8, 6], kind: 2 },
+    ],
+    jumpPads: [],
   };
 }

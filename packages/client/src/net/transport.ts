@@ -5,7 +5,7 @@
  * means another implementation of this interface.
  */
 
-import type { MapId } from '@stitchstrike/shared';
+import type { GameMode, MapId } from '@stitchstrike/shared';
 
 export type Frame = string | Uint8Array;
 
@@ -46,7 +46,7 @@ export function wsTransport(url: string): Transport {
 }
 
 /** Solo play: the exact server code (RoomHost) running in a Web Worker. No network, no server. */
-export function workerTransport(fillTo: number, mode: 'coop' | 'pvp' = 'coop', map: MapId = 'bedroom'): Transport {
+export function workerTransport(fillTo: number, mode: GameMode = 'coop', map: MapId = 'bedroom', waves = 10, difficulty = 1, startWave = 1): Transport {
   const t = base('solo worker');
   const worker = new Worker(new URL('./soloWorker.ts', import.meta.url), { type: 'module' });
   worker.onmessage = (e: MessageEvent<Frame>) => {
@@ -55,7 +55,7 @@ export function workerTransport(fillTo: number, mode: 'coop' | 'pvp' = 'coop', m
     t.onMessage(d);
   };
   worker.onerror = (e) => t.onClose(`worker error: ${e.message}`);
-  worker.postMessage({ init: true, fillTo, mode, map });
+  worker.postMessage({ init: true, fillTo, mode, map, waves, difficulty, startWave });
   t.send = (d) => worker.postMessage(d);
   t.close = () => worker.terminate();
   queueMicrotask(() => t.onOpen());

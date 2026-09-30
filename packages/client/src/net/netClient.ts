@@ -1,7 +1,8 @@
 import {
   clonePlayerState, decodeSnapshot, encodeInputs, ENEMY_INTERP_DELAY_MS, INPUT_DT, INPUTS_PER_PACKET, INTERP_DELAY_MS, MSG_SNAPSHOT,
   stepPlayer, TICK_RATE,
-  type CoopState, type GameEvent, type GameMode, type InputCmd, type NetEnemy, type NetPlayer, type PlayerState, type RosterEntry,
+  Buildable, SPRING,
+  type CoopState, type GameEvent, type GameMode, type InputCmd, type Look, type NetEnemy, type NetPlayer, type PlayerState, type RosterEntry,
   type ServerText, type Shot, type Snapshot, type World,
 } from '@stitchstrike/shared';
 import type { Frame, Transport } from './transport.ts';
@@ -28,6 +29,7 @@ export interface RemoteView {
   x: number; y: number; z: number;
   yaw: number; pitch: number;
   alive: boolean; crouch: boolean;
+  downed: boolean; powered: boolean; revive: number;
 }
 
 export interface NetStats {
@@ -46,6 +48,9 @@ export class NetClient {
   id = 0;
   room = '';
   mode: GameMode = 'coop';
+  /** Co-op mission length (0 = endless) and difficulty, from the welcome. */
+  waves = 10;
+  difficulty = 1;
   /** Latest co-op state (phase, wave, cores, pads). Enemies come from enemySamples(). */
   coop: CoopState | null = null;
   roster = new Map<number, RosterEntry>();
@@ -81,10 +86,10 @@ export class NetClient {
   private statsTime = performance.now();
   private pingTimer: ReturnType<typeof setInterval> | null = null;
 
-  constructor(private transport: Transport, private world: World, name: string) {
+  constructor(private transport: Transport, private world: World, name: string, look?: Look) {
     this.stats = { rtt: 0, kbpsIn: 0, snapshotHz: 0, pending: 0, lastCorrection: 0, transport: transport.kind };
     transport.onOpen = () => {
-      transport.send(JSON.stringify({ t: 'hello', name }));
+      transport.send(JSON.stringify({ t: 'hello', name, look }));
       this.pingTimer = setInterval(() => transport.send(JSON.stringify({ t: 'ping', c: performance.now() })), 1000);
     };
     transport.onMessage = (d) => this.receive(d);
@@ -182,6 +187,8 @@ export class NetClient {
           this.id = msg.id;
           this.room = msg.room;
           this.mode = msg.mode;
+          this.waves = msg.waves;
+          this.difficulty = msg.difficulty;
           if (msg.map !== this.world.id) {
             // The room runs another map: reload on it so collision agrees with the server.
             const u = new URL(location.href);
@@ -220,8 +227,20 @@ export class NetClient {
     if (snap.coop) {
       this.coop = snap.coop;
       if (snap.coop.enemies) this.pushEnemies(snap.tick, snap.coop.enemies);
+      this.syncSprings(snap.coop);
     }
     this.reconcile(snap);
+  }
+
+  /** Built spring pads launch us in prediction exactly as on the server. */
+  private syncSprings(c: CoopState): void {
+    const springs = (this.world.springs ??= []);
+    springs.length = 0;
+    c.pads.forEach((p, i) => {
+      if (p.kind !== Buildable.Spring) return;
+      const pos = this.world.coop.pads[i].pos;
+      springs.push({ x: pos[0], z: pos[2], r: SPRING.radius, launch: SPRING.launch + (p.tier - 1) * 2.5 });
+    });
   }
 
   private reconcile(snap: Snapshot): void {
@@ -267,13 +286,15 @@ export class NetClient {
    * Produces one fixed-step input, predicts it locally, and queues it for the server.
    * Reports whether the local weapon fired this step, which weapon, and the input seq (pellet seed).
    */
-  input(buttons: number, yaw: number, pitch: number, now: number): { fired: boolean; weapon: number; seq: number } {
+  input(buttons: number, yaw: number, pitch: number, now: number, wantWeapon = this.predicted?.weapon ?? 0, action = 0): { fired: boolean; weapon: number; seq: number } {
     const cmd: InputCmd = {
       seq: ++this.seq,
       buttons,
       yaw: Math.fround(yaw),
       pitch: Math.fround(pitch),
       renderTick: this.aimTick(now),
+      weapon: wantWeapon,
+      action,
     };
     let fired = false;
     let weapon = this.predicted?.weapon ?? 0;
@@ -337,6 +358,9 @@ export class NetClient {
         pitch: pa.pitch + (pc.pitch - pa.pitch) * g,
         alive: g < 0.5 ? pa.alive : pc.alive,
         crouch: pc.crouch,
+        downed: pc.downed,
+        powered: pc.powered,
+        revive: pc.revive,
       });
     }
     return out;

@@ -1,132 +1,232 @@
-import { ENEMIES, EnemyType, MOTH_ALTITUDE, NavGrid, pushOutOfBoxes, type Enemy } from './enemies.ts';
+import { BOSS_STOMP, DRONE_DROP, ENEMIES, EnemyType, NavGrid, pushOutOfBoxes, SNIP_CUT, SOLDIER_ACCURACY, type Enemy } from './enemies.ts';
 import type { GameEvent, Shot } from './protocol.ts';
 import { hasLineOfSight } from './raycast.ts';
 import type { Vec3, World } from './world.ts';
 
 /**
  * Co-op defence director (plan §5, §6.1, §9): build phase -> wave -> build
- * phase ... Heartspools have a shield and health; build pads take one of three
- * buildables paid for with the team's buttons.
+ * phase ... Heartspools have a shield and health; build pads take a
+ * buildable (upgradable to tier 3) paid for with the team's buttons.
+ * Blockades re-bake the invaders' flow fields, so players can maze them.
  */
 
 export const Phase = { Build: 0, Wave: 1, Won: 2, Lost: 3 } as const;
-export const Buildable = { None: 0, Turret: 1, Wall: 2, Mat: 3 } as const;
+export const Buildable = {
+  None: 0, Turret: 1, Wall: 2, Mat: 3,
+  /** Cheap stackable building-brick blockade. */
+  Barricade: 4,
+  /** Battery-powered zapper: chains a shock between nearby invaders. */
+  Zapper: 5,
+  /** One big snap on the first ground invader that steps on it. */
+  Mousetrap: 6,
+  /** Spring pad: launches toys up onto furniture. */
+  Spring: 7,
+} as const;
 
-export interface BuildableDef { name: string; cost: number; hp: number }
+export interface BuildableDef { name: string; short: string; cost: number; hp: number; blurb: string }
 export const BUILDABLES: BuildableDef[] = [
-  { name: '', cost: 0, hp: 0 },
-  { name: 'Pom-Pom Turret', cost: 150, hp: 160 },
-  { name: 'Pin Wall', cost: 80, hp: 340 },
-  { name: 'Tangle Mat', cost: 100, hp: 220 },
+  { name: '', short: '', cost: 0, hp: 0, blurb: '' },
+  { name: 'Pom-Pom Turret', short: 'Turret', cost: 150, hp: 160, blurb: 'Auto-fires at the nearest invader' },
+  { name: 'Pin Wall', short: 'Pin Wall', cost: 80, hp: 340, blurb: 'Tough blockade; invaders path around it' },
+  { name: 'Tangle Mat', short: 'Tangle', cost: 100, hp: 220, blurb: 'Slows walkers by 60%' },
+  { name: 'Brick Barricade', short: 'Bricks', cost: 50, hp: 220, blurb: 'Cheap blockade for mazing' },
+  { name: 'Battery Zapper', short: 'Zapper', cost: 175, hp: 150, blurb: 'Chains shocks through up to 4 invaders' },
+  { name: 'Mousetrap', short: 'Trap', cost: 90, hp: 120, blurb: 'Huge snap, then re-arms' },
+  { name: 'Spring Pad', short: 'Spring', cost: 60, hp: 100, blurb: 'Launches toys up to high ground' },
 ];
+/** Keys 3-9 in the build deck, in this order. */
+export const DECK = [Buildable.Turret, Buildable.Wall, Buildable.Mat, Buildable.Barricade, Buildable.Zapper, Buildable.Mousetrap, Buildable.Spring];
+export const MAX_TIER = 3;
+/** Cost to take a buildable from `tier` to `tier + 1`. */
+export function upgradeCost(kind: number, tier: number): number {
+  return Math.ceil(BUILDABLES[kind].cost * 0.6 * tier / 5) * 5;
+}
+const tierHp = (tier: number) => 1 + 0.5 * (tier - 1);
+const tierPower = (tier: number) => 1 + 0.4 * (tier - 1);
 
 export const CORE = { hp: 600, shield: 250, shieldRegen: 18, radius: 0.7 };
 export const TURRET = { range: 10, fireRate: 2.5, damage: 8, height: 1.3 };
+export const ZAPPER = { range: 5.5, every: 1.2, damage: 18, targets: 4, height: 1.2 };
+export const MOUSETRAP = { radius: 1.3, damage: 160, rearm: 6 };
+export const SPRING = { radius: 1.1, launch: 17 };
 export const WALL_RADIUS = 1.1;
+export const BARRICADE_RADIUS = 1.0;
 export const MAT_RADIUS = 1.8;
 export const MAT_SLOW = 0.4;
 export const BUILD_RANGE = 2.6;
 export const FIRST_BUILD_SECONDS = 40;
 export const BUILD_SECONDS = 25;
 export const END_SECONDS = 12;
-export const START_BUTTONS = 350;
-export const MAX_ALIVE = 64;
-/** Shot ids at or above this are turrets: id - TURRET_SHOT_BASE is the pad index. */
+export const MAX_ALIVE = 80;
+/** Shot ids at or above this are buildables: id - TURRET_SHOT_BASE is the pad index. */
 export const TURRET_SHOT_BASE = 128;
+/** Shot id used for invader fire. */
+export const ENEMY_SHOT_ID = 255;
+
+// ---------------------------------------------------------------- difficulty and missions
+
+export interface DifficultyDef { name: string; enemyHp: number; enemyCount: number; damageTaken: number; startButtons: number }
+export const DIFFICULTIES: DifficultyDef[] = [
+  { name: 'Cosy', enemyHp: 0.75, enemyCount: 0.8, damageTaken: 0.7, startButtons: 450 },
+  { name: 'Scratchy', enemyHp: 1, enemyCount: 1, damageTaken: 1, startButtons: 350 },
+  { name: 'Moth-eaten', enemyHp: 1.3, enemyCount: 1.2, damageTaken: 1.25, startButtons: 300 },
+  { name: 'Unravelled', enemyHp: 1.7, enemyCount: 1.4, damageTaken: 1.5, startButtons: 250 },
+];
+
+export interface CoopOptions {
+  /** Waves to win (5 skirmish, 10 mission with a boss); 0 = endless. */
+  waves?: number;
+  difficulty?: number;
+}
 
 interface SpawnGroup { type: number; count: number; spawn: number; delay: number; interval: number }
 
 const G = EnemyType.Grunt, S = EnemyType.Scuttler, M = EnemyType.Moth, B = EnemyType.Brute;
+const T = EnemyType.Teeth, P = EnemyType.Top, O = EnemyType.Soldier, D = EnemyType.Drone, X = EnemyType.Snip, Z = EnemyType.Boss;
+const g = (type: number, count: number, delay = 0, interval = 1, spawn = -1): SpawnGroup => ({ type, count, spawn, delay, interval });
+
+/** The ten waves of a full mission: each introduces something new, and the Unraveller closes it. */
 export const WAVES: SpawnGroup[][] = [
-  [{ type: G, count: 10, spawn: -1, delay: 0, interval: 1.4 }],
-  [{ type: G, count: 12, spawn: -1, delay: 0, interval: 1.2 }, { type: S, count: 8, spawn: 1, delay: 6, interval: 0.8 }],
-  [{ type: G, count: 14, spawn: -1, delay: 0, interval: 1.0 }, { type: M, count: 8, spawn: -1, delay: 4, interval: 1.0 }, { type: S, count: 8, spawn: 0, delay: 12, interval: 0.6 }],
-  [{ type: G, count: 16, spawn: -1, delay: 0, interval: 0.9 }, { type: S, count: 12, spawn: -1, delay: 5, interval: 0.5 }, { type: M, count: 10, spawn: -1, delay: 10, interval: 0.8 }, { type: B, count: 1, spawn: 0, delay: 15, interval: 1 }],
-  [{ type: G, count: 20, spawn: -1, delay: 0, interval: 0.7 }, { type: S, count: 14, spawn: -1, delay: 4, interval: 0.4 }, { type: M, count: 14, spawn: -1, delay: 8, interval: 0.6 }, { type: B, count: 3, spawn: -1, delay: 12, interval: 5 }],
+  [g(G, 10, 0, 1.4)],
+  [g(G, 10, 0, 1.2), g(T, 12, 6, 0.35)],
+  [g(G, 12, 0, 1.0), g(S, 8, 6, 0.8), g(M, 6, 4, 1.0)],
+  [g(G, 10, 0, 1.0), g(O, 6, 3, 1.6), g(T, 20, 8, 0.2)],
+  [g(G, 14, 0, 0.8), g(P, 6, 4, 1.2), g(M, 8, 8, 0.8), g(B, 1, 15)],
+  [g(O, 8, 0, 1.2), g(X, 3, 6, 3), g(T, 24, 4, 0.2), g(S, 10, 12, 0.5)],
+  [g(G, 16, 0, 0.8), g(D, 3, 6, 4), g(M, 10, 10, 0.7), g(P, 8, 14, 0.9)],
+  [g(B, 2, 0, 8), g(X, 4, 4, 3), g(O, 10, 6, 1), g(T, 30, 10, 0.15)],
+  [g(G, 20, 0, 0.7), g(D, 4, 5, 4), g(P, 10, 8, 0.8), g(M, 12, 12, 0.6), g(B, 2, 18, 6)],
+  [g(Z, 1, 4, 1, 0), g(G, 14, 0, 1), g(T, 30, 10, 0.2), g(O, 8, 16, 1.4), g(X, 3, 24, 4)],
 ];
+/** A skirmish is five waves; its last wave brings a Brute pack instead of the boss. */
+const SKIRMISH: SpawnGroup[][] = [WAVES[0], WAVES[1], WAVES[2], WAVES[3],
+  [g(G, 18, 0, 0.7), g(S, 12, 4, 0.4), g(M, 10, 8, 0.6), g(B, 3, 12, 5), g(O, 6, 6, 1.5)]];
+
+/** Endless: loop the mission waves, each loop tougher, a boss every tenth wave. */
+function endlessWave(n: number): { groups: SpawnGroup[]; hp: number; count: number } {
+  const loop = Math.floor((n - 1) / WAVES.length);
+  return { groups: WAVES[(n - 1) % WAVES.length], hp: 1 + loop * 0.45, count: 1 + loop * 0.3 };
+}
 
 export interface CoreState { hp: number; shield: number; alive: boolean }
-export interface PadState { kind: number; hp: number; cooldown: number }
+export interface PadState { kind: number; tier: number; hp: number; cooldown: number }
 
 /** What the director needs from the room it lives in. */
 export interface CoopHost {
+  /** Standing toys only (downed toys are ignored by invaders). */
   livePlayers(): { id: number; x: number; y: number; z: number }[];
-  damagePlayer(id: number, damage: number, enemyType: number): void;
+  damagePlayer(id: number, damage: number, enemyType: number, push?: [number, number]): void;
   shot(s: Shot): void;
   event(e: GameEvent): void;
+  /** An invader just unravelled (for drops). */
+  enemyDied?(e: Enemy, byPlayer: boolean): void;
 }
 
 interface Pending { at: number; type: number; spawn: number }
 
 export class CoopDirector {
   readonly nav: NavGrid;
+  readonly waves: number;
+  readonly difficulty: number;
   phase: number = Phase.Build;
   /** Wave number shown to players, 1-based; 0 before the first wave. */
   wave = 0;
   timer = FIRST_BUILD_SECONDS;
-  buttons = START_BUTTONS;
+  buttons = 0;
   cores: CoreState[] = [];
   pads: PadState[] = [];
   enemies: Enemy[] = [];
   readonly ready = new Set<number>();
+  /** Spring pads (built ones) for movement; kept in sync with pads. */
+  readonly springs: { x: number; z: number; r: number; launch: number }[] = [];
   private queue: Pending[] = [];
   private waveTime = 0;
   private nextEnemyId = 1;
   private time = 0;
+  private waveHp = 1;
+  private navDirty = false;
+  private killedByPlayer = new Set<number>();
 
-  constructor(readonly world: World) {
+  constructor(readonly world: World, options: CoopOptions = {}) {
+    this.waves = options.waves ?? 10;
+    this.difficulty = Math.max(0, Math.min(DIFFICULTIES.length - 1, options.difficulty ?? 1));
     this.nav = new NavGrid(world);
     this.reset();
   }
 
+  /** 0 means endless. */
   get totalWaves(): number {
-    return WAVES.length;
+    return this.waves;
+  }
+
+  get diff(): DifficultyDef {
+    return DIFFICULTIES[this.difficulty];
   }
 
   reset(): void {
     this.phase = Phase.Build;
     this.wave = 0;
     this.timer = FIRST_BUILD_SECONDS;
-    this.buttons = START_BUTTONS;
+    this.buttons = this.diff.startButtons;
     this.cores = this.world.coop.cores.map(() => ({ hp: CORE.hp, shield: CORE.shield, alive: true }));
-    this.pads = this.world.coop.pads.map(() => ({ kind: Buildable.None, hp: 0, cooldown: 0 }));
+    this.pads = this.world.coop.pads.map(() => ({ kind: Buildable.None, tier: 0, hp: 0, cooldown: 0 }));
     this.enemies = [];
     this.queue = [];
     this.ready.clear();
+    this.onPadsChanged();
   }
 
   // ------------------------------------------------------------ player actions
 
-  private nearestPad(x: number, z: number, filled: boolean): number {
+  private nearestPad(x: number, z: number): number {
     let best = -1;
     let bestD = BUILD_RANGE;
     this.world.coop.pads.forEach((p, i) => {
       const d = Math.hypot(p.pos[0] - x, p.pos[2] - z);
-      if (d < bestD && (this.pads[i].kind !== Buildable.None) === filled) { bestD = d; best = i; }
+      if (d < bestD) { bestD = d; best = i; }
     });
     return best;
   }
 
+  /** Builds `kind` on the nearest empty pad, or upgrades it if the pad already holds that kind. */
   build(x: number, z: number, kind: number, by: number): boolean {
     if (this.phase === Phase.Won || this.phase === Phase.Lost) return false;
     const def = BUILDABLES[kind];
-    if (!def || kind === Buildable.None || this.buttons < def.cost) return false;
-    const i = this.nearestPad(x, z, false);
+    if (!def || kind === Buildable.None) return false;
+    const i = this.nearestPad(x, z);
     if (i < 0) return false;
-    this.buttons -= def.cost;
-    this.pads[i] = { kind, hp: def.hp, cooldown: 0 };
-    this.emit({ type: 'built', pad: i, kind, by });
+    const pad = this.pads[i];
+    if (pad.kind === Buildable.None) {
+      if (this.buttons < def.cost) return false;
+      this.buttons -= def.cost;
+      this.pads[i] = { kind, tier: 1, hp: def.hp, cooldown: 0 };
+    } else if (pad.kind === kind && pad.tier < MAX_TIER) {
+      const cost = upgradeCost(kind, pad.tier);
+      if (this.buttons < cost) return false;
+      this.buttons -= cost;
+      const frac = pad.hp / (def.hp * tierHp(pad.tier));
+      pad.tier += 1;
+      pad.hp = def.hp * tierHp(pad.tier) * Math.max(frac, 0.5);
+    } else {
+      return false;
+    }
+    this.emit({ type: 'built', pad: i, kind, by, tier: this.pads[i].tier });
+    this.onPadsChanged();
     return true;
   }
 
   sell(x: number, z: number, by: number): boolean {
-    const i = this.nearestPad(x, z, true);
+    const i = this.nearestPad(x, z);
     if (i < 0) return false;
     const pad = this.pads[i];
+    if (pad.kind === Buildable.None) return false;
     const def = BUILDABLES[pad.kind];
-    this.buttons += Math.floor((def.cost * 0.5 * pad.hp) / def.hp);
-    this.pads[i] = { kind: Buildable.None, hp: 0, cooldown: 0 };
-    this.emit({ type: 'built', pad: i, kind: Buildable.None, by });
+    let spent = def.cost;
+    for (let t = 1; t < pad.tier; t++) spent += upgradeCost(pad.kind, t);
+    this.buttons += Math.floor((spent * 0.5 * pad.hp) / (def.hp * tierHp(pad.tier)));
+    this.pads[i] = { kind: Buildable.None, tier: 0, hp: 0, cooldown: 0 };
+    this.emit({ type: 'built', pad: i, kind: Buildable.None, by, tier: 0 });
+    this.onPadsChanged();
     return true;
   }
 
@@ -137,16 +237,47 @@ export class CoopDirector {
   }
 
   /** Applies weapon damage; returns the reward if this killed the enemy. */
-  damageEnemy(e: Enemy, damage: number, dir: Vec3, knockback: number): number {
+  damageEnemy(e: Enemy, damage: number, dir: Vec3, knockback: number, byPlayer = true): number {
     if (e.hp <= 0) return 0;
     e.hp -= damage;
     const def = ENEMIES[e.type];
-    const mass = def.radius * def.radius * 4;
+    const mass = def.radius * def.radius * 4 * (def.boss ? 6 : 1);
     e.kx += (dir[0] * knockback) / mass;
     e.kz += (dir[2] * knockback) / mass;
     if (e.hp > 0) return 0;
+    if (byPlayer) this.killedByPlayer.add(e.id);
     this.buttons += def.reward;
     return def.reward;
+  }
+
+  /** Yarn-ball tangle: half speed for a while. */
+  tangle(e: Enemy, seconds: number): void {
+    e.slow = Math.max(e.slow, ENEMIES[e.type].boss ? seconds * 0.4 : seconds);
+  }
+
+  /** The strongest invader alive that is a boss, for the boss health bar. */
+  boss(): Enemy | null {
+    return this.enemies.find((e) => e.hp > 0 && ENEMIES[e.type].boss) ?? null;
+  }
+
+  private onPadsChanged(): void {
+    this.springs.length = 0;
+    this.world.coop.pads.forEach((p, i) => {
+      const pad = this.pads[i];
+      if (pad?.kind === Buildable.Spring) this.springs.push({ x: p.pos[0], z: p.pos[2], r: SPRING.radius, launch: SPRING.launch + (pad.tier - 1) * 2.5 });
+    });
+    this.navDirty = true;
+  }
+
+  private rebakeNav(): void {
+    const blockers: { x: number; z: number; r: number }[] = [];
+    this.world.coop.pads.forEach((p, i) => {
+      const k = this.pads[i].kind;
+      if (k === Buildable.Wall || k === Buildable.Barricade) blockers.push({ x: p.pos[0], z: p.pos[2], r: 1.9 });
+    });
+    this.nav.rebake(blockers);
+    for (const e of this.enemies) e.node = -1;
+    this.navDirty = false;
   }
 
   // ------------------------------------------------------------ tick
@@ -160,6 +291,7 @@ export class CoopDirector {
   update(dt: number, host: CoopHost, playerCount: number): void {
     this.host = host;
     this.time += dt;
+    if (this.navDirty) this.rebakeNav();
     switch (this.phase) {
       case Phase.Build:
         this.timer -= dt;
@@ -181,9 +313,18 @@ export class CoopDirector {
         break;
     }
     this.stepEnemies(dt, host);
-    this.stepTurrets(dt, host);
+    this.stepBuildables(dt, host);
     // Remove the dead after everyone had a chance to hit them this tick.
-    this.enemies = this.enemies.filter((e) => e.hp > 0);
+    const before = this.enemies;
+    this.enemies = before.filter((e) => e.hp > 0);
+    if (this.enemies.length !== before.length) {
+      for (const e of before) {
+        if (e.hp > 0) continue;
+        host.enemyDied?.(e, this.killedByPlayer.has(e.id));
+        if (ENEMIES[e.type].boss) this.emit({ type: 'boss', state: 'down' });
+      }
+      this.killedByPlayer.clear();
+    }
   }
 
   private startWave(playerCount: number): void {
@@ -192,14 +333,26 @@ export class CoopDirector {
     this.waveTime = 0;
     this.ready.clear();
     const n = Math.max(1, playerCount);
-    const countScale = (0.6 + 0.4 * n) * 1.25;
+    let groups: SpawnGroup[];
+    let countScale = (0.6 + 0.4 * n) * 1.25 * this.diff.enemyCount;
+    this.waveHp = 1;
+    if (this.waves === 0) {
+      const w = endlessWave(this.wave);
+      groups = w.groups;
+      countScale *= w.count;
+      this.waveHp = w.hp;
+    } else {
+      groups = (this.waves <= 5 ? SKIRMISH : WAVES)[Math.min(this.wave, this.waves <= 5 ? SKIRMISH.length : WAVES.length) - 1];
+    }
     const spawns = this.world.coop.enemySpawns.length;
     this.queue = [];
     let rot = 0;
-    for (const g of WAVES[this.wave - 1]) {
-      const count = Math.max(1, Math.round(g.count * countScale));
+    for (const grp of groups) {
+      // Swarms scale gently with team size (a swarm is already a crowd).
+      const scale = grp.type === EnemyType.Teeth ? Math.sqrt(countScale) : countScale;
+      const count = ENEMIES[grp.type].boss ? grp.count : Math.max(1, Math.round(grp.count * scale));
       for (let i = 0; i < count; i++) {
-        this.queue.push({ at: g.delay + i * g.interval, type: g.type, spawn: g.spawn >= 0 ? g.spawn : rot++ % spawns });
+        this.queue.push({ at: grp.delay + i * grp.interval, type: grp.type, spawn: grp.spawn >= 0 ? grp.spawn % spawns : rot++ % spawns });
       }
     }
     this.queue.sort((a, b) => a.at - b.at);
@@ -207,8 +360,8 @@ export class CoopDirector {
   }
 
   private endWave(): void {
-    this.buttons += 75 + 20 * this.wave;
-    if (this.wave >= WAVES.length) {
+    this.buttons += 75 + 20 * Math.min(this.wave, 12);
+    if (this.waves > 0 && this.wave >= this.waves) {
       this.phase = Phase.Won;
       this.timer = END_SECONDS;
     } else {
@@ -218,25 +371,30 @@ export class CoopDirector {
     this.emit({ type: 'phase', phase: this.phase, wave: this.wave });
   }
 
+  private spawnEnemy(type: number, x: number, y: number, z: number, hpScale: number): Enemy {
+    const def = ENEMIES[type];
+    const alive = this.cores.map((c, i) => (c.alive ? i : -1)).filter((i) => i >= 0);
+    const hp = Math.round(def.hp * hpScale);
+    const e: Enemy = {
+      id: this.nextEnemyId, type, x, y, z, vx: 0, vz: 0, yaw: 0, hp, maxHp: hp,
+      core: alive[Math.floor(Math.random() * alive.length)] ?? 0,
+      node: -1, cooldown: 0, kx: 0, kz: 0, slow: 0,
+      special: type === EnemyType.Drone ? DRONE_DROP.every * 0.5 : type === EnemyType.Boss ? BOSS_STOMP.every : 0,
+    };
+    this.enemies.push(e);
+    this.nextEnemyId = (this.nextEnemyId % 65535) + 1;
+    if (def.boss) this.emit({ type: 'boss', state: 'arrive' });
+    return e;
+  }
+
   private spawnDue(playerCount: number): void {
-    const hpScale = 0.7 + 0.3 * Math.max(1, playerCount);
+    const hpScale = (0.7 + 0.3 * Math.max(1, playerCount)) * this.diff.enemyHp * this.waveHp;
     while (this.queue.length && this.queue[0].at <= this.waveTime && this.enemies.length < MAX_ALIVE) {
       const q = this.queue.shift()!;
       const def = ENEMIES[q.type];
       const sp = this.world.coop.enemySpawns[q.spawn];
-      const alive = this.cores.map((c, i) => (c.alive ? i : -1)).filter((i) => i >= 0);
       const jitter = () => (Math.random() - 0.5) * 1.5;
-      const hp = Math.round(def.hp * hpScale);
-      this.enemies.push({
-        id: this.nextEnemyId,
-        type: q.type,
-        x: sp[0] + jitter(), y: def.flying ? 1 : 0, z: sp[2] + jitter(),
-        vx: 0, vz: 0, yaw: 0,
-        hp, maxHp: hp,
-        core: alive[Math.floor(Math.random() * alive.length)] ?? 0,
-        node: -1, cooldown: 0, kx: 0, kz: 0,
-      });
-      this.nextEnemyId = (this.nextEnemyId % 65535) + 1;
+      this.spawnEnemy(q.type, sp[0] + jitter(), def.flying ? 1 : 0, sp[2] + jitter(), hpScale);
     }
   }
 
@@ -261,10 +419,12 @@ export class CoopDirector {
 
   private damagePad(i: number, dmg: number): void {
     const p = this.pads[i];
+    if (p.kind === Buildable.None) return;
     p.hp -= dmg;
     if (p.hp <= 0) {
-      this.pads[i] = { kind: Buildable.None, hp: 0, cooldown: 0 };
-      this.emit({ type: 'built', pad: i, kind: Buildable.None, by: 0 });
+      this.pads[i] = { kind: Buildable.None, tier: 0, hp: 0, cooldown: 0 };
+      this.emit({ type: 'built', pad: i, kind: Buildable.None, by: 0, tier: 0 });
+      this.onPadsChanged();
     }
   }
 
@@ -275,17 +435,20 @@ export class CoopDirector {
     const boxes = this.world.boxes;
     const aliveCores = this.cores.map((c, i) => (c.alive ? i : -1)).filter((i) => i >= 0);
     if (aliveCores.length === 0) return;
+    const spawned: Enemy[] = [];
 
     for (const e of this.enemies) {
       if (e.hp <= 0) continue;
       const def = ENEMIES[e.type];
       if (!this.cores[e.core].alive) { e.core = aliveCores[e.id % aliveCores.length]; e.node = -1; }
       e.cooldown = Math.max(0, e.cooldown - dt);
+      e.slow = Math.max(0, e.slow - dt);
+      e.special -= dt;
 
-      let slow = 1;
+      let slow = e.slow > 0 ? 0.5 : 1;
       if (!def.flying) {
         pads.forEach((p, i) => {
-          if (this.pads[i].kind === Buildable.Mat && Math.hypot(p.pos[0] - e.x, p.pos[2] - e.z) < MAT_RADIUS) slow = MAT_SLOW;
+          if (this.pads[i].kind === Buildable.Mat && Math.hypot(p.pos[0] - e.x, p.pos[2] - e.z) < MAT_RADIUS) slow = Math.min(slow, MAT_SLOW / tierPower(this.pads[i].tier));
         });
       }
 
@@ -293,6 +456,7 @@ export class CoopDirector {
       let tx = cores[e.core][0];
       let tz = cores[e.core][2];
       let attack: (() => void) | null = null;
+      let hold = false;
       const aggro = def.flying ? 4.5 : 3.5;
       let nearestPlayer: { id: number; x: number; y: number; z: number } | null = null;
       let nearestD = aggro;
@@ -302,16 +466,70 @@ export class CoopDirector {
       }
       const dCore = Math.hypot(tx - e.x, tz - e.z);
       const reach = def.radius + CORE.radius + 0.5;
-      if (nearestPlayer && nearestD < dCore) {
+      const knock = (px: number, pz: number): [number, number] | undefined => {
+        if (!def.knockback) return undefined;
+        const l = Math.hypot(px - e.x, pz - e.z) || 1;
+        return [((px - e.x) / l) * def.knockback, ((pz - e.z) / l) * def.knockback];
+      };
+
+      // Scissor snips hunt buildables first.
+      let snipPad = -1;
+      if (def.cutsBuildables) {
+        let best = 30;
+        pads.forEach((p, i) => {
+          if (this.pads[i].kind === Buildable.None) return;
+          const d = Math.hypot(p.pos[0] - e.x, p.pos[2] - e.z);
+          if (d < best) { best = d; snipPad = i; }
+        });
+      }
+
+      if (def.range) {
+        // Tin soldiers: stop in range of a toy (or the Heartspool) they can see, and shoot.
+        const eye: Vec3 = [e.x, e.y + def.height * 0.8, e.z];
+        let target: { id: number; x: number; y: number; z: number } | null = null;
+        let best = def.range;
+        for (const p of players) {
+          const d = Math.hypot(p.x - e.x, p.z - e.z);
+          if (d < best && hasLineOfSight(eye, [p.x, p.y + 1, p.z], boxes)) { best = d; target = p; }
+        }
+        if (target) {
+          const tgt = target;
+          hold = true;
+          tx = tgt.x; tz = tgt.z;
+          attack = () => {
+            const hit = Math.random() < SOLDIER_ACCURACY;
+            const miss = hit ? 0 : 0.8;
+            const to: Vec3 = [tgt.x + (Math.random() - 0.5) * miss * 2, tgt.y + 0.9 + (Math.random() - 0.5) * miss, tgt.z + (Math.random() - 0.5) * miss * 2];
+            host.shot({ id: ENEMY_SHOT_ID, hit: hit ? tgt.id : 0, head: false, enemy: false, kind: ShotKind.Enemy, from: eye, to });
+            if (hit) host.damagePlayer(tgt.id, def.damage, e.type);
+          };
+        } else if (dCore < def.range && hasLineOfSight(eye, [tx, 1, tz], boxes)) {
+          hold = true;
+          const ci = e.core;
+          attack = () => {
+            host.shot({ id: ENEMY_SHOT_ID, hit: 0, head: false, enemy: false, kind: ShotKind.Enemy, from: eye, to: [tx, 1, tz] });
+            this.damageCore(ci, def.damage);
+          };
+        }
+      }
+
+      if (!attack && snipPad >= 0) {
+        const p = pads[snipPad].pos;
+        tx = p[0]; tz = p[2];
+        if (Math.hypot(p[0] - e.x, p[2] - e.z) < def.radius + 1.4) {
+          const pi = snipPad;
+          attack = () => this.damagePad(pi, SNIP_CUT);
+        }
+      } else if (!attack && nearestPlayer && nearestD < dCore) {
         tx = nearestPlayer.x; tz = nearestPlayer.z;
         if (nearestD < def.radius + 0.9) {
-          const id = nearestPlayer.id;
-          attack = () => host.damagePlayer(id, def.damage, e.type);
+          const np = nearestPlayer;
+          attack = () => host.damagePlayer(np.id, def.damage, e.type, knock(np.x, np.z));
         }
-      } else if (dCore < reach) {
+      } else if (!attack && dCore < reach) {
         const ci = e.core;
         attack = () => this.damageCore(ci, def.damage);
-      } else if (!def.flying) {
+      } else if (!attack && !def.flying && snipPad < 0) {
         if (e.node < 0) e.node = this.nav.nearest(e.x, e.z, boxes);
         if (e.node >= 0) {
           const n = this.nav.nodes[e.node];
@@ -324,12 +542,38 @@ export class CoopDirector {
         }
       }
 
+      // Specials: drones drop teeth, the boss stomps.
+      if (e.type === EnemyType.Drone && e.special <= 0) {
+        e.special = DRONE_DROP.every;
+        for (let k = 0; k < DRONE_DROP.count && this.enemies.length + spawned.length < MAX_ALIVE; k++) {
+          const t = this.spawnEnemyDeferred(EnemyType.Teeth, e.x + (Math.random() - 0.5), 0, e.z + (Math.random() - 0.5), e.maxHp / def.hp);
+          spawned.push(t);
+        }
+      }
+      if (def.boss && e.special <= 0) {
+        e.special = BOSS_STOMP.every;
+        this.emit({ type: 'stomp', x: e.x, z: e.z });
+        for (const p of players) {
+          const d = Math.hypot(p.x - e.x, p.z - e.z);
+          if (d < BOSS_STOMP.radius) host.damagePlayer(p.id, BOSS_STOMP.damage * (1 - d / BOSS_STOMP.radius * 0.5), e.type, knock(p.x, p.z));
+        }
+        pads.forEach((p, i) => {
+          if (Math.hypot(p.pos[0] - e.x, p.pos[2] - e.z) < BOSS_STOMP.radius) this.damagePad(i, BOSS_STOMP.damage * 2);
+        });
+      }
+
       // Steering.
       const dx = tx - e.x, dz = tz - e.z;
       const dl = Math.hypot(dx, dz);
-      const speed = attack ? 0 : def.speed * slow;
-      const wx = dl > 1e-3 ? (dx / dl) * speed : 0;
-      const wz = dl > 1e-3 ? (dz / dl) * speed : 0;
+      const speed = attack || hold ? 0 : def.speed * slow;
+      let wx = dl > 1e-3 ? (dx / dl) * speed : 0;
+      let wz = dl > 1e-3 ? (dz / dl) * speed : 0;
+      if (e.type === EnemyType.Top && dl > 1e-3) {
+        // Spinning tops wobble across their path.
+        const wob = Math.sin(this.time * 3.5 + e.id) * speed * 0.7;
+        wx += (-dz / dl) * wob;
+        wz += (dx / dl) * wob;
+      }
       const k = Math.min(1, dt * 8);
       e.vx += (wx - e.vx) * k;
       e.vz += (wz - e.vz) * k;
@@ -341,16 +585,19 @@ export class CoopDirector {
       if (dl > 1e-3) e.yaw = Math.atan2(-dx, -dz);
 
       if (def.flying) {
-        const alt = attack ? 1.2 : MOTH_ALTITUDE + Math.sin(this.time * 3 + e.id) * 0.4;
+        const cruise = def.altitude ?? 3.2;
+        const alt = attack ? Math.min(cruise, 1.2 + (e.type === EnemyType.Drone ? 2 : 0)) : cruise + Math.sin(this.time * 3 + e.id) * 0.4;
         e.y += (alt - e.y) * Math.min(1, dt * 2);
       } else {
         pushOutOfBoxes(e, def.radius, boxes);
-        // Buildables: walls block, brutes smash whatever they touch.
+        // Buildables: walls and barricades block; brutes and the boss smash whatever they touch.
         pads.forEach((p, i) => {
           const pad = this.pads[i];
           if (pad.kind === Buildable.None) return;
           const d = Math.hypot(p.pos[0] - e.x, p.pos[2] - e.z);
-          const blockR = pad.kind === Buildable.Wall ? WALL_RADIUS + def.radius : pad.kind === Buildable.Turret ? 0.6 + def.radius : 0;
+          const blockR = pad.kind === Buildable.Wall ? WALL_RADIUS + def.radius
+            : pad.kind === Buildable.Barricade ? BARRICADE_RADIUS + def.radius
+            : pad.kind === Buildable.Turret || pad.kind === Buildable.Zapper ? 0.6 + def.radius : 0;
           if (blockR > 0 && d < blockR && d > 1e-6) {
             e.x = p.pos[0] + ((e.x - p.pos[0]) / d) * blockR;
             e.z = p.pos[2] + ((e.z - p.pos[2]) / d) * blockR;
@@ -366,6 +613,7 @@ export class CoopDirector {
         e.cooldown = 1 / def.attackRate;
       }
     }
+    this.enemies.push(...spawned);
 
     // Separation so crowds spread into a flowing line instead of one blob.
     const list = this.enemies;
@@ -387,28 +635,72 @@ export class CoopDirector {
     }
   }
 
-  private stepTurrets(dt: number, host: CoopHost): void {
+  /** Like spawnEnemy, but returns the enemy for the caller to add (safe while iterating). */
+  private spawnEnemyDeferred(type: number, x: number, y: number, z: number, hpScale: number): Enemy {
+    const e = this.spawnEnemy(type, x, y, z, hpScale);
+    this.enemies.pop();
+    return e;
+  }
+
+  private stepBuildables(dt: number, host: CoopHost): void {
     const pads = this.world.coop.pads;
     pads.forEach((p, i) => {
       const pad = this.pads[i];
-      if (pad.kind !== Buildable.Turret) return;
+      if (pad.kind === Buildable.None) return;
       pad.cooldown = Math.max(0, pad.cooldown - dt);
       if (pad.cooldown > 0) return;
-      const from: Vec3 = [p.pos[0], TURRET.height, p.pos[2]];
-      let target: Enemy | null = null;
-      let best = TURRET.range;
-      for (const e of this.enemies) {
-        if (e.hp <= 0) continue;
-        const aim: Vec3 = [e.x, e.y + ENEMIES[e.type].height * 0.5, e.z];
-        const d = Math.hypot(aim[0] - from[0], aim[1] - from[1], aim[2] - from[2]);
-        if (d < best && hasLineOfSight(from, aim, this.world.boxes)) { best = d; target = e; }
+      const power = tierPower(pad.tier);
+      if (pad.kind === Buildable.Turret) {
+        const from: Vec3 = [p.pos[0], TURRET.height, p.pos[2]];
+        let target: Enemy | null = null;
+        let best = TURRET.range + (pad.tier - 1);
+        for (const e of this.enemies) {
+          if (e.hp <= 0) continue;
+          const aim: Vec3 = [e.x, e.y + ENEMIES[e.type].height * 0.5, e.z];
+          const d = Math.hypot(aim[0] - from[0], aim[1] - from[1], aim[2] - from[2]);
+          if (d < best && hasLineOfSight(from, aim, this.world.boxes)) { best = d; target = e; }
+        }
+        if (!target) return;
+        pad.cooldown = 1 / (TURRET.fireRate * power);
+        const to: Vec3 = [target.x, target.y + ENEMIES[target.type].height * 0.5, target.z];
+        const dir: Vec3 = [(to[0] - from[0]) / best, (to[1] - from[1]) / best, (to[2] - from[2]) / best];
+        this.damageEnemy(target, TURRET.damage * power, dir, 0.3, false);
+        host.shot({ id: TURRET_SHOT_BASE + i, hit: 0, head: false, enemy: true, kind: ShotKind.Hitscan, to });
+      } else if (pad.kind === Buildable.Zapper) {
+        // Chain: pad -> nearest -> nearest to that ... up to 4 invaders in range.
+        let from: Vec3 = [p.pos[0], ZAPPER.height, p.pos[2]];
+        const hit = new Set<Enemy>();
+        for (let n = 0; n < ZAPPER.targets + pad.tier - 1; n++) {
+          let best: Enemy | null = null;
+          let bestD = n === 0 ? ZAPPER.range : ZAPPER.range * 0.7;
+          for (const e of this.enemies) {
+            if (e.hp <= 0 || hit.has(e)) continue;
+            const d = Math.hypot(e.x - from[0], e.y + 0.4 - from[1], e.z - from[2]);
+            if (d < bestD) { bestD = d; best = e; }
+          }
+          if (!best) break;
+          hit.add(best);
+          const to: Vec3 = [best.x, best.y + ENEMIES[best.type].height * 0.5, best.z];
+          host.shot({ id: TURRET_SHOT_BASE + i, hit: 0, head: false, enemy: true, kind: ShotKind.Zap, from, to });
+          this.damageEnemy(best, ZAPPER.damage * power, [0, 0, 0], 0, false);
+          best.slow = Math.max(best.slow, 0.4);
+          from = to;
+        }
+        if (hit.size > 0) pad.cooldown = ZAPPER.every / power;
+      } else if (pad.kind === Buildable.Mousetrap) {
+        for (const e of this.enemies) {
+          const def = ENEMIES[e.type];
+          if (e.hp <= 0 || def.flying || Math.hypot(e.x - p.pos[0], e.z - p.pos[2]) > MOUSETRAP.radius + def.radius) continue;
+          const dmg = MOUSETRAP.damage * power * (def.boss || e.type === EnemyType.Brute ? 0.4 : 1);
+          this.damageEnemy(e, dmg, [0, 1, 0], 0, false);
+          this.emit({ type: 'snap', pad: i });
+          pad.cooldown = MOUSETRAP.rearm;
+          break;
+        }
       }
-      if (!target) return;
-      pad.cooldown = 1 / TURRET.fireRate;
-      const to: Vec3 = [target.x, target.y + ENEMIES[target.type].height * 0.5, target.z];
-      const dir: Vec3 = [(to[0] - from[0]) / best, (to[1] - from[1]) / best, (to[2] - from[2]) / best];
-      this.damageEnemy(target, TURRET.damage, dir, 0.3);
-      host.shot({ id: TURRET_SHOT_BASE + i, hit: 0, head: false, enemy: true, to });
     });
   }
 }
+
+/** Shot kinds (see protocol Shot.kind). */
+export const ShotKind = { Hitscan: 0, Blast: 1, Zap: 2, Enemy: 3 } as const;

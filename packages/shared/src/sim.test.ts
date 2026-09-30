@@ -8,8 +8,8 @@ import { createBedroom } from './world.ts';
 
 const world = createBedroom();
 
-function cmd(seq: number, buttons: number, yaw = 0, pitch = 0, renderTick = 0): InputCmd {
-  return { seq, buttons, yaw: Math.fround(yaw), pitch: Math.fround(pitch), renderTick };
+function cmd(seq: number, buttons: number, yaw = 0, pitch = 0, renderTick = 0, weapon = 0, action = 0): InputCmd {
+  return { seq, buttons, yaw: Math.fround(yaw), pitch: Math.fround(pitch), renderTick, weapon, action };
 }
 
 describe('movement', () => {
@@ -87,7 +87,7 @@ describe('movement', () => {
     expect(shots).toBeGreaterThanOrEqual(POPPER.fireRate - 1);
     expect(shots).toBeLessThanOrEqual(POPPER.fireRate + 1);
     for (let i = 61; i <= 400; i++) stepPlayer(s, cmd(i, Buttons.Fire), world);
-    expect(s.ammo).toBeLessThanOrEqual(POPPER.magazine);
+    expect(s.mags[0]).toBeLessThanOrEqual(POPPER.magazine);
   });
 });
 
@@ -113,8 +113,14 @@ describe('protocol', () => {
     self.vx = 0.123456789;
     const snap = {
       tick: 999, ack: 42, respawn: 0, self,
-      players: [{ id: 3, x: 1.2345, y: 2.5, z: -3.75, yaw: 1, pitch: -0.3, health: 73, alive: true, crouch: false, weapon: 1, kos: 4, deaths: 2 }],
-      shots: [{ id: 3, hit: 5, head: true, enemy: false, to: [4, 1.3, -2] as [number, number, number] }],
+      players: [{ id: 3, x: 1.2345, y: 2.5, z: -3.75, yaw: 1, pitch: -0.3, health: 73, armor: 40, alive: true, crouch: false, downed: true, powered: true, revive: 0.5, weapon: 1, kos: 4, deaths: 2 }],
+      shots: [
+        { id: 3, hit: 5, head: true, enemy: false, kind: 0, to: [4, 1.3, -2] as [number, number, number] },
+        { id: 255, hit: 3, head: false, enemy: false, kind: 3, from: [1, 1, 1] as [number, number, number], to: [2, 1, 2] as [number, number, number] },
+      ],
+      projectiles: [{ owner: 3, x: 1, y: 2, z: 3 }],
+      pickups: 0b1011,
+      drops: [{ kind: 0, x: 5, y: 0, z: -5 }],
       coop: null,
     };
     const out = decodeSnapshot(encodeSnapshot(snap))!;
@@ -130,6 +136,15 @@ describe('protocol', () => {
     expect(out.shots[0].hit).toBe(5);
     expect(out.shots[0].head).toBe(true);
     expect(out.shots[0].to[1]).toBeCloseTo(1.3, 2);
+    expect(out.shots[1].kind).toBe(3);
+    expect(out.shots[1].from![0]).toBeCloseTo(1, 2);
+    expect(p.armor).toBe(40);
+    expect(p.downed).toBe(true);
+    expect(p.powered).toBe(true);
+    expect(p.revive).toBeCloseTo(0.5, 2);
+    expect(out.projectiles[0].z).toBeCloseTo(3, 2);
+    expect(out.pickups).toBe(0b1011);
+    expect(out.drops[0].x).toBeCloseTo(5, 2);
   });
 });
 

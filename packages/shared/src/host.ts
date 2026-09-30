@@ -1,6 +1,6 @@
 import { Bot } from './bots.ts';
 import { isSnapshotTick, MAX_PLAYERS, TICK_RATE } from './constants.ts';
-import { decodeInputs, encodeSnapshot, type ClientText, type GameMode, type ServerText } from './protocol.ts';
+import { decodeInputs, encodeSnapshot, sanitizeLook, type ClientText, type GameMode, type ServerText } from './protocol.ts';
 import { Room } from './room.ts';
 import { createWorld, type MapId } from './world.ts';
 
@@ -17,6 +17,12 @@ export interface HostOptions {
   fillTo: number;
   mode?: GameMode;
   map?: MapId;
+  /** Co-op: waves to win (5 skirmish, 10 mission), 0 = endless. */
+  waves?: number;
+  /** Co-op difficulty 0..3 (Cosy, Scratchy, Moth-eaten, Unravelled). */
+  difficulty?: number;
+  /** Co-op practice: start at this wave (solo only). */
+  startWave?: number;
 }
 
 /**
@@ -34,7 +40,11 @@ export class RoomHost {
   private snapshots = 0;
 
   constructor(readonly options: HostOptions) {
-    this.room = new Room(createWorld(options.map ?? 'bedroom'), options.mode ?? 'coop');
+    this.room = new Room(createWorld(options.map ?? 'bedroom'), options.mode ?? 'coop', { waves: options.waves, difficulty: options.difficulty });
+    if (this.room.coop && options.startWave && options.startWave > 1) {
+      this.room.coop.wave = options.startWave - 1;
+      this.room.coop.buttons += 150 * (options.startWave - 1);
+    }
     this.balanceBots();
   }
 
@@ -57,11 +67,14 @@ export class RoomHost {
               return;
             }
             this.removeOneBot();
-            const p = this.room.addPlayer(String(msg.name ?? ''));
+            const p = this.room.addPlayer(String(msg.name ?? ''), false, sanitizeLook(msg.look));
             if (!p) { this.sendText(conn, { t: 'full' }); conn.close(); return; }
             id = p.id;
             this.conns.set(id, conn);
-            this.sendText(conn, { t: 'welcome', id, tick: this.room.tick, room: this.options.code, mode: this.room.mode, map: this.room.world.id });
+            this.sendText(conn, {
+              t: 'welcome', id, tick: this.room.tick, room: this.options.code, mode: this.room.mode, map: this.room.world.id,
+              waves: this.room.coop?.totalWaves ?? 0, difficulty: this.room.coop?.difficulty ?? 1,
+            });
             this.broadcastRoster();
           } else if (msg.t === 'ping') {
             this.sendText(conn, { t: 'pong', c: msg.c, tick: this.room.tick });
@@ -106,13 +119,11 @@ export class RoomHost {
   }
 
   private broadcastState(): void {
-    const players = this.room.netPlayers();
-    const shots = this.room.drainShots();
     // Enemy positions go out at half the snapshot rate (10 Hz); clients interpolate them further in the past.
     this.snapshots += 1;
-    const coop = this.room.coopState(this.snapshots % 2 === 0);
+    const shared = this.room.sharedSnapshot(this.snapshots % 2 === 0);
     for (const [id, conn] of this.conns) {
-      conn.send(encodeSnapshot(this.room.snapshotFor(id, players, shots, coop)));
+      conn.send(encodeSnapshot(this.room.snapshotFor(id, shared)));
     }
     const list = this.room.drainEvents();
     if (list.length > 0) this.broadcastText({ t: 'events', tick: this.room.tick, list });

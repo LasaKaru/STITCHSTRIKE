@@ -1,5 +1,5 @@
 import { INPUT_DT, JUMP_VELOCITY, PLAYER } from './constants.ts';
-import { SWITCH_SECONDS, WEAPONS } from './weapons.ts';
+import { SWITCH_SECONDS, WEAPON_COUNT, WEAPONS } from './weapons.ts';
 import type { Box, Vec3, World } from './world.ts';
 
 export const Buttons = {
@@ -12,16 +12,21 @@ export const Buttons = {
   Crouch: 1 << 6,
   Fire: 1 << 7,
   Reload: 1 << 8,
-  Weapon1: 1 << 9,
-  Weapon2: 1 << 10,
-  /** Co-op: build card 1/2/3 on the nearest empty build pad. */
-  Build1: 1 << 11,
-  Build2: 1 << 12,
-  Build3: 1 << 13,
-  /** Co-op: recycle the buildable on the nearest pad for half its cost. */
-  Sell: 1 << 14,
+  /** Hold to interact: re-stitch (revive) a downed teammate. */
+  Use: 1 << 9,
+} as const;
+
+/**
+ * One-shot actions ride in their own byte of an input command (each command
+ * reaches the server exactly once, so an action is applied exactly once).
+ * 1..15 build (or upgrade) that buildable kind on the nearest pad.
+ */
+export const Action = {
+  None: 0,
+  /** Co-op: recycle the buildable on the nearest pad for half its value. */
+  Sell: 20,
   /** Co-op: vote to skip the rest of the build phase. */
-  Ready: 1 << 15,
+  Ready: 21,
 } as const;
 
 export interface InputCmd {
@@ -32,6 +37,10 @@ export interface InputCmd {
   pitch: number;
   /** Server tick (fractional) the client was rendering remote players at; used for lag compensation. */
   renderTick: number;
+  /** Weapon slot the player wants equipped. */
+  weapon: number;
+  /** One-shot Action (0 = none). */
+  action: number;
 }
 
 /** Everything the shared step function reads or writes. Client prediction replays this exactly. */
@@ -51,11 +60,11 @@ export interface PlayerState {
   cooldown: number;
   /** Equipped weapon index into WEAPONS. */
   weapon: number;
-  /** Magazine of the Pom-Pom Popper. */
-  ammo: number;
-  /** Magazine of the Button Buster. */
-  ammoB: number;
+  /** Rounds left in each weapon's magazine (index = weapon). */
+  mags: number[];
   reload: number;
+  /** Co-op: knocked down, waiting for a teammate to re-stitch you (crawl only). */
+  downed: boolean;
 }
 
 export function createPlayerState(spawn: Vec3, yaw = 0): PlayerState {
@@ -68,14 +77,14 @@ export function createPlayerState(spawn: Vec3, yaw = 0): PlayerState {
     buttons: 0,
     cooldown: 0,
     weapon: 0,
-    ammo: WEAPONS[0].magazine,
-    ammoB: WEAPONS[1].magazine,
+    mags: WEAPONS.map((w) => w.magazine),
     reload: 0,
+    downed: false,
   };
 }
 
 export function clonePlayerState(s: PlayerState): PlayerState {
-  return { ...s };
+  return { ...s, mags: s.mags.slice() };
 }
 
 export const MAX_PITCH = Math.PI / 2 - 0.01;
@@ -170,13 +179,13 @@ export function stepPlayer(s: PlayerState, cmd: InputCmd, world: World): StepRes
   if (len > 0) { wx /= len; wz /= len; }
 
   const crouch = (b & Buttons.Crouch) !== 0;
-  const speed = crouch ? PLAYER.crouchSpeed : (b & Buttons.Sprint) ? PLAYER.sprintSpeed : PLAYER.runSpeed;
+  const speed = s.downed ? PLAYER.crawlSpeed : crouch ? PLAYER.crouchSpeed : (b & Buttons.Sprint) ? PLAYER.sprintSpeed : PLAYER.runSpeed;
   const response = s.onGround ? PLAYER.groundResponse : PLAYER.airResponse;
   const k = 1 - Math.exp(-response * dt);
   s.vx += (wx * speed - s.vx) * k;
   s.vz += (wz * speed - s.vz) * k;
 
-  if (pressed & Buttons.Jump) {
+  if ((pressed & Buttons.Jump) && !s.downed) {
     if (s.onGround) {
       s.vy = JUMP_VELOCITY;
       s.onGround = false;
@@ -207,29 +216,46 @@ export function stepPlayer(s: PlayerState, cmd: InputCmd, world: World): StepRes
     if (s.onGround) s.airJumps = 1;
   }
 
+  // Jump pads and built spring pads fire when you land on them.
+  if (s.onGround && !s.downed) {
+    let launch = 0;
+    for (const j of world.jumpPads) {
+      if (Math.abs(s.y - j.y) < 0.3 && Math.hypot(s.x - j.x, s.z - j.z) < j.r) launch = j.launch;
+    }
+    if (world.springs) {
+      for (const j of world.springs) {
+        if (s.y < 0.3 && Math.hypot(s.x - j.x, s.z - j.z) < j.r) launch = j.launch;
+      }
+    }
+    if (launch > 0) {
+      s.vy = launch;
+      s.onGround = false;
+      s.airJumps = 1;
+    }
+  }
+
   // Keep inside the world even if a box has a gap.
   if (s.y < -3) {
     s.y = 0; s.vy = 0;
   }
 
   const weapon = s.weapon;
-  const fired = stepWeapon(s, b, pressed, dt);
+  const fired = s.downed ? false : stepWeapon(s, b, pressed, cmd.weapon, dt);
   s.buttons = b;
   return { fired, weapon };
 }
 
 function magazine(s: PlayerState): number {
-  return s.weapon === 0 ? s.ammo : s.ammoB;
+  return s.mags[s.weapon] ?? 0;
 }
 
 function setMagazine(s: PlayerState, v: number): void {
-  if (s.weapon === 0) s.ammo = v;
-  else s.ammoB = v;
+  s.mags[s.weapon] = v;
 }
 
-function stepWeapon(s: PlayerState, b: number, pressed: number, dt: number): boolean {
+function stepWeapon(s: PlayerState, b: number, pressed: number, wanted: number, dt: number): boolean {
   s.cooldown = Math.max(0, s.cooldown - dt);
-  const want = pressed & Buttons.Weapon1 ? 0 : pressed & Buttons.Weapon2 ? 1 : s.weapon;
+  const want = Number.isInteger(wanted) && wanted >= 0 && wanted < WEAPON_COUNT ? wanted : s.weapon;
   if (want !== s.weapon) {
     s.weapon = want;
     s.reload = 0;
@@ -259,7 +285,8 @@ function stepWeapon(s: PlayerState, b: number, pressed: number, dt: number): boo
 }
 
 export function eyePosition(s: PlayerState, crouching: boolean): Vec3 {
-  return [s.x, s.y + (crouching ? PLAYER.eyeHeight * 0.7 : PLAYER.eyeHeight), s.z];
+  const h = s.downed ? PLAYER.eyeHeight * 0.3 : crouching ? PLAYER.eyeHeight * 0.7 : PLAYER.eyeHeight;
+  return [s.x, s.y + h, s.z];
 }
 
 export function lookDirection(yaw: number, pitch: number): Vec3 {

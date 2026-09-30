@@ -34,8 +34,8 @@ function runClient(i: number): Promise<Stats> {
       const batch: InputCmd[] = [];
       timer = setInterval(() => {
         yaw += (Math.random() - 0.5) * 0.2;
-        const buttons = Buttons.Forward | Buttons.Fire | (Math.random() < 0.02 ? Buttons.Jump : 0) | (seq % 60 < 30 ? Buttons.Ready : 0);
-        batch.push({ seq: ++seq, buttons, yaw: Math.fround(yaw), pitch: 0, renderTick: 0 });
+        const buttons = Buttons.Forward | Buttons.Fire | (Math.random() < 0.02 ? Buttons.Jump : 0);
+        batch.push({ seq: ++seq, buttons, yaw: Math.fround(yaw), pitch: 0, renderTick: 0, weapon: seq % 300 < 150 ? 0 : 3, action: seq % 120 === 0 ? 21 : 0 });
         if (batch.length >= INPUTS_PER_PACKET) ws.send(encodeInputs(batch.splice(0)));
       }, 1000 / INPUT_RATE);
     });

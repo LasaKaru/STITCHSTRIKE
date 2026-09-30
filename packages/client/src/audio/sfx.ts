@@ -4,7 +4,8 @@
  * first user gesture (browser autoplay rule).
  */
 
-type Sound = 'popper' | 'buster' | 'hit' | 'kill' | 'build' | 'sell' | 'hurt' | 'wave' | 'alarm' | 'win' | 'lose' | 'switch' | 'turret';
+export type Sound = 'popper' | 'buster' | 'hit' | 'kill' | 'build' | 'sell' | 'hurt' | 'wave' | 'alarm' | 'win' | 'lose' | 'switch' | 'turret'
+  | 'lance' | 'hook' | 'launch' | 'blast' | 'zap' | 'snap' | 'pickup' | 'downed' | 'revived' | 'stomp' | 'boss' | 'enemyShot' | 'upgrade' | 'spring' | 'collect';
 
 export class Sfx {
   private ctx: AudioContext | null = null;
@@ -83,6 +84,21 @@ export class Sfx {
       case 'alarm': this.tone(880, 0.15, 'square', 0.08 * v, 0.7); this.tone(660, 0.2, 'square', 0.08 * v, 0.7, 0.18); break;
       case 'win': [0, 0.15, 0.3, 0.5].forEach((d, i) => this.tone(262 * [1, 1.26, 1.5, 2][i], 0.4, 'triangle', 0.2 * v, 1, d)); break;
       case 'lose': [0, 0.25, 0.5].forEach((d, i) => this.tone(330 * [1, 0.84, 0.66][i], 0.5, 'triangle', 0.2 * v, 0.9, d)); break;
+      case 'lance': this.tone(1400, 0.25, 'sine', 0.2 * v, 0.2); this.hiss(0.2, 0.3 * v, 5000, 1.5); this.tone(120, 0.15, 'sine', 0.35 * v, 0.5); break;
+      case 'hook': this.tone(300, 0.05, 'square', 0.08 * v, 0.6); this.hiss(0.04, 0.18 * v, 2600, 1); break;
+      case 'launch': this.tone(140, 0.2, 'sine', 0.4 * v, 0.6); this.hiss(0.15, 0.2 * v, 700, 0.8); break;
+      case 'blast': this.tone(70, 0.45, 'sine', 0.6 * v, 0.4); this.hiss(0.4, 0.5 * v, 500, 0.5); this.hiss(0.2, 0.2 * v, 3000, 0.7, 0.05); break;
+      case 'zap': this.tone(900, 0.08, 'sawtooth', 0.06 * v, 2.5); this.hiss(0.08, 0.2 * v, 6000, 4); break;
+      case 'snap': this.tone(1800, 0.03, 'square', 0.15 * v, 0.5); this.tone(90, 0.15, 'sine', 0.4 * v, 0.5); this.hiss(0.08, 0.3 * v, 2000, 1); break;
+      case 'pickup': [0, 0.07, 0.14].forEach((d, i) => this.tone(660 * [1, 1.26, 1.5][i], 0.12, 'triangle', 0.2 * v, 1, d)); break;
+      case 'collect': [0, 0.08, 0.16, 0.26].forEach((d, i) => this.tone(880 * [1, 1.26, 1.5, 2][i], 0.2, 'sine', 0.22 * v, 1, d)); break;
+      case 'downed': [0, 0.2].forEach((d, i) => this.tone(220 * [1, 0.75][i], 0.35, 'triangle', 0.3 * v, 0.8, d)); break;
+      case 'revived': [0, 0.12, 0.24].forEach((d, i) => this.tone(392 * [1, 1.26, 1.5][i], 0.25, 'triangle', 0.25 * v, 1, d)); break;
+      case 'stomp': this.tone(45, 0.6, 'sine', 0.8 * v, 0.5); this.hiss(0.5, 0.5 * v, 200, 0.5); break;
+      case 'boss': [0, 0.3, 0.6, 0.9].forEach((d, i) => this.tone(110 * [1, 1.19, 1, 0.84][i], 0.5, 'sawtooth', 0.12 * v, 1, d)); break;
+      case 'enemyShot': this.tone(500, 0.06, 'square', 0.06 * v, 0.5); this.hiss(0.05, 0.1 * v, 3000, 1); break;
+      case 'upgrade': [0, 0.08, 0.16].forEach((d, i) => this.tone(523 * [1, 1.5, 2][i], 0.15, 'square', 0.07 * v, 1, d)); this.hiss(0.3, 0.2 * v, 3000, 2); break;
+      case 'spring': this.tone(200, 0.3, 'sine', 0.3 * v, 3); break;
     }
   }
 }

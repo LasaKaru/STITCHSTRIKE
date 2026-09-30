@@ -11,6 +11,32 @@
   background: repeating-linear-gradient(115deg, var(--orange) 0 8px, #f08a45 8px 12px);
 }
 #health-text { margin-top: 4px; font-size: 15px; }
+.yarnbar.armor { height: 8px; margin-bottom: 4px; border-width: 1px; }
+#armor-fill { height: 100%; width: 0; transition: width .15s; background: repeating-linear-gradient(115deg, #c9ced6 0 6px, #eef1f5 6px 10px); }
+#health-text .power { color: #ff5ab4; font-weight: 800; margin-left: 6px; }
+#health-text .armor { color: #c9ced6; margin-left: 6px; }
+
+#bossbar { margin-top: 8px; width: min(520px, 70vw); }
+#bossbar span { font-weight: 900; letter-spacing: 3px; font-size: 13px; color: #ffb0a0; }
+#bossbar .bar { height: 12px; border-radius: 99px; background: rgba(0,0,0,.5); overflow: hidden; border: 2px dashed rgba(255,176,160,.6); margin-top: 3px; }
+#bossbar i { display: block; height: 100%; background: repeating-linear-gradient(115deg, #b3262c 0 10px, #d8404a 10px 16px); transition: width .2s; }
+
+#downed { left: 50%; top: 58%; transform: translateX(-50%); text-align: center; background: rgba(90,20,30,.55); padding: 10px 18px; border-radius: 14px; border: 2px dashed rgba(255,190,190,.6); }
+#downed b { display: block; font-size: 24px; letter-spacing: 3px; color: #ffb0b0; }
+#downed span { font-size: 14px; }
+#downed .bar { height: 8px; width: 240px; border-radius: 99px; background: rgba(0,0,0,.5); overflow: hidden; margin: 6px auto 0; }
+#downed-fill { display: block; height: 100%; background: var(--lime); width: 0; }
+body.is-downed #damage { opacity: .55 !important; }
+body.is-downed canvas { filter: saturate(.35); }
+#revive { left: 50%; top: 60%; transform: translateX(-50%); font-size: 16px; font-weight: 700; text-align: center; }
+#revive b { color: var(--lime); }
+
+#deck .card .tier { color: #ffc94a; letter-spacing: 2px; }
+#deck .card.selected { border-color: var(--gold); border-style: solid; }
+#deck.open .card { background: rgba(60,66,84,.95); }
+#deck:not(.open) { display: none; }
+#deck .card.upgrade .cost { color: var(--lime); }
+#deckhint { font-size: 12px; color: var(--muted); margin-top: 4px; }
 
 .bottom-right { right: 20px; bottom: 20px; text-align: right; }
 .weapon { font-size: 13px; color: var(--lime); letter-spacing: 1px; text-transform: uppercase; }
@@ -102,8 +128,10 @@ body.pvp .coop-only { display: none !important; }
 #buttons small { font-size: 12px; color: var(--muted); font-weight: 600; letter-spacing: 1px; }
 
 #slots { display: flex; gap: 6px; justify-content: flex-end; margin-bottom: 4px; }
+#slots { flex-wrap: wrap; max-width: 520px; margin-left: auto; }
 #slots span { font-size: 12px; padding: 2px 8px; border-radius: 8px; background: rgba(0,0,0,.35); color: var(--muted); }
 #slots span.on { background: var(--lime); color: #20242e; font-weight: 800; }
+#slots span:not(.on) .n { display: none; }
 
 .status { left: 50%; top: 38%; transform: translateX(-50%); font-size: 20px; text-align: center; pointer-events: auto; }
 .status a { color: var(--gold); }

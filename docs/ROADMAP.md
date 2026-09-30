@@ -1,14 +1,59 @@
 # STITCHSTRIKE roadmap
 
-**The pitch:** an indie first/third-person hero shooter crossed with wave-based tower defence. You're a tiny knitted action figure in a giant house, and it feels like a Saturday morning in the 90s: bright, silly and nostalgic, with cartoon villains. Everything is wool. That's the hook that sets it apart from plastic-toy shooters, so the ideas below lean into it.
+## Design brief
 
-Already in the game:
-- co-op defence (1–4 players plus bots) and PvP free-for-all, online or offline
-- two maps: The Bedroom and the Back Garden
-- Heartspools, a build phase with turrets, walls and mats, 5 waves, 4 enemy types, 2 weapons
-- sculpted knitted characters
-- a cinematic main menu
-- the Electron desktop build
+**STITCHSTRIKE is an indie first- and third-person shooter that blends classic wave-based tower defence with intense action.** It plays like a love letter to 90s childhoods and evokes movies like *Small Soldiers* and *Toy Story*. Its twist: everything is **wool**. The heroes, the invaders and the giant house are all knitted, crocheted and felted.
+
+### Vibe and atmosphere
+Pure, distilled nostalgia: the universal memory of smashing action figures together on a messy bedroom floor.
+- It doesn't take itself too seriously. It's bright, colourful and packed with retro charm.
+- It feels like a weekend morning in the 1990s.
+- It has original **90s packaging** aesthetics (blister cards, box art, "Collect them all!").
+- The villains are **Saturday-morning-cartoon** style.
+- The soundtrack is upbeat and rocking.
+
+### Mission and core loop
+A hybrid of hero shooter and tower defence.
+- **The mission:** defend the **Heartspools**, glowing spools of hand-spun thread that hold every childhood memory of every hand-made toy, from successive waves of hostile mass-produced toys. If the Heartspools unravel, those memories are lost forever.
+- **The flow:**
+  - **Build phase:** spend the team's **buttons** on traps, turrets and blockades: building-brick barricades, battery zappers, mousetraps, pin walls, tangle mats and spring pads.
+  - **Wave phase:** shooting, platforming and teamwork keep the invaders away from the Heartspools.
+- **Modes:** full single-player (with bot teammates), online co-op (up to 4), **local split-screen**, and classic PvP (Free-for-All deathmatch, Team Deathmatch).
+
+### Environments and levels
+You are a 5-inch action figure, so the world is **massive**. Levels are everyday domestic and retail places:
+- messy bedrooms
+- suburban garages
+- bathrooms
+- back gardens
+- toy store aisles
+
+The other pillars of level design:
+- **Traversal:** heavy platforming. Jump across shelves, **climb up bedsheets and curtains**, and use **jump pads** to get from the floor to countertops.
+- **Collectibles:** every level hides secrets. High shelves and dark corners reward you with **golden thimbles**, **weapon parts** and **credits**.
+
+### Characters
+- **Progression:** no hero classes with locked abilities; the focus is on **extreme customisation**. You start as a generic knitted action figure and unlock hundreds of heads, hats, yarn colours, knit patterns, weapon parts and **packaging styles**.
+- **Key figures:** you serve under **Sgt. Tuft Buttonsworth**, a moth-eaten knitted war veteran, against **Baron von Ravel** and his **Mass-Knit Army**. The Baron wants to unpick every hand-made toy into factory acrylic.
+
+> The brief was modelled on *Hypercharge: Unboxed*. STITCHSTRIKE keeps its own names and look, so its terms and characters ("Hypercore", "Sgt. Max Ammo", "Major Evil") and real toy trademarks never appear in the game. That is what makes it sellable.
+
+### Development pillars
+
+| Pillar | What it means | How STITCHSTRIKE does it |
+|---|---|---|
+| **Scale and physics** | Feel like a 5-inch toy: slightly floaty but precise movement. Toys burst like toys instead of ragdolling like humans. | 1.5 u figures in 40–100 u rooms; gravity 25 with a double jump; air control; spring pads and climbable fabric. Unravelled toys burst into yarn, stuffing and knitted pieces. |
+| **Verticality** | A desk needs pathways (cords, stacked books, fallen rulers) to become terrain. | Book-stack stairs, crate climbs, a treehouse, climbable blankets and curtains, jump pads, and a shelf and countertop layer in every map. |
+| **Zero pay-to-win** | Every skin, head and weapon part is earned by play, never bought. | A local profile with XP, levels, medals and collectibles unlocks all cosmetics. There is no store for power, and weapons are never gated. |
+| **Hybrid AI pathfinding** | Blockades anywhere, so routes must recompute instantly. | Flow fields (Dijkstra per Heartspool) re-bake whenever a blockade is built or destroyed; walls cost extra, so enemies go around, and they chew through only when boxed in. |
+| **Varied enemies** | Ground swarms, ranged attackers and flyers force both guns and traps. | Chatter-teeth swarms, spinning tops, toy-soldier snipers, RC drones, moths, scissor snips, brutes and a boss per mission. |
+| **Performance with dense mess** | 500 static toys plus 100 enemies must not crash the player's hardware. | Merged static mess per material, instanced grass and leaves, pooled figures with distance LOD, shadow-map budgets per quality level, and a hard cap on live enemies. |
+
+## Build status
+
+The checklist tracks what is in the game (✅) and what is still ahead (⬜).
+
+<!-- STATUS -->
 
 Priorities: **P1** makes the game fun enough to sell, **P2** makes it rich, **P3** is polish and long tail.
 

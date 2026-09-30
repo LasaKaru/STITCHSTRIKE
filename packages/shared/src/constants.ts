@@ -50,6 +50,13 @@ export const PLAYER = {
   spawnProtection: 2,
   /** Enemy hits on toys are softened in co-op; the Heartspools are their real target. */
   coopDamageScale: 0.7,
+  maxArmor: 100,
+  /** Downed (co-op): crawl speed, seconds before bleeding out, re-stitch time and range, health after. */
+  crawlSpeed: 1.1,
+  bleedSeconds: 20,
+  reviveSeconds: 2.5,
+  reviveRange: 2.1,
+  reviveHealth: 60,
 } as const;
 
 export const JUMP_VELOCITY = Math.sqrt(2 * PLAYER.gravity * PLAYER.jumpHeight);

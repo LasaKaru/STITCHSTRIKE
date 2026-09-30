@@ -18,16 +18,21 @@
     <div class="hud top-center" id="wavebar">
       <div id="wave"></div>
       <div id="phase"></div>
+      <div id="bossbar" class="hidden"><span>THE UNRAVELLER</span><div class="bar"><i></i></div></div>
     </div>
+    <div class="hud hidden" id="downed"><b>UNRAVELLING!</b><span id="downed-text"></span><div class="bar"><i id="downed-fill"></i></div></div>
+    <div class="hud" id="revive"></div>
     <div class="hud bottom-center coop-only">
       <div id="padhint"></div>
       <div id="deck"></div>
+      <div id="deckhint"></div>
     </div>
     <div id="banner" class="hud"></div>
     <div id="popups" class="hud"></div>
 
     <div class="hud bottom-left">
       <div id="buttons" class="coop-only"></div>
+      <div class="yarnbar armor"><div id="armor-fill"></div></div>
       <div class="yarnbar"><div id="health-fill"></div></div>
       <div id="health-text"></div>
     </div>
@@ -49,9 +54,10 @@
         <table class="keys">
           <tr><td>WASD</td><td>move</td><td>Mouse</td><td>look / fire</td></tr>
           <tr><td>Space</td><td>jump (×2)</td><td>Shift</td><td>sprint</td></tr>
-          <tr><td>1 / 2</td><td>Popper / Buster</td><td>R</td><td>reload</td></tr>
-          <tr class="coop-only"><td>3 4 5</td><td>build on pad</td><td>G</td><td>recycle</td></tr>
-          <tr class="coop-only"><td>Enter</td><td>ready up</td><td>C</td><td>crouch</td></tr>
+          <tr><td>1–5 · wheel</td><td>weapons</td><td>R</td><td>reload</td></tr>
+          <tr class="coop-only"><td>B then 1–7</td><td>build / upgrade on a pad</td><td>Q</td><td>build again</td></tr>
+          <tr class="coop-only"><td>G</td><td>recycle</td><td>Enter / F</td><td>ready up</td></tr>
+          <tr class="coop-only"><td>Hold E</td><td>re-stitch a teammate</td><td>C</td><td>crouch</td></tr>
           <tr><td>V</td><td>1st / 3rd person</td><td>Tab</td><td>scores</td></tr>
         </table>
         <p class="hint"><a href="/" onclick="event.stopPropagation()">Leave match · main menu</a></p>

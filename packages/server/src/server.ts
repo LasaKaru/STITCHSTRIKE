@@ -53,12 +53,12 @@ export function startGameServer(o: GameServerOptions): Promise<GameServer> {
   const rooms = new Map<string, RoomHost>();
   const root = o.staticDir ? resolve(o.staticDir) : null;
 
-  function getRoom(code: string, fillTo: number, mode: GameMode, map: MapId): RoomHost {
-    // Rooms are keyed by mode and map too, so each combination is its own match.
-    const key = `${mode}:${map}:${code}`;
+  function getRoom(code: string, fillTo: number, mode: GameMode, map: MapId, waves: number, difficulty: number): RoomHost {
+    // Rooms are keyed by mode, map and mission settings too, so each combination is its own match.
+    const key = `${mode}:${map}:${waves}:${difficulty}:${code}`;
     let host = rooms.get(key);
     if (!host) {
-      host = new RoomHost({ code, fillTo, mode, map });
+      host = new RoomHost({ code, fillTo, mode, map, waves, difficulty });
       host.start();
       rooms.set(key, host);
       log(`[room ${key}] opened (bots fill to ${fillTo})`);
@@ -103,11 +103,15 @@ export function startGameServer(o: GameServerOptions): Promise<GameServer> {
     const code = roomCode(url.searchParams.get('room'));
     const botParam = url.searchParams.get('bots');
     const fill = botParam === null ? fillBots : Math.max(0, Math.min(8, Number(botParam) || 0));
-    const mode: GameMode = url.searchParams.get('mode') === 'pvp' ? 'pvp' : 'coop';
+    const m = url.searchParams.get('mode');
+    const mode: GameMode = m === 'pvp' || m === 'tdm' ? m : 'coop';
+    const wavesParam = Number(url.searchParams.get('waves') ?? 10);
+    const waves = [0, 5, 10].includes(wavesParam) ? wavesParam : 10;
+    const difficulty = Math.max(0, Math.min(3, Math.floor(Number(url.searchParams.get('difficulty') ?? 1)) || 0));
     const mapParam = url.searchParams.get('map');
     const map: MapId = MAPS.some((m) => m.id === mapParam) ? (mapParam as MapId) : 'bedroom';
-    const host = getRoom(code, fill, mode, map);
-    const key = `${mode}:${map}:${code}`;
+    const host = getRoom(code, fill, mode, map, waves, difficulty);
+    const key = `${mode}:${map}:${waves}:${difficulty}:${code}`;
 
     const delay = (fn: () => void) => (fakeLag > 0 ? setTimeout(fn, fakeLag) : fn());
     const conn: Connection = {

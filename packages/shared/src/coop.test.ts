@@ -1,18 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { TICK_RATE } from './constants.ts';
-import { Buildable, BUILDABLES, CORE, FIRST_BUILD_SECONDS, Phase, START_BUTTONS, TURRET_SHOT_BASE } from './coop.ts';
+import { Buildable, BUILDABLES, CORE, DIFFICULTIES, FIRST_BUILD_SECONDS, Phase, TURRET_SHOT_BASE } from './coop.ts';
 import { ENEMIES, EnemyType, NavGrid } from './enemies.ts';
 import { RoomHost } from './host.ts';
-import { Buttons, createPlayerState, type InputCmd } from './movement.ts';
+import { Action, Buttons, createPlayerState, type InputCmd } from './movement.ts';
 import { decodeSnapshot, encodeSnapshot } from './protocol.ts';
 import { Room } from './room.ts';
 import { pelletDirections, WEAPONS } from './weapons.ts';
 import { circleClear, createBedroom, createWorld, MAPS, type Vec3 } from './world.ts';
 
 const world = createBedroom();
+const START_BUTTONS = DIFFICULTIES[1].startButtons;
 
-function cmd(seq: number, buttons: number, yaw = 0, pitch = 0, renderTick = 0): InputCmd {
-  return { seq, buttons, yaw: Math.fround(yaw), pitch: Math.fround(pitch), renderTick };
+function cmd(seq: number, buttons: number, yaw = 0, pitch = 0, renderTick = 0, weapon = 0, action = 0): InputCmd {
+  return { seq, buttons, yaw: Math.fround(yaw), pitch: Math.fround(pitch), renderTick, weapon, action };
 }
 
 function skipBuildPhase(room: Room): void {
@@ -49,14 +50,14 @@ describe.each(MAPS.map((m) => m.id))('co-op layout: %s', (map) => {
     const host = new RoomHost({ code: 'MAP', fillTo: 3, mode: 'coop', map });
     const coop = host.room.coop!;
     let ended = -1;
-    for (let t = 0; t < TICK_RATE * 60 * 14 && ended < 0; t++) {
+    for (let t = 0; t < TICK_RATE * 60 * 40 && ended < 0; t++) {
       if (coop.phase === Phase.Build) coop.timer = Math.min(coop.timer, 2);
       host.step();
       if (coop.phase === Phase.Won || coop.phase === Phase.Lost) ended = coop.phase;
     }
     expect(ended).toBeGreaterThanOrEqual(Phase.Won);
-    expect(coop.wave).toBeGreaterThanOrEqual(2);
-  });
+    expect(coop.wave).toBeGreaterThanOrEqual(3);
+  }, 60000);
 });
 
 describe('co-op waves', () => {
@@ -92,7 +93,7 @@ describe('co-op waves', () => {
     room.update();
     const coop = room.coop!;
     coop.phase = Phase.Wave;
-    coop.enemies.push({ id: 900, type: EnemyType.Grunt, x: 10, y: 0, z: 6, vx: 0, vz: 0, yaw: 0, hp: 70, maxHp: 70, core: 0, node: -1, cooldown: 0, kx: 0, kz: 0 });
+    coop.enemies.push({ id: 900, type: EnemyType.Grunt, x: 10, y: 0, z: 6, vx: 0, vz: 0, yaw: 0, hp: 70, maxHp: 70, core: 0, node: -1, cooldown: 0, kx: 0, kz: 0, slow: 0, special: 0 });
     for (let t = 0; t < 3; t++) room.update();
     const seenAt = room.tick;
     // It moves out of the line of fire before our shots arrive; rewind still hits it.
@@ -115,7 +116,7 @@ describe('co-op waves', () => {
     const p = room.addPlayer('Dot')!;
     const pad = world.coop.pads[0];
     p.state = createPlayerState([pad.pos[0], 0, pad.pos[2] + 0.5]);
-    room.queueInputs(p.id, [cmd(1, 0), cmd(2, Buttons.Build1)]);
+    room.queueInputs(p.id, [cmd(1, 0), cmd(2, 0, 0, 0, 0, 0, Buildable.Turret)]);
     room.update();
     const coop = room.coop!;
     expect(coop.pads[0].kind).toBe(Buildable.Turret);
@@ -125,12 +126,12 @@ describe('co-op waves', () => {
     coop.buttons = 10;
     const pad2 = world.coop.pads[1];
     p.state = createPlayerState([pad2.pos[0], 0, pad2.pos[2]]);
-    room.queueInputs(p.id, [cmd(3, 0), cmd(4, Buttons.Build1)]);
+    room.queueInputs(p.id, [cmd(3, 0), cmd(4, 0, 0, 0, 0, 0, Buildable.Turret)]);
     room.update();
     expect(coop.pads[1].kind).toBe(Buildable.None);
 
     coop.phase = Phase.Wave;
-    coop.enemies.push({ id: 7, type: EnemyType.Scuttler, x: pad.pos[0] + 5, y: 0, z: pad.pos[2], vx: 0, vz: 0, yaw: 0, hp: 32, maxHp: 32, core: 0, node: -1, cooldown: 0, kx: 0, kz: 0 });
+    coop.enemies.push({ id: 7, type: EnemyType.Scuttler, x: pad.pos[0] + 5, y: 0, z: pad.pos[2], vx: 0, vz: 0, yaw: 0, hp: 32, maxHp: 32, core: 0, node: -1, cooldown: 0, kx: 0, kz: 0, slow: 0, special: 0 });
     room.drainShots();
     let turretShots = 0;
     for (let t = 0; t < TICK_RATE * 3; t++) {
@@ -146,7 +147,7 @@ describe('co-op waves', () => {
     const p = room.addPlayer('Moss')!;
     const pad = world.coop.pads[2];
     p.state = createPlayerState([pad.pos[0], 0, pad.pos[2]]);
-    room.queueInputs(p.id, [cmd(1, 0), cmd(2, Buttons.Build2), cmd(3, 0), cmd(4, Buttons.Sell)]);
+    room.queueInputs(p.id, [cmd(1, 0), cmd(2, 0, 0, 0, 0, 0, Buildable.Wall), cmd(3, 0), cmd(4, 0, 0, 0, 0, 0, Action.Sell)]);
     room.update();
     room.update();
     expect(room.coop!.pads[2].kind).toBe(Buildable.None);
@@ -158,7 +159,7 @@ describe('co-op waves', () => {
     const coop = room.coop!;
     coop.phase = Phase.Wave;
     const c = world.coop.cores[1];
-    coop.enemies.push({ id: 3, type: EnemyType.Brute, x: c[0] + 1.2, y: 0, z: c[2], vx: 0, vz: 0, yaw: 0, hp: 9999, maxHp: 9999, core: 1, node: -1, cooldown: 0, kx: 0, kz: 0 });
+    coop.enemies.push({ id: 3, type: EnemyType.Brute, x: c[0] + 1.2, y: 0, z: c[2], vx: 0, vz: 0, yaw: 0, hp: 9999, maxHp: 9999, core: 1, node: -1, cooldown: 0, kx: 0, kz: 0, slow: 0, special: 0 });
     room.update();
     expect(coop.cores[1].shield).toBeLessThan(CORE.shield);
     expect(coop.cores[1].hp).toBe(CORE.hp);
@@ -168,16 +169,16 @@ describe('co-op waves', () => {
     const room = new Room(world, 'coop');
     const a = room.addPlayer('A')!;
     const b = room.addPlayer('B')!;
-    room.queueInputs(a.id, [cmd(1, 0), cmd(2, Buttons.Ready)]);
+    room.queueInputs(a.id, [cmd(1, 0), cmd(2, 0, 0, 0, 0, 0, Action.Ready)]);
     room.update();
     expect(room.coop!.timer).toBeGreaterThan(10);
-    room.queueInputs(b.id, [cmd(1, 0), cmd(2, Buttons.Ready)]);
+    room.queueInputs(b.id, [cmd(1, 0), cmd(2, 0, 0, 0, 0, 0, Action.Ready)]);
     room.update();
     expect(room.coop!.timer).toBeLessThanOrEqual(3);
   });
 
   it('a full match with bots runs to an ending and restarts', () => {
-    const host = new RoomHost({ code: 'SIM', fillTo: 4, mode: 'coop' });
+    const host = new RoomHost({ code: 'SIM', fillTo: 4, mode: 'coop', waves: 5 });
     const coop = host.room.coop!;
     let ended = -1;
     let maxAlive = 0;
@@ -195,7 +196,7 @@ describe('co-op waves', () => {
     for (let t = 0; t < TICK_RATE * 14; t++) host.step();
     expect(coop.phase).toBe(Phase.Build);
     expect(coop.wave).toBe(0);
-  });
+  }, 60000);
 });
 
 describe('weapons + protocol', () => {
@@ -212,14 +213,14 @@ describe('weapons + protocol', () => {
   it('switching weapons uses the other magazine', () => {
     const room = new Room(world, 'pvp');
     const p = room.addPlayer('Cable')!;
-    room.queueInputs(p.id, [cmd(1, Buttons.Weapon2), cmd(2, 0)]);
+    room.queueInputs(p.id, [cmd(1, 0, 0, 0, 0, 1), cmd(2, 0, 0, 0, 0, 1)]);
     room.update();
     expect(p.state.weapon).toBe(1);
     p.state.cooldown = 0;
-    room.queueInputs(p.id, [cmd(3, Buttons.Fire), cmd(4, 0)]);
+    room.queueInputs(p.id, [cmd(3, Buttons.Fire, 0, 0, 0, 1), cmd(4, 0, 0, 0, 0, 1)]);
     room.update();
-    expect(p.state.ammoB).toBe(WEAPONS[1].magazine - 1);
-    expect(p.state.ammo).toBe(WEAPONS[0].magazine);
+    expect(p.state.mags[1]).toBe(WEAPONS[1].magazine - 1);
+    expect(p.state.mags[0]).toBe(WEAPONS[0].magazine);
     // One trigger pull fired every pellet.
     expect(room.drainShots().filter((s) => s.id === p.id)).toHaveLength(WEAPONS[1].pellets);
   });
@@ -230,13 +231,13 @@ describe('weapons + protocol', () => {
     for (let t = 0; t < TICK_RATE * 6; t++) host.step();
     const coop = host.room.coopState()!;
     expect(coop.enemies!.length).toBeGreaterThan(0);
-    const snap = decodeSnapshot(encodeSnapshot(host.room.snapshotFor(1, host.room.netPlayers(), [], coop)))!;
+    const snap = decodeSnapshot(encodeSnapshot(host.room.snapshotFor(1, { ...host.room.sharedSnapshot(), coop })))!;
     expect(snap.coop!.wave).toBe(1);
     expect(snap.coop!.cores).toHaveLength(3);
     expect(snap.coop!.pads).toHaveLength(world.coop.pads.length);
     expect(snap.coop!.enemies).toHaveLength(coop.enemies!.length);
     expect(snap.coop!.enemies![0].x).toBeCloseTo(coop.enemies![0].x, 2);
-    const lean = decodeSnapshot(encodeSnapshot(host.room.snapshotFor(1, host.room.netPlayers(), [], host.room.coopState(false))))!;
+    const lean = decodeSnapshot(encodeSnapshot(host.room.snapshotFor(1, host.room.sharedSnapshot(false))))!;
     expect(lean.coop!.enemies).toBeNull();
     expect(lean.coop!.wave).toBe(1);
     expect(snap.coop!.buttons).toBe(coop.buttons);

@@ -1,7 +1,9 @@
 import { INPUT_RATE, TICK_RATE } from './constants.ts';
-import { Buildable, BUILDABLES, Phase } from './coop.ts';
+import { Buildable, BUILDABLES, DECK, MAX_TIER, Phase, upgradeCost } from './coop.ts';
 import { ENEMIES } from './enemies.ts';
 import { Buttons, eyePosition, type InputCmd } from './movement.ts';
+import { PickupKind } from './pickups.ts';
+import { PLAYER } from './constants.ts';
 import { hasLineOfSight } from './raycast.ts';
 import type { Room, RoomPlayer } from './room.ts';
 import type { Vec3 } from './world.ts';
@@ -37,6 +39,8 @@ export class Bot {
   private targetKey = '';
   private target: Target | null = null;
   private buildCooldown = 2 + Math.random() * 4;
+  private weapon = 0;
+  private action = 0;
 
   constructor(private room: Room, player: RoomPlayer) {
     this.id = player.id;
@@ -136,12 +140,12 @@ export class Bot {
       buttons |= this.strafe > 0 ? Buttons.Right : Buttons.Left;
       if (dist > 10) buttons |= Buttons.Forward;
       if (dist < 4) buttons |= Buttons.Back;
-      // Shotgun up close, popper at range.
-      buttons |= dist < 6 ? Buttons.Weapon2 : Buttons.Weapon1;
+      this.weapon = this.chooseWeapon(target, dist);
       const yawErr = Math.abs(wrapAngle(desiredYaw - this.yaw));
       if (this.reaction <= 0 && yawErr < 0.2) buttons |= Buttons.Fire;
     } else {
-      buttons |= this.coopChores(me) ?? 0;
+      this.coopChores(me);
+      this.errands(me);
       const dx = this.goal[0] - s.x;
       const dz = this.goal[2] - s.z;
       if (Math.hypot(dx, dz) < 1.2) {
@@ -169,38 +173,99 @@ export class Bot {
       if (this.seq % 16 < 8) buttons |= Buttons.Jump;
       if (this.stuckTimer > 1.2) { this.goal = this.pickGoal(); this.stuckTimer = 0; }
     }
-    const mag = s.weapon === 0 ? s.ammo : s.ammoB;
-    if (mag === 0 && s.reload === 0) buttons |= Buttons.Reload;
+    if ((s.mags[s.weapon] ?? 0) === 0 && s.reload === 0) buttons |= Buttons.Reload;
+    // Re-stitch a downed teammate standing right here.
+    if (this.reviving(me)) { buttons |= Buttons.Use; buttons &= ~(Buttons.Forward | Buttons.Left | Buttons.Right | Buttons.Back | Buttons.Fire); }
 
     this.seq += 1;
+    const action = this.action;
+    this.action = 0;
     return {
       seq: this.seq,
       buttons,
       yaw: Math.fround(this.yaw),
       pitch: Math.fround(this.pitch),
       renderTick: this.room.tick,
+      weapon: this.weapon,
+      action,
     };
   }
 
-  /** During the build phase, walk to a free pad and spend some of the team's buttons. */
-  private coopChores(me: RoomPlayer): number {
+  /** Buster up close, Lance far away, yarn balls into crowds, Popper or Hook in between. */
+  private chooseWeapon(target: Target, dist: number): number {
+    if (dist < 5) return 1;
+    if (this.room.coop) {
+      let crowd = 0;
+      for (const e of this.room.coop.enemies) if (e.hp > 0 && Math.hypot(e.x - target.x, e.z - target.z) < 3) crowd++;
+      if (crowd >= 4 && dist > 8 && dist < 30) return 4;
+    }
+    if (dist > 24) return 2;
+    return dist < 12 ? 3 : 0;
+  }
+
+  /** Downed teammate within reach, if any. */
+  private reviving(me: RoomPlayer): boolean {
+    if (!this.room.coop || me.bleed > 0) return false;
+    for (const p of this.room.players.values()) {
+      if (p !== me && p.alive && p.bleed > 0 && Math.hypot(p.state.x - me.state.x, p.state.z - me.state.z) < PLAYER.reviveRange - 0.4) return true;
+    }
+    return false;
+  }
+
+  /** Between fights: go re-stitch downed teammates, and fetch stuffing when hurt. */
+  private errands(me: RoomPlayer): void {
+    if (this.room.coop) {
+      let best = 30;
+      for (const p of this.room.players.values()) {
+        if (p === me || !p.alive || p.bleed <= 0) continue;
+        const d = Math.hypot(p.state.x - me.state.x, p.state.z - me.state.z);
+        if (d < best) { best = d; this.goal = [p.state.x, p.state.y, p.state.z]; }
+      }
+      if (best < 30) return;
+    }
+    if (me.health < PLAYER.maxHealth * 0.5) {
+      let best = 25;
+      for (const spot of this.room.availablePickups()) {
+        if (spot.kind !== PickupKind.Stuffing || spot.pos[1] > 0.5) continue;
+        const d = Math.hypot(spot.pos[0] - me.state.x, spot.pos[2] - me.state.z);
+        if (d < best) { best = d; this.goal = spot.pos; }
+      }
+    }
+  }
+
+  /** During the build phase, walk to a pad and spend some of the team's buttons (building or upgrading). */
+  private coopChores(me: RoomPlayer): void {
     const coop = this.room.coop;
-    if (!coop || coop.phase !== Phase.Build) return 0;
+    if (!coop || coop.phase !== Phase.Build) return;
     this.buildCooldown -= 1 / INPUT_RATE;
-    if (this.buildCooldown > 0 || coop.buttons < BUILDABLES[Buildable.Turret].cost + 50) return 0;
+    if (this.buildCooldown > 0 || coop.buttons < 110) return;
     const pads = this.room.world.coop.pads;
-    let free = -1;
+    // Prefer an empty pad; with plenty of buttons, upgrade a turret or zapper instead.
+    let pick = -1;
     let best = Infinity;
+    const rich = coop.buttons > 400;
     pads.forEach((p, i) => {
-      if (coop.pads[i].kind !== Buildable.None || !coop.cores[p.core].alive) return;
-      const d = Math.hypot(p.pos[0] - me.state.x, p.pos[2] - me.state.z);
-      if (d < best) { best = d; free = i; }
+      const pad = coop.pads[i];
+      if (!coop.cores[p.core].alive) return;
+      const upgradable = rich && (pad.kind === Buildable.Turret || pad.kind === Buildable.Zapper) && pad.tier < MAX_TIER;
+      if (pad.kind !== Buildable.None && !upgradable) return;
+      const d = Math.hypot(p.pos[0] - me.state.x, p.pos[2] - me.state.z) + (upgradable ? 6 : 0);
+      if (d < best) { best = d; pick = i; }
     });
-    if (free < 0) return 0;
-    this.goal = pads[free].pos;
-    if (best > 1.5) return 0;
+    if (pick < 0) return;
+    this.goal = pads[pick].pos;
+    if (Math.hypot(pads[pick].pos[0] - me.state.x, pads[pick].pos[2] - me.state.z) > 1.5) return;
     this.buildCooldown = 4 + Math.random() * 6;
-    const roll = Math.random();
-    return roll < 0.6 ? Buttons.Build1 : roll < 0.8 ? Buttons.Build2 : Buttons.Build3;
+    const pad = coop.pads[pick];
+    if (pad.kind !== Buildable.None) {
+      if (coop.buttons >= upgradeCost(pad.kind, pad.tier)) this.action = pad.kind;
+      return;
+    }
+    // Mostly turrets and zappers, with blockades, traps and the odd spring pad.
+    const weights: [number, number][] = [[Buildable.Turret, 5], [Buildable.Zapper, 3], [Buildable.Wall, 2], [Buildable.Barricade, 2], [Buildable.Mat, 2], [Buildable.Mousetrap, 2], [Buildable.Spring, 0.5]];
+    const affordable = weights.filter(([k]) => DECK.includes(k as never) && BUILDABLES[k].cost <= coop.buttons);
+    const total = affordable.reduce((a, [, w]) => a + w, 0);
+    let roll = Math.random() * total;
+    for (const [k, w] of affordable) { roll -= w; if (roll <= 0) { this.action = k; break; } }
   }
 }

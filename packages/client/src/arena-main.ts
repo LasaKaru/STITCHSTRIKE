@@ -4,7 +4,10 @@ import {
   BUILD_RANGE, Buildable, BUILDABLES, Buttons, createWorld, ENEMIES, ENEMY_INTERP_DELAY_MS, eyePosition, lookDirection, MAX_PITCH,
   pelletDirections, Phase, PLAYER, rayBox, rayPlayer, rayWorld, TURRET, TURRET_SHOT_BASE, WEAPONS,
   MAPS, type GameMode, type MapId, type PlayerState, type Vec3,
+  Action, DECK, DIFFICULTIES, ENEMY_SHOT_ID, EnemyType, launchProjectile, LAUNCHER, MAX_TIER, PICKUPS, PickupKind, ShotKind, upgradeCost, WEAPON_COUNT,
 } from '@stitchstrike/shared';
+import { CombatMusic, type Intensity } from './audio/combatMusic.ts';
+import { PickupsView } from './scene/pickupsView.ts';
 import { Sfx } from './audio/sfx.ts';
 import { loadSettings } from './settings.ts';
 import { NetClient, type EnemySample } from './net/netClient.ts';
@@ -30,7 +33,11 @@ import { QUALITY_LAYERS, setWoolLayers, updateShellLod } from './wool/woolMateri
 const params = new URLSearchParams(location.search);
 const map: MapId = MAPS.some((m) => m.id === params.get('map')) ? (params.get('map') as MapId) : 'bedroom';
 const world = createWorld(map);
-const mode: GameMode = params.get('mode') === 'pvp' ? 'pvp' : 'coop';
+const modeParam = params.get('mode');
+const mode: GameMode = modeParam === 'pvp' || modeParam === 'tdm' ? modeParam : 'coop';
+const wavesParam = Number(params.get('waves') ?? 10);
+const waves = [0, 5, 10].includes(wavesParam) ? wavesParam : 10;
+const difficulty = Math.max(0, Math.min(3, Math.floor(Number(params.get('difficulty') ?? 1)) || 0));
 const solo = params.get('solo') === '1';
 const lag = Math.max(0, Number(params.get('lag') ?? 0) || 0);
 const bots = params.get('bots');
@@ -42,17 +49,20 @@ const fixedCam = params.get('cam');
 const name = (params.get('name') ?? settings.name).slice(0, 16);
 document.body.classList.add(mode);
 document.getElementById('modeline')!.textContent = mode === 'coop'
-  ? 'Co-op defence · protect the Heartspools'
-  : 'PvP free-for-all · first to unravel the most toys';
+  ? `Co-op defence · ${waves === 0 ? 'Endless' : `${waves} waves`} · ${DIFFICULTIES[difficulty].name}`
+  : mode === 'tdm' ? 'Team Deathmatch · Team Cotton vs Team Wool' : 'PvP free-for-all · first to unravel the most toys';
+if (mode === 'tdm') document.body.classList.add('pvp');
 
 // ---------------------------------------------------------------- transport
 
 function connect(): Transport {
-  if (solo) return withFakeLag(workerTransport(bots === null ? 4 : Number(bots), mode, map), lag);
+  if (solo) return withFakeLag(workerTransport(bots === null ? 4 : Number(bots), mode, map, waves, difficulty, Number(params.get('wave') ?? 1) || 1), lag);
   const q = new URLSearchParams();
   q.set('room', params.get('room') ?? 'LOBBY');
   q.set('mode', mode);
   q.set('map', map);
+  q.set('waves', String(waves));
+  q.set('difficulty', String(difficulty));
   if (bots !== null) q.set('bots', bots);
   const base = params.get('server') ?? (settings.server || `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
   return withFakeLag(wsTransport(`${base}/?${q}`), lag);
@@ -139,14 +149,16 @@ function colorOf(id: number): number {
 interface EnemyVisual { yaw: number; phase: number; speed: number; hitAge: number; last: THREE.Vector3 }
 const enemyVisuals = new Map<number, EnemyVisual>();
 let enemies: EnemySample[] = [];
-const ENEMY_COLORS = [0xb3262c, 0x6a3c9a, 0xb8a58a, 0x3e5a3a];
+const ENEMY_COLORS = [0xb3262c, 0x6a3c9a, 0xb8a58a, 0x3e5a3a, 0xf6f1e4, 0x2f7fe0, 0x2f5a9a, 0x2a2a30, 0xe8742a, 0x8a5a3a];
 
 net.onEnemyGone = (e) => {
   // Show the unravel when the interpolated view reaches that moment, not when the packet lands.
   setTimeout(() => {
     const at = new THREE.Vector3(e.x, e.y + ENEMIES[e.type].height * 0.5, e.z);
-    fx.fluffBurst(at, ENEMY_COLORS[e.type], e.type === 3 ? 140 : 45, e.type === 3 ? 5 : 3);
-    fx.puff(at, 0xfff2e0, e.type === 3 ? 3 : 1.5);
+    const big = e.type === EnemyType.Brute || e.type === EnemyType.Boss;
+    fx.fluffBurst(at, ENEMY_COLORS[e.type], e.type === EnemyType.Boss ? 600 : big ? 140 : 45, big ? 6 : 3);
+    fx.fluffBurst(at, 0xfff8ee, big ? 60 : 12, 2.5); // stuffing
+    fx.puff(at, 0xfff2e0, e.type === EnemyType.Boss ? 8 : big ? 3 : 1.5);
     enemyVisuals.delete(e.id);
   }, ENEMY_INTERP_DELAY_MS);
 };
@@ -165,6 +177,26 @@ function nearestEnemy(p: THREE.Vector3, within: number): EnemySample | null {
 
 net.onShot = (s) => {
   const to = new THREE.Vector3(...s.to);
+  if (s.kind === ShotKind.Blast) {
+    fx.blast(to, WEAPONS[LAUNCHER].color);
+    sfx.play('blast', attenuation(to));
+    fx.shake = Math.max(fx.shake, 0.4 * attenuation(to));
+    if (s.id === net.id) { pickupsView.clearLocal(); if (s.enemy) hitMarker(false); }
+    return;
+  }
+  if (s.kind === ShotKind.Zap && s.from) {
+    fx.zap(new THREE.Vector3(...s.from), to);
+    sfx.play('zap', attenuation(to) * 0.7);
+    return;
+  }
+  if (s.kind === ShotKind.Enemy && s.from) {
+    const from = new THREE.Vector3(...s.from);
+    fx.projectile(from, to, 0xff5040, true);
+    sfx.play('enemyShot', attenuation(from) * 0.6);
+    if (s.hit === net.id) { damageFlash(); sfx.play('hurt'); }
+    return;
+  }
+  if (s.id === ENEMY_SHOT_ID) return;
   if (s.enemy) {
     const e = nearestEnemy(to, 1.6);
     if (e) {
@@ -180,6 +212,7 @@ net.onShot = (s) => {
   }
   let from: THREE.Vector3;
   let color: number;
+  let weapon = 0;
   if (s.id >= TURRET_SHOT_BASE) {
     const pad = world.coop.pads[s.id - TURRET_SHOT_BASE];
     if (!pad) return;
@@ -189,13 +222,16 @@ net.onShot = (s) => {
   } else {
     const p = remoteNow.get(s.id);
     from = p ? p.clone().add(new THREE.Vector3(0, PLAYER.eyeHeight - 0.25, 0)) : to.clone().add(new THREE.Vector3(0, 0.5, 0));
-    color = colorOf(s.id);
-    sfx.play('popper', attenuation(from) * 0.6);
+    weapon = net.latest?.players.find((q) => q.id === s.id)?.weapon ?? 0;
+    color = weapon === 0 ? colorOf(s.id) : WEAPONS[weapon]?.color ?? colorOf(s.id);
+    sfx.play(WEAPON_SOUNDS[weapon] ?? 'popper', attenuation(from) * 0.6);
   }
-  fx.projectile(from, to, color);
+  fx.projectile(from, to, color, weapon === 1);
   if (s.hit === net.id) { damageFlash(); sfx.play('hurt'); }
   fx.puff(to, s.hit || s.enemy ? 0xfff2cc : 0xcfd6e6, 0.8);
 };
+
+const WEAPON_SOUNDS = ['popper', 'buster', 'lance', 'hook', 'launch'] as const;
 
 function attenuation(p: THREE.Vector3): number {
   return Math.max(0.05, 1 - camera.position.distanceTo(p) / 30);
@@ -237,9 +273,45 @@ net.onEvent = (e) => {
       sfx.play('alarm');
       break;
     case 'built':
-      if (e.by === net.id) sfx.play(e.kind === Buildable.None ? 'sell' : 'build');
+      if (e.by === net.id) sfx.play(e.kind === Buildable.None ? 'sell' : e.tier > 1 ? 'upgrade' : 'build');
+      if (e.by === net.id && e.tier > 1) popup(`${BUILDABLES[e.kind].short} tier ${e.tier}!`);
       if (e.by === 0 && e.kind === Buildable.None) sfx.play('alarm', 0.5);
       break;
+    case 'downed': {
+      const who = net.roster.get(e.id)?.name ?? '?';
+      if (e.id === net.id) { banner('YOU ARE UNRAVELLING! HOLD ON…', 'bad'); sfx.play('downed'); }
+      else feed(`${escapeHtml(who)} <span>is down · hold E to re-stitch</span>`, false);
+      break;
+    }
+    case 'revived': {
+      if (e.id === net.id) { banner('RE-STITCHED!', 'good'); sfx.play('revived'); }
+      else if (e.by === net.id) { popup('Teammate re-stitched!'); sfx.play('revived'); }
+      if (e.by) feed(`${escapeHtml(net.roster.get(e.by)?.name ?? '?')} <span>re-stitched</span> ${escapeHtml(net.roster.get(e.id)?.name ?? '?')}`, e.by === net.id || e.id === net.id);
+      break;
+    }
+    case 'pickup':
+      if (e.id === net.id) {
+        sfx.play('pickup');
+        popup(e.kind === PickupKind.Stuffing ? `+${PICKUPS[0].amount} stitches` : e.kind === PickupKind.Thimble ? `+${PICKUPS[1].amount} thimble armour` : 'POWER POM! ×1.5 damage');
+      }
+      break;
+    case 'boss':
+      if (e.state === 'arrive') { banner('THE UNRAVELLER APPROACHES!', 'bad', 4000); sfx.play('boss'); }
+      else { banner('THE UNRAVELLER IS UNPICKED!', 'good', 4000); sfx.play('win'); }
+      break;
+    case 'stomp': {
+      const at = new THREE.Vector3(e.x, 0, e.z);
+      fx.stomp(at);
+      sfx.play('stomp', attenuation(at));
+      fx.shake = Math.max(fx.shake, 1.2 * attenuation(at));
+      break;
+    }
+    case 'snap': {
+      coopProps?.snap(e.pad);
+      const pad = world.coop.pads[e.pad];
+      if (pad) sfx.play('snap', attenuation(new THREE.Vector3(pad.pos[0], 0, pad.pos[2])));
+      break;
+    }
   }
 };
 
@@ -256,7 +328,7 @@ const sensitivity = settings.sensitivity;
 const invertY = settings.invertY ? -1 : 1;
 
 const overlay = document.getElementById('overlay')!;
-const lock = () => { sfx.unlock(); renderer.domElement.requestPointerLock(); };
+const lock = () => { sfx.unlock(); music.start(settings.musicVolume); renderer.domElement.requestPointerLock(); };
 renderer.domElement.addEventListener('click', lock);
 overlay.addEventListener('click', lock);
 document.addEventListener('pointerlockchange', () => {
@@ -288,11 +360,45 @@ const KEYMAP: [string[], number][] = [
   [['KeyW', 'ArrowUp'], Buttons.Forward], [['KeyS', 'ArrowDown'], Buttons.Back],
   [['KeyA', 'ArrowLeft'], Buttons.Left], [['KeyD', 'ArrowRight'], Buttons.Right],
   [['Space'], Buttons.Jump], [['ShiftLeft', 'ShiftRight'], Buttons.Sprint],
-  [['KeyC', 'ControlLeft'], Buttons.Crouch], [['KeyR'], Buttons.Reload],
-  [['Digit1'], Buttons.Weapon1], [['Digit2'], Buttons.Weapon2],
-  [['Digit3'], Buttons.Build1], [['Digit4'], Buttons.Build2], [['Digit5'], Buttons.Build3],
-  [['KeyG'], Buttons.Sell], [['Enter', 'KeyF'], Buttons.Ready],
+  [['KeyC', 'ControlLeft'], Buttons.Crouch], [['KeyR'], Buttons.Reload], [['KeyE'], Buttons.Use],
 ];
+
+/** Weapon we want equipped (sent with every input), and the next one-shot action. */
+let wantWeapon = 0;
+let pendingAction = 0;
+let lastBuild: number = Buildable.Turret;
+let deckToggled = false;
+
+/** The build deck is open when toggled with B, or automatically on a pad during the build phase. */
+function deckOpen(): boolean {
+  if (mode !== 'coop') return false;
+  const s = net.predicted;
+  const onPad = !!s && (coopProps?.nearestPad(s.x, s.z, BUILD_RANGE) ?? -1) >= 0;
+  return deckToggled || (onPad && net.coop?.phase === Phase.Build);
+}
+
+document.addEventListener('keydown', (e) => {
+  if (document.pointerLockElement !== renderer.domElement || e.repeat) return;
+  const digit = e.code.startsWith('Digit') ? Number(e.code.slice(5)) : 0;
+  if (digit >= 1 && deckOpen() && digit <= DECK.length) {
+    lastBuild = DECK[digit - 1];
+    pendingAction = lastBuild;
+  } else if (digit >= 1 && digit <= WEAPON_COUNT) {
+    wantWeapon = digit - 1;
+  } else if (e.code === 'KeyB' && mode === 'coop') {
+    deckToggled = !deckToggled;
+  } else if (e.code === 'KeyQ' && mode === 'coop') {
+    pendingAction = lastBuild;
+  } else if (e.code === 'KeyG' && mode === 'coop') {
+    pendingAction = Action.Sell;
+  } else if ((e.code === 'Enter' || e.code === 'KeyF') && mode === 'coop') {
+    pendingAction = Action.Ready;
+  }
+});
+document.addEventListener('wheel', (e) => {
+  if (document.pointerLockElement !== renderer.domElement) return;
+  wantWeapon = (wantWeapon + (e.deltaY > 0 ? 1 : WEAPON_COUNT - 1)) % WEAPON_COUNT;
+}, { passive: true });
 
 function sampleButtons(): number {
   let b = 0;
@@ -303,7 +409,10 @@ function sampleButtons(): number {
 
 /** Headless test driver: aims at the nearest enemy (co-op) or spins (PvP), readies up and fires. */
 function autopilotButtons(now: number, p: PlayerState | null): number {
-  let b = Buttons.Fire | (Math.sin(now / 900) > 0.9 ? Buttons.Ready : 0);
+  let b = Buttons.Fire;
+  if (Math.sin(now / 900) > 0.9) pendingAction = Action.Ready;
+  // Cycle the arsenal so every weapon gets exercised.
+  wantWeapon = Math.floor(now / 6000) % WEAPON_COUNT;
   const target = p && enemies.length ? enemies.reduce((a, e) => (Math.hypot(e.x - p.x, e.z - p.z) < Math.hypot(a.x - p.x, a.z - p.z) ? e : a)) : null;
   if (target && p) {
     const dx = target.x - p.x, dz = target.z - p.z;
@@ -325,6 +434,8 @@ const hud = {
   health: $('health-fill'), healthText: $('health-text'), ammo: $('ammo'), slots: $('slots'), score: $('score'),
   net: $('net'), status: $('status'), hit: $('hitmarker'), damage: $('damage'), feed: $('feed'),
   cores: $('cores'), wave: $('wave'), phase: $('phase'), deck: $('deck'), padhint: $('padhint'), buttons: $('buttons'), popups: $('popups'),
+  armor: $('armor-fill'), boss: $('bossbar'), downed: $('downed'), downedText: $('downed-text'), downedFill: $('downed-fill'), revive: $('revive'),
+  deckhint: $('deckhint'),
 };
 const scoreboard = $('scoreboard');
 const netPanel = $('netpanel');
@@ -334,8 +445,8 @@ if (mode === 'coop') {
   hud.cores.innerHTML = CORE_LETTERS.map((l, i) => `<div class="core" id="core${i}">
     <div class="letter" style="background:#${CORE_COLORS[i].toString(16).padStart(6, '0')}">${l}</div>
     <div class="bars"><div class="hp"><i></i></div><div class="sh"><i></i></div></div></div>`).join('');
-  hud.deck.innerHTML = [Buildable.Turret, Buildable.Wall, Buildable.Mat].map((k, i) => `<div class="card" id="card${k}">
-    <div class="key">[${i + 3}]</div><div>${BUILDABLES[k].name}</div><div class="cost">${BUILDABLES[k].cost} buttons</div></div>`).join('');
+  hud.deck.innerHTML = DECK.map((k, i) => `<div class="card" id="card${k}" title="${BUILDABLES[k].blurb}">
+    <div class="key">[${i + 1}] <span class="tier"></span></div><div>${BUILDABLES[k].short}</div><div class="cost">${BUILDABLES[k].cost}</div></div>`).join('');
 }
 
 let hitTimer = 0;
@@ -393,12 +504,32 @@ function updateHud(): void {
   const me = net.me();
   const health = me?.health ?? 0;
   hud.health.style.width = `${(health / PLAYER.maxHealth) * 100}%`;
-  hud.healthText.textContent = `${Math.ceil(health)} stitches`;
+  hud.armor.style.width = `${((me?.armor ?? 0) / PLAYER.maxArmor) * 100}%`;
+  hud.healthText.innerHTML = `${Math.ceil(health)} stitches${me?.armor ? `<span class="armor">+${Math.ceil(me.armor)} thimble</span>` : ''}${me?.powered ? '<span class="power">POWER POM!</span>' : ''}`;
   const s = net.predicted;
   const w = WEAPONS[s?.weapon ?? 0];
-  const mag = s ? (s.weapon === 0 ? s.ammo : s.ammoB) : 0;
+  const mag = s ? s.mags[s.weapon] ?? 0 : 0;
   hud.ammo.textContent = s ? (s.reload > 0 ? 'Rewinding yarn…' : `${mag} / ${w.magazine}`) : '';
-  hud.slots.innerHTML = WEAPONS.map((x, i) => `<span class="${i === (s?.weapon ?? 0) ? 'on' : ''}">${i + 1} ${x.name}</span>`).join('');
+  hud.slots.innerHTML = WEAPONS.map((x, i) => `<span class="${i === (s?.weapon ?? 0) ? 'on' : ''}">${i + 1}<span class="n"> ${x.name}</span></span>`).join('');
+
+  // Down and re-stitch.
+  const downed = !!me?.downed;
+  document.body.classList.toggle('is-downed', downed);
+  hud.downed.classList.toggle('hidden', !downed);
+  if (downed) {
+    hud.downedText.textContent = `Bleeding out in ${net.respawn.toFixed(0)} s · a teammate can hold E to re-stitch you`;
+    hud.downedFill.style.width = `${(me?.revive ?? 0) * 100}%`;
+  }
+  let reviveHtml = '';
+  if (s && !downed) {
+    for (const p of net.latest?.players ?? []) {
+      if (p.id === net.id || !p.downed) continue;
+      if (Math.hypot(p.x - s.x, p.z - s.z) < PLAYER.reviveRange + 2) {
+        reviveHtml = `Hold <b>E</b> to re-stitch ${escapeHtml(net.roster.get(p.id)?.name ?? 'teammate')} · ${Math.round(p.revive * 100)}%`;
+      }
+    }
+  }
+  hud.revive.innerHTML = reviveHtml;
   hud.score.textContent = me ? (mode === 'coop' ? `${me.kos} toys unravelled` : `${me.kos} KO · ${me.deaths} unravelled`) : '';
   const st = net.netStats();
   hud.net.textContent = `${st.transport} · ping ${Math.round(st.rtt)} ms · ${st.snapshotHz.toFixed(0)} Hz · ${st.kbpsIn.toFixed(0)} kbps`;
@@ -408,7 +539,10 @@ function updateHud(): void {
 
   const c = net.coop;
   if (c) {
-    hud.wave.textContent = c.phase === Phase.Won ? 'VICTORY' : c.phase === Phase.Lost ? 'DEFEAT' : c.wave === 0 ? 'GET READY' : `WAVE ${c.wave} / ${c.totalWaves}`;
+    hud.wave.textContent = c.phase === Phase.Won ? 'VICTORY' : c.phase === Phase.Lost ? 'DEFEAT' : c.wave === 0 ? 'GET READY'
+      : c.totalWaves === 0 ? `WAVE ${c.wave} · ENDLESS` : `WAVE ${c.wave} / ${c.totalWaves}`;
+    hud.boss.classList.toggle('hidden', c.boss < 0);
+    if (c.boss >= 0) (hud.boss.querySelector('i') as HTMLElement).style.width = `${c.boss * 100}%`;
     const humans = [...net.roster.values()].filter((r) => !r.bot).length;
     if (c.phase === Phase.Build) {
       hud.phase.innerHTML = `Build phase · <b>${Math.ceil(c.timer)}s</b> · press <b>Enter</b> to ready up (${c.ready}/${humans})`;
@@ -431,28 +565,40 @@ function updateHud(): void {
       lastCoreHealth[i] = k.health;
     });
     hud.buttons.innerHTML = `${c.buttons} <small>BUTTONS</small>`;
-    for (const k of [Buildable.Turret, Buildable.Wall, Buildable.Mat]) {
-      document.getElementById(`card${k}`)?.classList.toggle('poor', c.buttons < BUILDABLES[k].cost);
-    }
     const pad = s ? coopProps?.nearestPad(s.x, s.z, BUILD_RANGE) ?? -1 : -1;
+    const here = pad >= 0 ? c.pads[pad] : null;
+    const open = deckOpen();
+    hud.deck.classList.toggle('open', open);
+    for (const k of DECK) {
+      const el = document.getElementById(`card${k}`);
+      if (!el) continue;
+      const upgrade = !!here && here.kind === k && here.tier < MAX_TIER;
+      const cost = upgrade ? upgradeCost(k, here!.tier) : BUILDABLES[k].cost;
+      el.classList.toggle('upgrade', upgrade);
+      el.classList.toggle('selected', k === lastBuild);
+      el.classList.toggle('poor', c.buttons < cost || (!!here && here.kind !== Buildable.None && !upgrade));
+      (el.querySelector('.cost') as HTMLElement).textContent = upgrade ? `▲ ${cost}` : here && here.kind === k ? 'MAX' : String(cost);
+      (el.querySelector('.tier') as HTMLElement).textContent = here && here.kind === k ? '★'.repeat(here.tier) : '';
+    }
     if (pad >= 0) {
-      const kind = c.pads[pad]?.kind ?? 0;
+      const kind = here?.kind ?? 0;
       hud.padhint.innerHTML = kind === Buildable.None
-        ? `Build pad ${CORE_LETTERS[world.coop.pads[pad].core]} · press <b>3</b> <b>4</b> <b>5</b> to build`
-        : `${BUILDABLES[kind].name} · ${Math.round((c.pads[pad]?.health ?? 0) * 100)}% · <b>G</b> to recycle`;
+        ? `Build pad ${CORE_LETTERS[world.coop.pads[pad].core]} · ${open ? 'press <b>1–7</b> to build' : 'press <b>B</b> for the build deck'}`
+        : `${BUILDABLES[kind].name} ${'★'.repeat(here!.tier)} · ${Math.round((here?.health ?? 0) * 100)}% · <b>${DECK.indexOf(kind as never) + 1}</b> upgrade · <b>G</b> recycle`;
     } else {
       hud.padhint.textContent = c.phase === Phase.Build ? 'Stand on a stitched pad to build' : '';
     }
+    hud.deckhint.innerHTML = open ? '<b>1–7</b> build or upgrade · <b>Q</b> build again · <b>B</b> close' : '<b>B</b> build deck · <b>Q</b> build again';
   } else {
-    hud.wave.textContent = 'FREE-FOR-ALL';
-    hud.phase.textContent = '';
+    hud.wave.textContent = mode === 'tdm' ? 'TEAM DEATHMATCH' : 'FREE-FOR-ALL';
+    hud.phase.innerHTML = mode === 'tdm' ? teamScoreText() : '';
   }
 
   if (net.status === 'connecting') hud.status.textContent = `Connecting to ${solo ? 'solo worker' : 'server'}…`;
   else if (net.status === 'full') hud.status.textContent = 'Room is full (8 toys).';
   else if (net.status === 'closed') {
     hud.status.innerHTML = `Disconnected: ${escapeHtml(net.closeReason)}. <a href="?solo=1&mode=${mode}">Play solo with bots instead</a>`;
-  } else if (!net.predicted && net.latest) hud.status.textContent = `Unravelled! Re-stitching in ${net.respawn.toFixed(1)} s`;
+  } else if (!net.predicted && net.latest) hud.status.textContent = `Unravelled! ${mode === 'coop' ? 'Back at the end of the wave, or' : 'Re-stitching'} in ${net.respawn.toFixed(1)} s`;
   else hud.status.textContent = '';
 }
 
@@ -465,6 +611,15 @@ function resize(): void {
   post?.setSize(window.innerWidth, window.innerHeight);
 }
 window.addEventListener('resize', resize);
+
+function teamScoreText(): string {
+  const score = [0, 0];
+  for (const p of net.latest?.players ?? []) score[net.roster.get(p.id)?.team ?? 0] += p.kos;
+  return `<b style="color:#e8742a">Team Cotton ${score[0]}</b> · <b style="color:#6fb4ff">Team Wool ${score[1]}</b>`;
+}
+
+const pickupsView = new PickupsView(scene, world);
+const music = new CombatMusic();
 
 let acc = 0;
 let last = performance.now();
@@ -511,7 +666,7 @@ function frame(): void {
     lastPos.set(r.id, new THREE.Vector3(r.x, r.y, r.z));
     a.root.position.set(r.x, r.y, r.z);
     a.root.rotation.y = r.yaw;
-    a.update(dt, t, Math.min(1.3, speed / PLAYER.runSpeed), r.pitch, r.crouch, airborne, !r.alive);
+    a.update(dt, t, r.downed ? 0 : Math.min(1.3, speed / PLAYER.runSpeed), r.pitch, r.crouch, airborne, !r.alive || r.downed);
     if (r.alive) remoteNow.set(r.id, new THREE.Vector3(r.x, r.y, r.z));
   }
 
@@ -546,20 +701,28 @@ function frame(): void {
   while (acc >= 1 / 60) {
     acc -= 1 / 60;
     const buttons = autopilot ? autopilotButtons(now, net.predicted) : locked ? sampleButtons() : 0;
-    const r = net.input(buttons, yaw, pitch, now);
+    const action = pendingAction;
+    pendingAction = 0;
+    const r = net.input(buttons, yaw, pitch, now, wantWeapon, action);
     if (r.fired && net.predicted) {
       const s = net.predicted;
       const weapon = WEAPONS[r.weapon];
       const crouch = (buttons & Buttons.Crouch) !== 0;
       const o = eyePosition(s, crouch);
       const muzzle = viewModel.muzzle();
-      for (const d of pelletDirections(weapon, lookDirection(s.yaw, s.pitch), r.seq)) {
-        const { to, enemy } = predictedHit(o, d, weapon.range);
-        fx.projectile(muzzle, to, r.weapon === 1 ? 0xffc94a : 0xe8742a, r.weapon === 1);
-        // Enemy hits shed fibres (from the server's verdict); misses puff dust off the wool.
-        if (!enemy) fx.puff(to, 0xcfd6e6, r.weapon === 1 ? 0.4 : 0.55);
+      const aim = lookDirection(s.yaw, s.pitch);
+      if (weapon.projectile) {
+        // Lob a predicted yarn ball from the same spot the server launches it.
+        pickupsView.launchLocal(launchProjectile(0, net.id, r.weapon, [o[0] + aim[0] * 0.5, o[1] - 0.15 + aim[1] * 0.5, o[2] + aim[2] * 0.5], aim));
+      } else {
+        for (const d of pelletDirections(weapon, aim, r.seq)) {
+          const { to, enemy } = predictedHit(o, d, weapon.range);
+          fx.projectile(muzzle, to, r.weapon === 0 ? 0xe8742a : weapon.color, r.weapon === 1);
+          // Enemy hits shed fibres (from the server's verdict); misses puff dust off the wool.
+          if (!enemy) fx.puff(to, 0xcfd6e6, r.weapon === 1 ? 0.4 : 0.55);
+        }
       }
-      sfx.play(r.weapon === 1 ? 'buster' : 'popper');
+      sfx.play(WEAPON_SOUNDS[r.weapon] ?? 'popper');
       viewModel.fire();
       flash = 0.05;
     }
@@ -601,6 +764,10 @@ function frame(): void {
     camera.position.set(c[0], c[1], c[2]);
     camera.lookAt(c[3], c[4], c[5]);
   }
+  if (fx.shake > 0.01 && !fixedCam) {
+    const k = fx.shake * fx.shake * 0.25;
+    eye.x += (Math.random() - 0.5) * k; eye.y += (Math.random() - 0.5) * k; eye.z += (Math.random() - 0.5) * k;
+  }
   if (p && thirdPerson) {
     const back: Vec3 = lookDirection(yaw, pitch);
     tmp.set(eye.x - back[0] * 3, eye.y - back[1] * 3 + 0.4, eye.z - back[2] * 3);
@@ -608,13 +775,13 @@ function frame(): void {
   } else if (!fixedCam) {
     camera.position.copy(eye);
   }
-  viewModel.group.visible = !!p && !thirdPerson && !fixedCam;
+  viewModel.group.visible = !!p && !p.downed && !thirdPerson && !fixedCam;
   if (ownAvatar) {
     ownAvatar.root.visible = !!p && (thirdPerson || !!fixedCam);
     if (p) {
       ownAvatar.root.position.set(eye.x, eye.y - (crouching ? PLAYER.eyeHeight * 0.7 : PLAYER.eyeHeight), eye.z);
       ownAvatar.root.rotation.y = yaw;
-      ownAvatar.update(dt, t, Math.min(1.3, Math.hypot(p.vx, p.vz) / PLAYER.runSpeed), pitch, crouching, !p.onGround, false);
+      ownAvatar.update(dt, t, Math.min(1.3, Math.hypot(p.vx, p.vz) / PLAYER.runSpeed), pitch, crouching, !p.onGround, p.downed);
     }
   }
   flash = Math.max(0, flash - dt);
@@ -630,6 +797,9 @@ function frame(): void {
   }
 
   fx.update(dt);
+  if (net.latest) pickupsView.update(dt, t, net.latest.pickups, net.latest.drops, net.latest.projectiles, net.id);
+  const cp = net.coop;
+  music.setIntensity((!cp ? (net.latest ? 2 : 0) : cp.phase === Phase.Wave ? (cp.boss >= 0 ? 3 : 2) : cp.phase === Phase.Build ? 1 : 0) as Intensity);
   room.update(t, camera);
   updateShellLod(camera);
 

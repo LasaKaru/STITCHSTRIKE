@@ -5,7 +5,21 @@ import { circleClear, type Box, type Vec3, type World } from './world.ts';
  * wool-eating Moths. They run only on the server; clients interpolate them.
  */
 
-export const EnemyType = { Grunt: 0, Scuttler: 1, Moth: 2, Brute: 3 } as const;
+export const EnemyType = {
+  Grunt: 0, Scuttler: 1, Moth: 2, Brute: 3,
+  /** Wind-up chattering teeth: a fast, fragile swarm. */
+  Teeth: 4,
+  /** Spinning top: zig-zags in fast and bowls toys over. */
+  Top: 5,
+  /** Tin toy soldier: stops at range and shoots. */
+  Soldier: 6,
+  /** RC drone: a flying carrier that drops teeth on the defence. */
+  Drone: 7,
+  /** Scissor snip: goes for buildables and cuts them apart. */
+  Snip: 8,
+  /** Boss: The Unraveller, Baron von Ravel's giant felted bear. */
+  Boss: 9,
+} as const;
 
 export interface EnemyDef {
   name: string;
@@ -17,16 +31,40 @@ export interface EnemyDef {
   attackRate: number;
   reward: number;
   flying: boolean;
-  /** Brutes also flatten buildables in their way. */
+  /** Brutes and the boss also flatten buildables in their way. */
   breaksBuildables: boolean;
+  /** Stops at this range with line of sight and fires (tin soldiers). */
+  range?: number;
+  /** Hunts buildables before anything else (scissor snips). */
+  cutsBuildables?: boolean;
+  /** Cruising height for flyers. */
+  altitude?: number;
+  boss?: boolean;
+  /** Knocks toys back on hit (spinning tops, the boss). */
+  knockback?: number;
 }
 
 export const ENEMIES: EnemyDef[] = [
   { name: 'Knit Grunt', hp: 70, speed: 2.4, radius: 0.45, height: 1.5, damage: 10, attackRate: 1, reward: 7, flying: false, breaksBuildables: false },
   { name: 'Scuttler', hp: 32, speed: 4.8, radius: 0.38, height: 0.7, damage: 6, attackRate: 2, reward: 6, flying: false, breaksBuildables: false },
-  { name: 'Moth', hp: 40, speed: 3.6, radius: 0.45, height: 0.7, damage: 8, attackRate: 1.2, reward: 9, flying: true, breaksBuildables: false },
-  { name: 'Felted Brute', hp: 520, speed: 1.5, radius: 0.9, height: 2.6, damage: 35, attackRate: 0.6, reward: 45, flying: false, breaksBuildables: true },
+  { name: 'Moth', hp: 40, speed: 3.6, radius: 0.45, height: 0.7, damage: 8, attackRate: 1.2, reward: 9, flying: true, breaksBuildables: false, altitude: 3.2 },
+  { name: 'Felted Brute', hp: 520, speed: 1.5, radius: 0.9, height: 2.6, damage: 35, attackRate: 0.6, reward: 45, flying: false, breaksBuildables: true, knockback: 4 },
+  { name: 'Chatter Teeth', hp: 14, speed: 5, radius: 0.28, height: 0.45, damage: 3, attackRate: 1.6, reward: 2, flying: false, breaksBuildables: false },
+  { name: 'Spinning Top', hp: 60, speed: 6, radius: 0.5, height: 0.9, damage: 12, attackRate: 1, reward: 8, flying: false, breaksBuildables: false, knockback: 7 },
+  { name: 'Tin Soldier', hp: 55, speed: 2, radius: 0.4, height: 1.35, damage: 7, attackRate: 0.8, reward: 10, flying: false, breaksBuildables: false, range: 14 },
+  { name: 'RC Drone', hp: 90, speed: 3.2, radius: 0.6, height: 0.5, damage: 10, attackRate: 1, reward: 14, flying: true, breaksBuildables: false, altitude: 5.5 },
+  { name: 'Scissor Snip', hp: 110, speed: 3, radius: 0.55, height: 0.8, damage: 12, attackRate: 1, reward: 16, flying: false, breaksBuildables: false, cutsBuildables: true },
+  { name: 'The Unraveller', hp: 4200, speed: 1.2, radius: 1.6, height: 4.6, damage: 50, attackRate: 0.5, reward: 300, flying: false, breaksBuildables: true, boss: true, knockback: 9 },
 ];
+
+/** Damage scissor snips do to buildables per cut. */
+export const SNIP_CUT = 60;
+/** Seconds between a drone's teeth drops, and how many per drop. */
+export const DRONE_DROP = { every: 6, count: 3 };
+/** The boss stomps every few seconds: damage and radius. */
+export const BOSS_STOMP = { every: 6, damage: 30, radius: 5 };
+/** Tin soldiers' chance to hit a toy per shot (they are toys, after all). */
+export const SOLDIER_ACCURACY = 0.55;
 
 export const MOTH_ALTITUDE = 3.2;
 
@@ -47,6 +85,10 @@ export interface Enemy {
   /** Seconds of remaining knockback drift. */
   kx: number;
   kz: number;
+  /** Seconds left tangled by a yarn ball (half speed). */
+  slow: number;
+  /** Type-specific timer: drone drops, boss stomps. */
+  special: number;
 }
 
 // ---------------------------------------------------------------- navigation
@@ -58,8 +100,11 @@ export interface Enemy {
 export class NavGrid {
   readonly nodes: { x: number; z: number }[] = [];
   readonly neighbours: number[][] = [];
-  readonly next: Int32Array[] = [];
-  readonly dist: Float32Array[] = [];
+  next: Int32Array[] = [];
+  dist: Float32Array[] = [];
+  /** Extra cost multiplier per node (blockades make routes expensive, not impossible). */
+  readonly cost: Float32Array;
+  private cores: Vec3[];
 
   constructor(world: World, step = 2, clearance = 0.8) {
     const boxes = world.boxes;
@@ -80,7 +125,27 @@ export class NavGrid {
       }
       this.neighbours.push(list);
     }
-    for (const core of world.coop.cores) this.buildFlow(core);
+    this.cost = new Float32Array(this.nodes.length).fill(1);
+    this.cores = world.coop.cores;
+    this.rebake([]);
+  }
+
+  /**
+   * Re-bakes every Heartspool's flow field around the current blockades, so
+   * invaders route around walls the moment they are built (tower-defence
+   * mazing). Nodes under a blockade cost 14x: if there is no way round,
+   * enemies still come through and chew the wall.
+   */
+  rebake(blockers: { x: number; z: number; r: number }[]): void {
+    this.cost.fill(1);
+    for (const b of blockers) {
+      this.nodes.forEach((n, i) => {
+        if (Math.hypot(n.x - b.x, n.z - b.z) < b.r) this.cost[i] = 14;
+      });
+    }
+    this.next = [];
+    this.dist = [];
+    for (const core of this.cores) this.buildFlow(core);
   }
 
   private buildFlow(core: Vec3): void {
@@ -127,7 +192,7 @@ export class NavGrid {
       if (done[i]) continue;
       done[i] = 1;
       for (const j of this.neighbours[i]) {
-        const d = dist[i] + Math.hypot(this.nodes[i].x - this.nodes[j].x, this.nodes[i].z - this.nodes[j].z);
+        const d = dist[i] + Math.hypot(this.nodes[i].x - this.nodes[j].x, this.nodes[i].z - this.nodes[j].z) * this.cost[j];
         if (d < dist[j]) {
           dist[j] = d;
           next[j] = i;
