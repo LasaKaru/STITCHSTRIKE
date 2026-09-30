@@ -6,6 +6,7 @@ import {
   MAPS, type GameMode, type MapId, type PlayerState, type Vec3,
 } from '@stitchstrike/shared';
 import { Sfx } from './audio/sfx.ts';
+import { loadSettings } from './settings.ts';
 import { NetClient, type EnemySample } from './net/netClient.ts';
 import { withFakeLag, workerTransport, wsTransport, type Transport } from './net/transport.ts';
 import { createAvatar, type Avatar } from './scene/avatar.ts';
@@ -33,19 +34,16 @@ const mode: GameMode = params.get('mode') === 'pvp' ? 'pvp' : 'coop';
 const solo = params.get('solo') === '1';
 const lag = Math.max(0, Number(params.get('lag') ?? 0) || 0);
 const bots = params.get('bots');
-const quality = (params.get('quality') ?? 'high') as 'low' | 'medium' | 'high';
+const settings = loadSettings();
+const quality = (params.get('quality') ?? settings.quality) as 'low' | 'medium' | 'high';
 const autopilot = params.get('autopilot') === '1';
 /** Fixed cinematic camera for screenshots and spectating: ?cam=overview|core|window. */
 const fixedCam = params.get('cam');
-const name = (params.get('name') ?? localStorageGet('ss-name') ?? `Toy${Math.floor(Math.random() * 900 + 100)}`).slice(0, 16);
+const name = (params.get('name') ?? settings.name).slice(0, 16);
 document.body.classList.add(mode);
 document.getElementById('modeline')!.textContent = mode === 'coop'
   ? 'Co-op defence · protect the Heartspools'
   : 'PvP free-for-all · first to unravel the most toys';
-
-function localStorageGet(k: string): string | null {
-  try { return localStorage.getItem(k); } catch { return null; }
-}
 
 // ---------------------------------------------------------------- transport
 
@@ -56,7 +54,7 @@ function connect(): Transport {
   q.set('mode', mode);
   q.set('map', map);
   if (bots !== null) q.set('bots', bots);
-  const base = params.get('server') ?? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
+  const base = params.get('server') ?? (settings.server || `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
   return withFakeLag(wsTransport(`${base}/?${q}`), lag);
 }
 
@@ -82,7 +80,7 @@ scene.environmentIntensity = world.outdoor ? 0.5 : 0.22;
 const room = world.outdoor ? buildWoolGarden(scene, world, quality) : buildWoolRoom(scene, world);
 (window as unknown as { __stitchstrike: unknown }).__stitchstrike = { net, scene, renderer };
 
-const camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.03, world.outdoor ? 900 : 200);
+const camera = new THREE.PerspectiveCamera(settings.fov, window.innerWidth / window.innerHeight, 0.03, world.outdoor ? 900 : 200);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
 
@@ -98,6 +96,7 @@ camera.add(muzzleFlash);
 
 const fx = new Fx(scene);
 const sfx = new Sfx();
+sfx.volume = settings.sfxVolume;
 const coopProps = mode === 'coop' ? new CoopProps(scene, world) : null;
 const enemyRenderer = mode === 'coop' ? new EnemyRenderer(scene) : null;
 
@@ -253,7 +252,8 @@ net.onSpawn = (s: PlayerState) => { yaw = s.yaw; pitch = 0; };
 const keys = new Set<string>();
 let mouseDown = false;
 let thirdPerson = false;
-const sensitivity = Number(localStorageGet('ss-sens') ?? 0.0022);
+const sensitivity = settings.sensitivity;
+const invertY = settings.invertY ? -1 : 1;
 
 const overlay = document.getElementById('overlay')!;
 const lock = () => { sfx.unlock(); renderer.domElement.requestPointerLock(); };
@@ -262,12 +262,13 @@ overlay.addEventListener('click', lock);
 document.addEventListener('pointerlockchange', () => {
   const locked = document.pointerLockElement === renderer.domElement;
   overlay.classList.toggle('hidden', locked);
+  if (locked) overlay.classList.add('paused'); // from now on the overlay is the pause screen
   if (!locked) { keys.clear(); mouseDown = false; }
 });
 document.addEventListener('mousemove', (e) => {
   if (document.pointerLockElement !== renderer.domElement) return;
   yaw -= e.movementX * sensitivity;
-  pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, pitch - e.movementY * sensitivity));
+  pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, pitch - e.movementY * sensitivity * invertY));
 });
 document.addEventListener('mousedown', (e) => { if (e.button === 0 && document.pointerLockElement) mouseDown = true; });
 document.addEventListener('mouseup', (e) => { if (e.button === 0) mouseDown = false; });
@@ -327,6 +328,7 @@ const hud = {
 };
 const scoreboard = $('scoreboard');
 const netPanel = $('netpanel');
+if (!settings.showNet) hud.net.style.display = 'none';
 
 if (mode === 'coop') {
   hud.cores.innerHTML = CORE_LETTERS.map((l, i) => `<div class="core" id="core${i}">

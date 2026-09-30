@@ -1,0 +1,13 @@
+"DepotBuild"
+{
+	"DepotID" "YOUR_WINDOWS_DEPOT_ID"
+	"ContentRoot" "../release/win-unpacked/"
+	"FileMapping"
+	{
+		"LocalPath" "*"
+		"DepotPath" "."
+		"Recursive" "1"
+	}
+	// steam_appid.txt is for local testing only; Steam supplies the app id when it launches the game.
+	"FileExclusion" "steam_appid.txt"
+}

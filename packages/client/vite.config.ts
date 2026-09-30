@@ -9,6 +9,7 @@ export default defineConfig({
     proxy: {
       // The arena connects to /ws on the page's own origin; in dev that is proxied to the game server.
       '/ws': { target: SERVER, ws: true, rewrite: (p) => p.replace(/^\/ws/, '') },
+      '/health': { target: SERVER },
     },
   },
   worker: { format: 'es' },

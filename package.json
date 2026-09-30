@@ -10,15 +10,22 @@
     "build": "pnpm --filter @stitchstrike/client build",
     "test": "vitest run",
     "typecheck": "tsc -b",
-    "loadtest": "pnpm --filter @stitchstrike/tools loadtest"
+    "loadtest": "pnpm --filter @stitchstrike/tools loadtest",
+    "desktop": "pnpm --filter stitchstrike start",
+    "desktop:dist": "pnpm --filter stitchstrike dist",
+    "desktop:win": "pnpm --filter stitchstrike dist:win"
   },
   "devDependencies": {
     "@types/node": "^22.20.4",
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
     "typescript": "^5.9.3",
     "vitest": "^5.0.2"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
+      "electron",
       "esbuild"
     ]
   }

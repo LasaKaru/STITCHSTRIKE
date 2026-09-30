@@ -45,7 +45,7 @@
       <div class="card">
         <h1>STITCHSTRIKE</h1>
         <p class="sub" id="modeline">Co-op defence · protect the Heartspools</p>
-        <p class="go">Click to play</p>
+        <p class="go"><span class="start">Click to play</span><span class="resume">Paused · click to resume</span></p>
         <table class="keys">
           <tr><td>WASD</td><td>move</td><td>Mouse</td><td>look / fire</td></tr>
           <tr><td>Space</td><td>jump (×2)</td><td>Shift</td><td>sprint</td></tr>
@@ -54,7 +54,7 @@
           <tr class="coop-only"><td>Enter</td><td>ready up</td><td>C</td><td>crouch</td></tr>
           <tr><td>V</td><td>1st / 3rd person</td><td>Tab</td><td>scores</td></tr>
         </table>
-        <p class="hint"><a href="/">← menu</a></p>
+        <p class="hint"><a href="/" onclick="event.stopPropagation()">Leave match · main menu</a></p>
       </div>
     </div>
     <script type="module" src="/src/arena-main.ts"></script>

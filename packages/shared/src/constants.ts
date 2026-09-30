@@ -40,8 +40,16 @@ export const PLAYER = {
   stepHeight: 0.45,
   groundResponse: 16,
   airResponse: 3,
-  maxHealth: 100,
+  maxHealth: 150,
   respawnSeconds: 3,
+  /** Stitch-up: after this long without taking damage, health knits itself back... */
+  regenDelay: 4,
+  /** ...at this many stitches per second. */
+  regenRate: 18,
+  /** Seconds of invulnerability after (re)spawning, so nobody is farmed at the spawn. */
+  spawnProtection: 2,
+  /** Enemy hits on toys are softened in co-op; the Heartspools are their real target. */
+  coopDamageScale: 0.7,
 } as const;
 
 export const JUMP_VELOCITY = Math.sqrt(2 * PLAYER.gravity * PLAYER.jumpHeight);

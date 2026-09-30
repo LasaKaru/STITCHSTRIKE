@@ -1,0 +1,12 @@
+"AppBuild"
+{
+	"AppID" "YOUR_APP_ID"
+	"Desc" "STITCHSTRIKE build"
+	"BuildOutput" "./output/"
+	"ContentRoot" "../release/"
+	"SetLive" ""
+	"Depots"
+	{
+		"YOUR_WINDOWS_DEPOT_ID" "depot_build_windows.vdf"
+	}
+}

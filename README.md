@@ -2,7 +2,11 @@
 
 **Soft toys. Hard fights.** A browser multiplayer toy shooter where everything is wool: the heroes, the enemies and the whole room. Knitted toys defend glowing **Heartspools** from waves of mass-knit invaders, out in a knitted **back garden** (yarn grass, sculpted trees, a treehouse, a shed and a very messy yard) or in a giant crocheted **bedroom**. Built with Three.js and TypeScript, with a server-authoritative netcode.
 
-![The knitted cast: sculpted, rigged, animated wool figures](docs/screenshots/figure-cast.jpg)
+![Main menu over the live in-engine cinematic](docs/screenshots/menu.jpg)
+
+| Title screen | Play setup | The knitted cast |
+|---|---|---|
+| ![](docs/screenshots/menu-title.jpg) | ![](docs/screenshots/menu-play.jpg) | ![](docs/screenshots/figure-cast.jpg) |
 
 | The Back Garden: knitted house, felt trees, treehouse, pond | First person in the yarn grass, Grunts incoming | Flamingos, sandcastle, parasol and mess on the lawn |
 |---|---|---|
@@ -21,7 +25,7 @@ pnpm install
 pnpm dev          # game server on :8787 + Vite on :5173 (the /ws path is proxied to the server)
 ```
 
-Open http://localhost:5173, pick a map (**Back Garden** or **The Bedroom**), then a mode:
+Open http://localhost:5173 for the main menu: press any key over the live cinematic, then **Play** (mode, map, offline with bots or an online room), **Quick match**, **Toy Box**, **Settings** (name, sensitivity, FOV, invert, quality, volumes, game server), **How to play** and **Credits**. Mouse, keyboard (↑↓, Enter, Esc) and gamepads all work. The arena reads the same settings, and Esc in a match is the pause screen. Arena links work directly too:
 
 | Mode | Link | What happens |
 |---|---|---|
@@ -33,12 +37,22 @@ Open http://localhost:5173, pick a map (**Back Garden** or **The Bedroom**), the
 
 Add `&map=garden` or `&map=bedroom` to any arena link (default: bedroom). Friends join the same match with the same room code and map: `/arena.html?mode=coop&map=garden&room=ABCD` (the landing page has a join form). If you join a room that runs another map, the client reloads on that map.
 
+### Desktop app (Windows .exe, Steam)
+
+```bash
+pnpm desktop        # build and launch the Electron app (fullscreen; -- --windowed for a window)
+pnpm desktop:win    # packages/desktop/release: win-unpacked/STITCHSTRIKE.exe (upload this folder to Steam) + portable .exe
+```
+
+The app embeds the game server, so solo, online rooms and LAN hosting (`--lan`) all work from the one exe. See [docs/DESKTOP_AND_STEAM.md](docs/DESKTOP_AND_STEAM.md) for the full Steam checklist and [docs/ROADMAP.md](docs/ROADMAP.md) for what to build next: weapons, enemies, bosses, missions, maps, customisation, split-screen and Steam lobbies.
+
 ### Controls
 
 WASD move · mouse look/fire · Space jump (double jump) · Shift sprint · C crouch · R reload · **1/2** Pom-Pom Popper / Button Buster · **3/4/5** build Turret / Pin Wall / Tangle Mat on the pad you stand on · **G** recycle (50% refund) · **Enter** ready up (skip build time) · V first/third person · Tab scores · F3 net stats.
 
 ### Co-op rules
 
+- **Toys** have 150 stitches. After 4 s without taking damage they knit themselves back together (**Stitch-up**), and they spawn with 2 s of protection. Enemy hits on toys are softened in co-op, because the Heartspools are the invaders' real target.
 - **Heartspools** (A, B, C) have a blue thread shield that absorbs damage first and regrows during build phases. Lose all three and the match is lost.
 - **Build pads** are the embroidered patches around each Heartspool. Costs are paid in **buttons**, a team pool you earn by unravelling enemies and clearing waves:
   - **Pom-Pom Turret** (150): auto-fires at the nearest enemy in sight.
@@ -61,7 +75,7 @@ Balance check (full simulated matches, bots only, on both maps): 1–4 bots lose
 Server env: `PORT` (8787), `FILL_BOTS` (4), `FAKE_LAG_MS` (one-way per direction).
 
 ```bash
-pnpm test         # 42 tests: simulation (movement, protocol, lag comp, prediction, co-op on every map) + SDF mesher and figure rig
+pnpm test         # 43 tests: simulation (movement, protocol, lag comp, prediction, co-op on every map) + SDF mesher and figure rig
 pnpm typecheck    # tsc -b across all packages
 pnpm build        # production client -> packages/client/dist
 pnpm loadtest -- --clients 4 --seconds 30 --mode coop   # headless clients against a running server
@@ -75,12 +89,14 @@ packages/
             movement + weapons (deterministic step), world + co-op layout, enemies + nav flow fields,
             CoopDirector (waves, Heartspools, pads, buttons), Room (authoritative sim, lag compensation),
             bots, binary protocol, RoomHost (transport-agnostic loop)
-  server/   Node WebSocket server: rooms by mode + code, 30 Hz tick, 20 Hz snapshots
+  server/   Node WebSocket server (startGameServer): rooms by mode + map + code, 30 Hz tick, 20 Hz snapshots, optional static client
+  desktop/  Electron app: embeds the server, serves the client, Steam/Windows packaging (electron-builder)
   client/   Vite + Three.js
             src/wool/    procedural stitch maps + the layered wool material (UV or world-space/triplanar)
             src/scene/   woolGarden (the outdoor map), woolRoom (the bedroom), woolKit + mess (shared knitted
                          building blocks and clutter), enemyRenderer (knitted enemies),
                          coopProps (Heartspools, pads, buildables), fx, viewModel, avatars, Pip, post chain
+            src/menu-main.ts + scene/cinematic.ts   main menu over a live six-shot in-engine cinematic; audio/music.ts
             src/net/     transports (WebSocket / Worker / fake lag) and the predicting NetClient
             src/audio/   synthesized sound effects (Web Audio, no files)
   tools/    headless load tester
@@ -166,6 +182,4 @@ Enemies are drawn with one `InstancedMesh` per body part per type, animated per 
 
 ## Roadmap from here
 
-- **More maps:** kitchen counter, sewing room, attic and a park from the plan, built with the same wool kit.
-- **Plan features still missing:** Spools (carry-able shield batteries), the yarn-swing move, more weapons with physical effects, the full buildable deck, medals and unlocks, customisation.
-- **Art and netcode:** hand-authored animation clips and facial expressions; moving figure meshing into a Web Worker; WebRTC/WebTransport datagrams for PvP.
+See **[docs/ROADMAP.md](docs/ROADMAP.md)**. It covers survivability and game feel, 9 weapon ideas, new traps and mazing, the Mass-Knit Army with bosses, missions and modes, split-screen, 7 new maps, customisation without pay-to-win, Steam lobbies and performance. It ends with a suggested order: a vertical slice for the Steam page, then Early Access, then 1.0.

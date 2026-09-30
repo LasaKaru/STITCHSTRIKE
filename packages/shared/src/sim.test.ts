@@ -140,8 +140,29 @@ describe('room', () => {
     a.state = createPlayerState([10, 0, 10]);
     b.state = createPlayerState([10, 0, 4]);
     a.state.onGround = b.state.onGround = true;
+    a.protect = b.protect = 0; // skip spawn protection
     return { a, b };
   }
+
+  it('spawn protection, then Stitch-up regeneration after a quiet spell', () => {
+    const room = new Room(world);
+    const { a, b } = faceEachOther(room);
+    b.protect = PLAYER.spawnProtection;
+    room.update();
+    room.queueInputs(a.id, [cmd(1, Buttons.Fire, 0, 0, room.tick)]);
+    room.update();
+    expect(b.health).toBe(PLAYER.maxHealth);
+    b.protect = 0;
+    a.state.cooldown = 0;
+    room.queueInputs(a.id, [cmd(2, 0), cmd(3, Buttons.Fire, 0, 0, room.tick)]);
+    room.update();
+    const hurt = b.health;
+    expect(hurt).toBeLessThan(PLAYER.maxHealth);
+    for (let t = 0; t < TICK_RATE * (PLAYER.regenDelay - 1); t++) room.update();
+    expect(b.health).toBe(hurt);
+    for (let t = 0; t < TICK_RATE * 3; t++) room.update();
+    expect(b.health).toBe(PLAYER.maxHealth);
+  });
 
   it('hitscan damages and knocks out the target, then respawns it', () => {
     const room = new Room(world);

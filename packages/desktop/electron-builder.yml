@@ -1,0 +1,48 @@
+# electron-builder config for the Steam / itch.io / direct-download builds.
+appId: com.stitchstrike.game
+productName: STITCHSTRIKE
+copyright: Copyright © 2026 STITCHSTRIKE
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**
+  - client/**
+  - build/icon.png
+  - package.json
+  - "!**/*.map"
+asar: true
+# Everything is bundled by esbuild, so no node_modules ship.
+npmRebuild: false
+nodeGypRebuild: false
+extraFiles:
+  # Steam reads this next to the exe when launched outside the Steam client (dev only; remove for release).
+  - from: steam/steam_appid.txt
+    to: steam_appid.txt
+win:
+  target:
+    # "dir" is the unpacked folder you upload to Steam with SteamPipe; "nsis" is a normal installer
+    # and "portable" a single .exe, both for itch.io or direct download.
+    - target: dir
+      arch: [x64]
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+  icon: build/icon.png
+  artifactName: ${productName}-${version}-${arch}.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: STITCHSTRIKE
+portable:
+  artifactName: ${productName}-${version}-portable.exe
+linux:
+  target: [dir, AppImage]
+  category: Game
+  icon: build/icon.png
+mac:
+  target: [dmg]
+  category: public.app-category.action-games
+  icon: build/icon.png

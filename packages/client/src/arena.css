@@ -60,6 +60,10 @@
 #overlay .keys td { padding: 3px 4px; }
 #overlay .keys td:nth-child(odd) { color: var(--gold); font-weight: 700; white-space: nowrap; }
 #overlay .hint a { color: var(--muted); }
+#overlay .go .resume, #overlay.paused .go .start { display: none; }
+#overlay.paused .go .resume { display: inline; }
+#overlay .hint a { display: inline-block; margin-top: 12px; padding: 8px 14px; border-radius: 10px; border: 2px dashed rgba(243,236,221,.35); text-decoration: none; }
+#overlay .hint a:hover { color: var(--gold); border-color: var(--gold); }
 
 /* ---------------------------------------------------------------- co-op HUD */
 body.pvp .coop-only { display: none !important; }

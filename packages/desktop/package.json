@@ -1,0 +1,23 @@
+{
+  "name": "stitchstrike",
+  "productName": "STITCHSTRIKE",
+  "version": "0.2.0",
+  "description": "Soft toys. Hard fights. A knitted co-op toy shooter.",
+  "author": "STITCHSTRIKE",
+  "private": true,
+  "main": "dist/main.cjs",
+  "scripts": {
+    "bundle": "node scripts/build.mjs",
+    "start": "pnpm --filter @stitchstrike/client build && node scripts/build.mjs && electron .",
+    "dist": "pnpm --filter @stitchstrike/client build && node scripts/build.mjs && electron-builder --publish never",
+    "dist:win": "pnpm --filter @stitchstrike/client build && node scripts/build.mjs && electron-builder --win --publish never",
+    "dist:linux": "pnpm --filter @stitchstrike/client build && node scripts/build.mjs && electron-builder --linux --publish never"
+  },
+  "devDependencies": {
+    "@stitchstrike/server": "workspace:*",
+    "@stitchstrike/shared": "workspace:*",
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2"
+  }
+}

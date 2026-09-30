@@ -16,6 +16,10 @@ export interface RoomPlayer {
   health: number;
   alive: boolean;
   respawnTimer: number;
+  /** Seconds since this player last took damage (drives Stitch-up regeneration). */
+  sinceHurt: number;
+  /** Remaining spawn protection, seconds. */
+  protect: number;
   kos: number;
   deaths: number;
   queue: InputCmd[];
@@ -67,7 +71,7 @@ export class Room {
       livePlayers: () => [...this.players.values()].filter((p) => p.alive).map((p) => ({ id: p.id, x: p.state.x, y: p.state.y, z: p.state.z })),
       damagePlayer: (id, dmg, enemyType) => {
         const p = this.players.get(id);
-        if (p) this.damage(null, p, dmg, enemyType);
+        if (p) this.damage(null, p, dmg * PLAYER.coopDamageScale, enemyType);
       },
       shot: (s) => this.shots.push(s),
       event: (e) => this.events.push(e),
@@ -88,7 +92,7 @@ export class Room {
     const player: RoomPlayer = {
       id, name: name.slice(0, 16) || `Toy ${id}`, color, bot,
       state: createPlayerState([0, 0, 0]),
-      health: PLAYER.maxHealth, alive: true, respawnTimer: 0,
+      health: PLAYER.maxHealth, alive: true, respawnTimer: 0, sinceHurt: 0, protect: 0,
       kos: 0, deaths: 0, queue: [], lastSeq: 0, budget: 0,
     };
     this.players.set(id, player);
@@ -151,6 +155,12 @@ export class Room {
       if (!p.alive) {
         p.respawnTimer -= TICK_DT;
         if (p.respawnTimer <= 0) this.spawn(p);
+      } else {
+        p.protect = Math.max(0, p.protect - TICK_DT);
+        p.sinceHurt += TICK_DT;
+        if (p.sinceHurt >= PLAYER.regenDelay && p.health < PLAYER.maxHealth) {
+          p.health = Math.min(PLAYER.maxHealth, p.health + PLAYER.regenRate * TICK_DT);
+        }
       }
     }
     if (this.coop) {
@@ -197,6 +207,8 @@ export class Room {
     p.health = PLAYER.maxHealth;
     p.alive = true;
     p.respawnTimer = 0;
+    p.sinceHurt = PLAYER.regenDelay;
+    p.protect = PLAYER.spawnProtection;
     this.events.push({ type: 'spawn', id: p.id });
   }
 
@@ -281,7 +293,8 @@ export class Room {
   }
 
   private damage(attacker: RoomPlayer | null, victim: RoomPlayer, dmg: number, enemyType = -1): void {
-    if (!victim.alive) return;
+    if (!victim.alive || victim.protect > 0) return;
+    victim.sinceHurt = 0;
     victim.health -= dmg;
     if (victim.health <= 0) {
       victim.health = 0;
