@@ -7,7 +7,7 @@ import { Buttons, createPlayerState, type InputCmd } from './movement.ts';
 import { decodeSnapshot, encodeSnapshot } from './protocol.ts';
 import { Room } from './room.ts';
 import { pelletDirections, WEAPONS } from './weapons.ts';
-import { circleClear, createBedroom, type Vec3 } from './world.ts';
+import { circleClear, createBedroom, createWorld, MAPS, type Vec3 } from './world.ts';
 
 const world = createBedroom();
 
@@ -20,7 +20,8 @@ function skipBuildPhase(room: Room): void {
   room.update();
 }
 
-describe('co-op layout', () => {
+describe.each(MAPS.map((m) => m.id))('co-op layout: %s', (map) => {
+  const world = createWorld(map);
   it('has three Heartspools, build pads for each and clear spawns', () => {
     const { cores, pads, enemySpawns, playerSpawns } = world.coop;
     expect(cores).toHaveLength(3);
@@ -42,6 +43,19 @@ describe('co-op layout', () => {
         expect(nav.dist[c][node]).toBe(0);
       }
     }
+  });
+
+  it('a full match with bots runs to an ending', () => {
+    const host = new RoomHost({ code: 'MAP', fillTo: 3, mode: 'coop', map });
+    const coop = host.room.coop!;
+    let ended = -1;
+    for (let t = 0; t < TICK_RATE * 60 * 14 && ended < 0; t++) {
+      if (coop.phase === Phase.Build) coop.timer = Math.min(coop.timer, 2);
+      host.step();
+      if (coop.phase === Phase.Won || coop.phase === Phase.Lost) ended = coop.phase;
+    }
+    expect(ended).toBeGreaterThanOrEqual(Phase.Won);
+    expect(coop.wave).toBeGreaterThanOrEqual(2);
   });
 });
 

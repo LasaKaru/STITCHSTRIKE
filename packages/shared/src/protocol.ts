@@ -1,6 +1,6 @@
 import { WORLD_BOUNDS } from './constants.ts';
 import type { InputCmd, PlayerState } from './movement.ts';
-import type { Vec3 } from './world.ts';
+import type { MapId, Vec3 } from './world.ts';
 
 /**
  * Wire format. Hot-path traffic (inputs, snapshots) is binary; rare control
@@ -34,7 +34,7 @@ export type ClientText =
   | { t: 'ping'; c: number };
 
 export type ServerText =
-  | { t: 'welcome'; id: number; tick: number; room: string; mode: GameMode }
+  | { t: 'welcome'; id: number; tick: number; room: string; mode: GameMode; map: MapId }
   | { t: 'roster'; players: RosterEntry[] }
   | { t: 'events'; tick: number; list: GameEvent[] }
   | { t: 'pong'; c: number; tick: number }

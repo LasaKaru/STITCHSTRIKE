@@ -64,8 +64,9 @@ export class NavGrid {
   constructor(world: World, step = 2, clearance = 0.8) {
     const boxes = world.boxes;
     const index = new Map<string, number>();
-    for (let gx = -19; gx <= 19; gx += step) {
-      for (let gz = -17; gz <= 17; gz += step) {
+    const { min, max } = world.bounds;
+    for (let gx = Math.ceil(min[0]); gx <= max[0]; gx += step) {
+      for (let gz = Math.ceil(min[1]); gz <= max[1]; gz += step) {
         if (!circleClear(boxes, gx, gz, clearance)) continue;
         index.set(`${gx},${gz}`, this.nodes.length);
         this.nodes.push({ x: gx, z: gz });
@@ -86,21 +87,51 @@ export class NavGrid {
     const n = this.nodes.length;
     const dist = new Float32Array(n).fill(Infinity);
     const next = new Int32Array(n).fill(-1);
-    const open: number[] = [];
+    // Binary-heap Dijkstra (the garden grid has ~2000 nodes).
+    const heap: number[] = [];
+    const push = (i: number) => {
+      heap.push(i);
+      let c = heap.length - 1;
+      while (c > 0) {
+        const p = (c - 1) >> 1;
+        if (dist[heap[p]] <= dist[heap[c]]) break;
+        [heap[p], heap[c]] = [heap[c], heap[p]];
+        c = p;
+      }
+    };
+    const pop = (): number => {
+      const top = heap[0];
+      const last = heap.pop()!;
+      if (heap.length) {
+        heap[0] = last;
+        let c = 0;
+        for (;;) {
+          const l = c * 2 + 1, r = l + 1;
+          let m = c;
+          if (l < heap.length && dist[heap[l]] < dist[heap[m]]) m = l;
+          if (r < heap.length && dist[heap[r]] < dist[heap[m]]) m = r;
+          if (m === c) break;
+          [heap[m], heap[c]] = [heap[c], heap[m]];
+          c = m;
+        }
+      }
+      return top;
+    };
+    const done = new Uint8Array(n);
     // Seed every node within reach of the core.
     this.nodes.forEach((p, i) => {
-      if (Math.hypot(p.x - core[0], p.z - core[2]) < 3.2) { dist[i] = 0; open.push(i); }
+      if (Math.hypot(p.x - core[0], p.z - core[2]) < 3.2) { dist[i] = 0; push(i); }
     });
-    // Dijkstra over a small graph; a sorted array is plenty.
-    while (open.length) {
-      open.sort((a, b) => dist[a] - dist[b]);
-      const i = open.shift()!;
+    while (heap.length) {
+      const i = pop();
+      if (done[i]) continue;
+      done[i] = 1;
       for (const j of this.neighbours[i]) {
         const d = dist[i] + Math.hypot(this.nodes[i].x - this.nodes[j].x, this.nodes[i].z - this.nodes[j].z);
         if (d < dist[j]) {
           dist[j] = d;
           next[j] = i;
-          if (!open.includes(j)) open.push(j);
+          push(j);
         }
       }
     }

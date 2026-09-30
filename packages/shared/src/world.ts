@@ -6,13 +6,22 @@ export interface Box {
   /** Render hint only; collision treats every box the same. */
   kind: 'floor' | 'wall' | 'furniture' | 'prop' | 'shelf';
   color?: number;
-  /** Render hint only: draw as something softer than a box. */
-  shape?: 'beanbag' | 'books' | 'bed' | 'headboard' | 'deskTop' | 'deskLeg' | 'deskSide' | 'chairSeat' | 'chairBack' | 'chairPost'
-    | 'toyChest' | 'blocks' | 'car' | 'ruler' | 'book' | 'drum' | 'bookStack';
+  /** Render hint only: what real object this collision box is drawn as. */
+  shape?: string;
 }
 
+export type MapId = 'bedroom' | 'garden';
+export const MAPS: { id: MapId; name: string; blurb: string }[] = [
+  { id: 'bedroom', name: 'Sunbeam Bedroom', blurb: 'A messy knitted bedroom lit by one sunbeam.' },
+  { id: 'garden', name: 'Back Garden', blurb: 'Lawn, trees, a house, a shed and a treehouse, all wool.' },
+];
+
 export interface World {
+  id: MapId;
   name: string;
+  /** Playable XZ area (nav grid and bots stay inside it). */
+  bounds: { min: [number, number]; max: [number, number] };
+  outdoor: boolean;
   boxes: Box[];
   spawns: Vec3[];
   /** Bot navigation waypoints at floor level or on reachable tops. */
@@ -45,7 +54,7 @@ export function circleClear(boxes: Box[], x: number, z: number, r: number, maxY 
   return true;
 }
 
-function ringPads(boxes: Box[], cores: Vec3[], perCore: number, radius: number): BuildPad[] {
+export function ringPads(boxes: Box[], cores: Vec3[], perCore: number, radius: number): BuildPad[] {
   const pads: BuildPad[] = [];
   cores.forEach((c, ci) => {
     let placed = 0;
@@ -63,7 +72,7 @@ function ringPads(boxes: Box[], cores: Vec3[], perCore: number, radius: number):
   return pads;
 }
 
-function box(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, kind: Box['kind'], color?: number): Box {
+export function box(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, kind: Box['kind'], color?: number): Box {
   return { min: [Math.min(x0, x1), Math.min(y0, y1), Math.min(z0, z1)], max: [Math.max(x0, x1), Math.max(y0, y1), Math.max(z0, z1)], kind, color };
 }
 
@@ -156,5 +165,11 @@ export function createBedroom(): World {
     playerSpawns: [[-1, 0, 0.5], [-3.5, 0, 1.5], [5, 0, 0], [4, 0, 8], [-8, 0, 2], [10, 0, 2]],
   };
 
-  return { name: 'Sunbeam Bedroom', boxes, spawns, waypoints, coop };
+  return { id: 'bedroom', name: 'Sunbeam Bedroom', bounds: { min: [-19, -17], max: [19, 17] }, outdoor: false, boxes, spawns, waypoints, coop };
 }
+
+export function createWorld(map: MapId = 'bedroom'): World {
+  return map === 'garden' ? createGarden() : createBedroom();
+}
+
+import { createGarden } from './garden.ts';

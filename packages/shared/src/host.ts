@@ -2,7 +2,7 @@ import { Bot } from './bots.ts';
 import { isSnapshotTick, MAX_PLAYERS, TICK_RATE } from './constants.ts';
 import { decodeInputs, encodeSnapshot, type ClientText, type GameMode, type ServerText } from './protocol.ts';
 import { Room } from './room.ts';
-import { createBedroom } from './world.ts';
+import { createWorld, type MapId } from './world.ts';
 
 /** Anything that can carry frames to one client: a WebSocket, a worker port, a test double. */
 export interface Connection {
@@ -16,6 +16,7 @@ export interface HostOptions {
   /** Bots are added until humans + bots reach this count. */
   fillTo: number;
   mode?: GameMode;
+  map?: MapId;
 }
 
 /**
@@ -33,7 +34,7 @@ export class RoomHost {
   private snapshots = 0;
 
   constructor(readonly options: HostOptions) {
-    this.room = new Room(createBedroom(), options.mode ?? 'coop');
+    this.room = new Room(createWorld(options.map ?? 'bedroom'), options.mode ?? 'coop');
     this.balanceBots();
   }
 
@@ -60,7 +61,7 @@ export class RoomHost {
             if (!p) { this.sendText(conn, { t: 'full' }); conn.close(); return; }
             id = p.id;
             this.conns.set(id, conn);
-            this.sendText(conn, { t: 'welcome', id, tick: this.room.tick, room: this.options.code, mode: this.room.mode });
+            this.sendText(conn, { t: 'welcome', id, tick: this.room.tick, room: this.options.code, mode: this.room.mode, map: this.room.world.id });
             this.broadcastRoster();
           } else if (msg.t === 'ping') {
             this.sendText(conn, { t: 'pong', c: msg.c, tick: this.room.tick });

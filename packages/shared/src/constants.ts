@@ -56,9 +56,10 @@ export const POPPER = {
   range: 60,
 } as const;
 
+/** Quantisation range for positions on the wire (covers every map; 2 mm steps). */
 export const WORLD_BOUNDS = {
-  min: [-32, -4, -32] as const,
-  max: [32, 28, 32] as const,
+  min: [-64, -4, -64] as const,
+  max: [64, 44, 64] as const,
 };
 
 export const DEFAULT_PORT = 8787;

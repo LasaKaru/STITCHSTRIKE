@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { WebSocketServer, type RawData, type WebSocket } from 'ws';
-import { DEFAULT_PORT, RoomHost, type Connection, type GameMode } from '@stitchstrike/shared';
+import { DEFAULT_PORT, MAPS, RoomHost, type Connection, type GameMode, type MapId } from '@stitchstrike/shared';
 
 const PORT = Number(process.env.PORT ?? DEFAULT_PORT);
 /** Artificial one-way delay per direction, for testing netcode (total RTT = 2x). */
@@ -15,12 +15,12 @@ function roomCode(raw: string | null): string {
   return code || 'LOBBY';
 }
 
-function getRoom(code: string, fillTo: number, mode: GameMode): RoomHost {
-  // Rooms are keyed by mode too, so ?room=ABCD&mode=pvp and co-op ABCD are different matches.
-  const key = `${mode}:${code}`;
+function getRoom(code: string, fillTo: number, mode: GameMode, map: MapId): RoomHost {
+  // Rooms are keyed by mode and map too, so each combination is its own match.
+  const key = `${mode}:${map}:${code}`;
   let host = rooms.get(key);
   if (!host) {
-    host = new RoomHost({ code, fillTo, mode });
+    host = new RoomHost({ code, fillTo, mode, map });
     host.start();
     rooms.set(key, host);
     console.log(`[room ${key}] opened (bots fill to ${fillTo})`);
@@ -39,7 +39,7 @@ const http = createServer((req, res) => {
     const body = JSON.stringify({
       ok: true,
       rooms: [...rooms.values()].map((r) => ({
-        code: r.options.code, mode: r.room.mode, humans: r.humans, players: r.room.players.size, tick: r.room.tick,
+        code: r.options.code, mode: r.room.mode, map: r.room.world.id, humans: r.humans, players: r.room.players.size, tick: r.room.tick,
         wave: r.room.coop?.wave, enemies: r.room.coop?.enemies.length,
       })),
     });
@@ -58,8 +58,10 @@ wss.on('connection', (ws: WebSocket, req) => {
   const botParam = url.searchParams.get('bots');
   const fill = botParam === null ? FILL_BOTS : Math.max(0, Math.min(8, Number(botParam) || 0));
   const mode: GameMode = url.searchParams.get('mode') === 'pvp' ? 'pvp' : 'coop';
-  const host = getRoom(code, fill, mode);
-  const key = `${mode}:${code}`;
+  const mapParam = url.searchParams.get('map');
+  const map: MapId = MAPS.some((m) => m.id === mapParam) ? (mapParam as MapId) : 'bedroom';
+  const host = getRoom(code, fill, mode, map);
+  const key = `${mode}:${map}:${code}`;
 
   const delay = (fn: () => void) => (FAKE_LAG_MS > 0 ? setTimeout(fn, FAKE_LAG_MS) : fn());
   const conn: Connection = {

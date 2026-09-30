@@ -182,6 +182,13 @@ export class NetClient {
           this.id = msg.id;
           this.room = msg.room;
           this.mode = msg.mode;
+          if (msg.map !== this.world.id) {
+            // The room runs another map: reload on it so collision agrees with the server.
+            const u = new URL(location.href);
+            u.searchParams.set('map', msg.map);
+            location.replace(u);
+            return;
+          }
           this.status = 'joined';
           break;
         case 'roster':

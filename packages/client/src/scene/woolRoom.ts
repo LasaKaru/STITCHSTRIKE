@@ -4,6 +4,7 @@ import type { Box, World } from '@stitchstrike/shared';
 import type { StitchPattern } from '../wool/stitches.ts';
 import { addShellFuzz, createWoolMaterial } from '../wool/woolMaterial.ts';
 import { knittedFloor, renderFurniture, roomDetails } from './woolFurniture.ts';
+import { scatterMess } from './mess.ts';
 
 /**
  * The whole room is wool: knitted walls and ceiling, a knitted carpet with a
@@ -206,6 +207,8 @@ export function buildWoolRoom(scene: THREE.Scene, world: World): WoolRoom {
   ragRug(group);
   shelfBooks(group);
   roomDetails(group, wool);
+  // A kid's room is never tidy: socks, crayons, open books, blocks and loose yarn.
+  scatterMess(group, world, { count: 90, seed: 11, outdoor: false });
 
   // A felt poster with a crocheted sun on the back wall, and a hanging yarn-ball mobile.
   const poster = boxMesh([-4, 9, -17.5], [4, 15, -17.35], wool('felt', 0x2f7fe0, 1));

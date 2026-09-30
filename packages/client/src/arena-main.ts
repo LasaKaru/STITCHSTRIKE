@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import {
-  BUILD_RANGE, Buildable, BUILDABLES, Buttons, createBedroom, ENEMIES, ENEMY_INTERP_DELAY_MS, eyePosition, lookDirection, MAX_PITCH,
+  BUILD_RANGE, Buildable, BUILDABLES, Buttons, createWorld, ENEMIES, ENEMY_INTERP_DELAY_MS, eyePosition, lookDirection, MAX_PITCH,
   pelletDirections, Phase, PLAYER, rayBox, rayPlayer, rayWorld, TURRET, TURRET_SHOT_BASE, WEAPONS,
-  type GameMode, type PlayerState, type Vec3,
+  MAPS, type GameMode, type MapId, type PlayerState, type Vec3,
 } from '@stitchstrike/shared';
 import { Sfx } from './audio/sfx.ts';
 import { NetClient, type EnemySample } from './net/netClient.ts';
@@ -14,6 +14,7 @@ import { EnemyRenderer, type EnemyView } from './scene/enemyRenderer.ts';
 import { Fx } from './scene/fx.ts';
 import { createPost, type Post } from './scene/post.ts';
 import { ViewModel } from './scene/viewModel.ts';
+import { buildWoolGarden } from './scene/woolGarden.ts';
 import { buildWoolRoom } from './scene/woolRoom.ts';
 import { QUALITY_LAYERS, setWoolLayers, updateShellLod } from './wool/woolMaterial.ts';
 
@@ -26,7 +27,8 @@ import { QUALITY_LAYERS, setWoolLayers, updateShellLod } from './wool/woolMateri
  */
 
 const params = new URLSearchParams(location.search);
-const world = createBedroom();
+const map: MapId = MAPS.some((m) => m.id === params.get('map')) ? (params.get('map') as MapId) : 'bedroom';
+const world = createWorld(map);
 const mode: GameMode = params.get('mode') === 'pvp' ? 'pvp' : 'coop';
 const solo = params.get('solo') === '1';
 const lag = Math.max(0, Number(params.get('lag') ?? 0) || 0);
@@ -48,10 +50,11 @@ function localStorageGet(k: string): string | null {
 // ---------------------------------------------------------------- transport
 
 function connect(): Transport {
-  if (solo) return withFakeLag(workerTransport(bots === null ? 4 : Number(bots), mode), lag);
+  if (solo) return withFakeLag(workerTransport(bots === null ? 4 : Number(bots), mode, map), lag);
   const q = new URLSearchParams();
   q.set('room', params.get('room') ?? 'LOBBY');
   q.set('mode', mode);
+  q.set('map', map);
   if (bots !== null) q.set('bots', bots);
   const base = params.get('server') ?? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
   return withFakeLag(wsTransport(`${base}/?${q}`), lag);
@@ -59,7 +62,6 @@ function connect(): Transport {
 
 const net = new NetClient(connect(), world, name);
 net.mode = mode;
-(window as unknown as { __stitchstrike: unknown }).__stitchstrike = { net };
 
 // ---------------------------------------------------------------- renderer + scene
 
@@ -70,22 +72,23 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.toneMapping = THREE.AgXToneMapping;
-renderer.toneMappingExposure = 1.15;
+renderer.toneMappingExposure = world.outdoor ? 1.0 : 1.15;
 document.getElementById('app')!.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x2a2f3a);
+scene.background = new THREE.Color(world.outdoor ? 0xcfdfea : 0x2a2f3a);
 scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
-scene.environmentIntensity = 0.22;
-const room = buildWoolRoom(scene, world);
+scene.environmentIntensity = world.outdoor ? 0.5 : 0.22;
+const room = world.outdoor ? buildWoolGarden(scene, world, quality) : buildWoolRoom(scene, world);
+(window as unknown as { __stitchstrike: unknown }).__stitchstrike = { net, scene, renderer };
 
-const camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.03, 200);
+const camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.03, world.outdoor ? 900 : 200);
 camera.rotation.order = 'YXZ';
 scene.add(camera);
 
 let post: Post | null = null;
 if (quality !== 'low') {
-  post = createPost(renderer, scene, camera, { dof: false, ao: quality === 'high', bloomStrength: 0.35, vignette: 0.22, grain: 0.015 });
+  post = createPost(renderer, scene, camera, { dof: false, ao: quality === 'high', bloomStrength: world.outdoor ? 0.12 : 0.35, vignette: 0.22, grain: 0.015 });
 }
 
 const viewModel = new ViewModel(camera);
@@ -575,12 +578,18 @@ function frame(): void {
     viewModel.update(dt, Math.hypot(p.vx, p.vz), p.onGround);
   } else if (net.latest) {
     // Unravelled: a slow orbit over the Heartspools.
-    eye.set(Math.sin(t * 0.2) * 14, 13, Math.cos(t * 0.2) * 14);
+    eye.set(Math.sin(t * 0.2) * (world.outdoor ? 30 : 14), world.outdoor ? 24 : 13, Math.cos(t * 0.2) * (world.outdoor ? 30 : 14));
   }
   if (p) camera.rotation.set(pitch, yaw, 0);
   else camera.lookAt(0, 1, 0);
   if (fixedCam) {
-    const shots: Record<string, [number, number, number, number, number, number]> = {
+    const shots: Record<string, [number, number, number, number, number, number]> = world.outdoor ? {
+      overview: [48, 40, 50, -4, 0, -4],
+      core: [12, 3.2, 12, 4, 1.2, 2],
+      window: [-6, 20, 40, -20, 6, -20],
+      coreA: [-10, 5, -12, -20, 1, -24],
+      tree: [-12, 3, 16, -30, 10, 0],
+    } : {
       overview: [15, 14, 16, -2, 1, -2],
       core: [6.5, 2.2, 9, 1, 1, 1.5],
       window: [8, 5, -6, -12, 4, 6],
