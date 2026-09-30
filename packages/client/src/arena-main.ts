@@ -3,13 +3,13 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import {
   BUILD_RANGE, Buildable, BUILDABLES, Buttons, createWorld, ENEMIES, ENEMY_INTERP_DELAY_MS, eyePosition, lookDirection, MAX_PITCH,
   pelletDirections, Phase, PLAYER, rayBox, rayPlayer, rayWorld, TURRET, TURRET_SHOT_BASE, WEAPONS,
-  GRAPPLE, KOTH, MAPS, TEAM_NAMES, type GameMode, type MapId, type PlayerState, type Vec3,
+  GRAPPLE, KOTH, MAPS, TEAM_COLORS, TEAM_NAMES, type GameMode, type MapId, type PlayerState, type Vec3,
   Action, DECK, DIFFICULTIES, ENEMY_SHOT_ID, EnemyType, launchProjectile, LAUNCHER, MAX_TIER, PICKUPS, PickupKind, ShotKind, upgradeCost, WEAPON_COUNT,
 } from '@stitchstrike/shared';
 import { CombatMusic, type Intensity } from './audio/combatMusic.ts';
 import { PickupsView } from './scene/pickupsView.ts';
 import { Sfx } from './audio/sfx.ts';
-import { loadSettings } from './settings.ts';
+import { keyLabel, loadSettings, palette } from './settings.ts';
 import { setPresence, syncAchievements, unlockAchievement } from './platform.ts';
 import { NetClient, type EnemySample } from './net/netClient.ts';
 import { withFakeLag, workerTransport, wsTransport, type Transport } from './net/transport.ts';
@@ -54,6 +54,10 @@ const solo = params.get('solo') === '1';
 const lag = Math.max(0, Number(params.get('lag') ?? 0) || 0);
 const bots = params.get('bots');
 const settings = loadSettings();
+const PAL = palette(settings.colorblind);
+// Colour-blind palette for the HUD's good/bad accents.
+document.documentElement.style.setProperty('--lime', `#${PAL.good.toString(16).padStart(6, '0')}`);
+document.documentElement.style.setProperty('--red', `#${PAL.bad.toString(16).padStart(6, '0')}`);
 const profile = loadProfile();
 profile.look = wearable(profile, profile.look);
 const quality = (params.get('quality') ?? settings.quality) as 'low' | 'medium' | 'high';
@@ -123,7 +127,7 @@ const fx = new Fx(scene);
 const sfx = new Sfx();
 sfx.volume = settings.sfxVolume;
 const coopProps = mode === 'coop' ? new CoopProps(scene, world) : null;
-const enemyRenderer = mode === 'coop' ? new EnemyRenderer(scene) : null;
+const enemyRenderer = mode === 'coop' ? new EnemyRenderer(scene, [PAL.healthLow, PAL.healthHigh]) : null;
 
 // ---------------------------------------------------------------- players
 
@@ -137,6 +141,13 @@ let grappleDown = false;
 const crosshairEl = document.getElementById('crosshair')!;
 let lastMantle = 0;
 
+/** Team yarn as this player sees it (remapped for colour-blind settings). */
+function shownColor(c: number): number {
+  const t = TEAM_COLORS.indexOf(c);
+  return t >= 0 ? PAL.team[t] : c;
+}
+const hexOf = (c: number) => `#${c.toString(16).padStart(6, '0')}`;
+
 function syncAvatars(): void {
   for (const [id, a] of avatars) {
     if (!net.roster.has(id) || id === net.id) { scene.remove(a.root); avatars.delete(id); }
@@ -144,16 +155,16 @@ function syncAvatars(): void {
   for (const [id, r] of net.roster) {
     if (id === net.id) {
       if (!ownAvatar) {
-        ownAvatar = createAvatar(r.color, id, r.look);
+        ownAvatar = createAvatar(shownColor(r.color), id, r.look);
         ownAvatar.root.visible = false;
         scene.add(ownAvatar.root);
-        viewModel.setJacket(jacketColor(r.look, r.color));
+        viewModel.setJacket(jacketColor(r.look, shownColor(r.color)));
         viewModel.setLook(r.look);
       }
       continue;
     }
     if (!avatars.has(id)) {
-      const a = createAvatar(r.color, id, r.look);
+      const a = createAvatar(shownColor(r.color), id, r.look);
       scene.add(a.root);
       avatars.set(id, a);
     }
@@ -268,7 +279,7 @@ function attenuation(p: THREE.Vector3): number {
 
 // ---------------------------------------------------------------- events
 
-const briefing = new Briefing(() => settings.sfxVolume);
+const briefing = new Briefing(() => settings.sfxVolume, settings.subtitles);
 let briefed = false;
 
 /** This match, for the results card. */
@@ -284,6 +295,28 @@ function progress(xp: number, credits: number, stats: Parameters<typeof award>[3
   for (const m of a.medals) unlockAchievement(m.id);
   a.medals.forEach((m, i) => setTimeout(() => { banner(`MEDAL: ${m.name.toUpperCase()}`, 'good', 3000); sfx.play('collect'); }, 1400 + i * 1600));
   if (a.unlocks.length) setTimeout(() => feed(`<span>Unlocked:</span> ${a.unlocks.map(escapeHtml).join(', ')}`, true), 900);
+}
+
+/** Subtitles: a short caption for sounds that carry information (throttled per cue). */
+const captionsEl = Object.assign(document.createElement('div'), { id: 'captions' });
+document.body.appendChild(captionsEl);
+const captionAt = new Map<string, number>();
+function caption(text: string, where?: THREE.Vector3): void {
+  if (!settings.subtitles) return;
+  const now = performance.now();
+  if (now - (captionAt.get(text) ?? -1e9) < 3000) return;
+  captionAt.set(text, now);
+  let dir = '';
+  if (where) {
+    // Which side the sound came from, relative to where we're looking.
+    const rel = Math.atan2(-(where.x - camera.position.x), -(where.z - camera.position.z)) - yaw;
+    const a = Math.atan2(Math.sin(rel), Math.cos(rel));
+    dir = Math.abs(a) < 0.6 ? ' (ahead)' : Math.abs(a) > 2.5 ? ' (behind)' : a > 0 ? ' (left)' : ' (right)';
+  }
+  const el = document.createElement('div');
+  el.textContent = `[${text}${dir}]`;
+  captionsEl.appendChild(el);
+  setTimeout(() => el.remove(), 2800);
 }
 
 let bannerTimer: ReturnType<typeof setTimeout> | undefined;
@@ -349,7 +382,7 @@ net.onEvent = (e) => {
     case 'downed': {
       const who = net.roster.get(e.id)?.name ?? '?';
       if (e.id === net.id) { banner('YOU ARE UNRAVELLING! HOLD ON…', 'bad'); sfx.play('downed'); }
-      else feed(`${escapeHtml(who)} <span>is down · hold E to re-stitch</span>`, false);
+      else feed(`${escapeHtml(who)} <span>is down · hold ${KL.use} to re-stitch</span>`, false);
       break;
     }
     case 'revived': {
@@ -372,17 +405,22 @@ net.onEvent = (e) => {
       const at = new THREE.Vector3(e.x, 0, e.z);
       fx.stomp(at);
       sfx.play('stomp', attenuation(at));
+      caption('Ground-shaking stomp', at);
       fx.shake = Math.max(fx.shake, 1.2 * attenuation(at));
       break;
     }
-    case 'drum':
-      sfx.play('drum', attenuation(new THREE.Vector3(e.x, 1, e.z)) * 0.8);
+    case 'drum': {
+      const at = new THREE.Vector3(e.x, 1, e.z);
+      sfx.play('drum', attenuation(at) * 0.8);
+      if (attenuation(at) > 0.1) caption('Drums beating: invaders speed up', at);
       break;
+    }
     case 'pop': {
       const at = new THREE.Vector3(e.x, 0.8, e.z);
       enemyRenderer?.popNear(e.x, e.z);
       fx.puff(at, 0xffc94a, 1.5);
       sfx.play('pop', attenuation(at));
+      if (attenuation(at) > 0.1) caption('Jack-in-the-Box springs', at);
       break;
     }
     case 'snap': {
@@ -437,7 +475,7 @@ document.addEventListener('mouseup', (e) => { if (e.button === 0) mouseDown = fa
 document.addEventListener('contextmenu', (e) => { if (document.pointerLockElement) e.preventDefault(); });
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Tab') { e.preventDefault(); scoreboard.classList.remove('hidden'); }
-  if (e.code === 'KeyV' && !e.repeat) thirdPerson = !thirdPerson;
+  if (e.code === settings.keys.camera && !e.repeat) thirdPerson = !thirdPerson;
   if (e.code === 'F3') { e.preventDefault(); netPanel.classList.toggle('hidden'); }
   keys.add(e.code);
 });
@@ -447,13 +485,17 @@ document.addEventListener('keyup', (e) => {
 });
 window.addEventListener('blur', () => { keys.clear(); mouseDown = false; grappleDown = false; });
 
+// Bound keys (Settings → Key bindings), plus the arrow keys as fixed alternatives for moving.
+const K = settings.keys;
 const KEYMAP: [string[], number][] = [
-  [['KeyW', 'ArrowUp'], Buttons.Forward], [['KeyS', 'ArrowDown'], Buttons.Back],
-  [['KeyA', 'ArrowLeft'], Buttons.Left], [['KeyD', 'ArrowRight'], Buttons.Right],
-  [['Space'], Buttons.Jump], [['ShiftLeft', 'ShiftRight'], Buttons.Sprint],
-  [['KeyC', 'ControlLeft'], Buttons.Crouch], [['KeyR'], Buttons.Reload], [['KeyE'], Buttons.Use],
-  [['KeyX'], Buttons.Grapple],
+  [[K.forward, 'ArrowUp'], Buttons.Forward], [[K.back, 'ArrowDown'], Buttons.Back],
+  [[K.left, 'ArrowLeft'], Buttons.Left], [[K.right, 'ArrowRight'], Buttons.Right],
+  [[K.jump], Buttons.Jump], [[K.sprint], Buttons.Sprint],
+  [[K.crouch], Buttons.Crouch], [[K.reload], Buttons.Reload], [[K.use], Buttons.Use],
+  [[K.grapple], Buttons.Grapple],
 ];
+/** Key names for HUD hints. */
+const KL = Object.fromEntries(Object.entries(K).map(([a, c]) => [a, keyLabel(c)])) as Record<keyof typeof K, string>;
 
 /** Weapon we want equipped (sent with every input), and the next one-shot action. */
 let wantWeapon = 0;
@@ -477,13 +519,13 @@ document.addEventListener('keydown', (e) => {
     pendingAction = lastBuild;
   } else if (digit >= 1 && digit <= WEAPON_COUNT) {
     wantWeapon = digit - 1;
-  } else if (e.code === 'KeyB' && mode === 'coop') {
+  } else if (e.code === K.deck && mode === 'coop') {
     deckToggled = !deckToggled;
-  } else if (e.code === 'KeyQ' && mode === 'coop') {
+  } else if (e.code === K.rebuild && mode === 'coop') {
     pendingAction = lastBuild;
-  } else if (e.code === 'KeyG' && mode === 'coop') {
+  } else if (e.code === K.recycle && mode === 'coop') {
     pendingAction = Action.Sell;
-  } else if ((e.code === 'Enter' || e.code === 'KeyF') && mode === 'coop') {
+  } else if (e.code === K.ready && mode === 'coop') {
     pendingAction = Action.Ready;
   }
 });
@@ -649,7 +691,7 @@ function updateHud(): void {
   document.body.classList.toggle('is-downed', downed);
   hud.downed.classList.toggle('hidden', !downed);
   if (downed) {
-    hud.downedText.textContent = `Bleeding out in ${net.respawn.toFixed(0)} s · a teammate can hold E to re-stitch you`;
+    hud.downedText.textContent = `Bleeding out in ${net.respawn.toFixed(0)} s · a teammate can hold ${KL.use} to re-stitch you`;
     hud.downedFill.style.width = `${(me?.revive ?? 0) * 100}%`;
   }
   let reviveHtml = '';
@@ -657,7 +699,7 @@ function updateHud(): void {
     for (const p of net.latest?.players ?? []) {
       if (p.id === net.id || !p.downed) continue;
       if (Math.hypot(p.x - s.x, p.z - s.z) < PLAYER.reviveRange + 2) {
-        reviveHtml = `Hold <b>E</b> to re-stitch ${escapeHtml(net.roster.get(p.id)?.name ?? 'teammate')} · ${Math.round(p.revive * 100)}%`;
+        reviveHtml = `Hold <b>${KL.use}</b> to re-stitch ${escapeHtml(net.roster.get(p.id)?.name ?? 'teammate')} · ${Math.round(p.revive * 100)}%`;
       }
     }
   }
@@ -677,7 +719,7 @@ function updateHud(): void {
     if (c.boss >= 0) (hud.boss.querySelector('i') as HTMLElement).style.width = `${c.boss * 100}%`;
     const humans = [...net.roster.values()].filter((r) => !r.bot).length;
     if (c.phase === Phase.Build) {
-      hud.phase.innerHTML = `Build phase · <b>${Math.ceil(c.timer)}s</b> · press <b>Enter</b> to ready up (${c.ready}/${humans})`;
+      hud.phase.innerHTML = `Build phase · <b>${Math.ceil(c.timer)}s</b> · press <b>${KL.ready}</b> to ready up (${c.ready}/${humans})`;
     } else if (c.phase === Phase.Wave) {
       hud.phase.innerHTML = `Defend the Heartspools! · ${enemies.length} toys incoming`;
     } else {
@@ -715,12 +757,12 @@ function updateHud(): void {
     if (pad >= 0) {
       const kind = here?.kind ?? 0;
       hud.padhint.innerHTML = kind === Buildable.None
-        ? `Build pad ${CORE_LETTERS[world.coop.pads[pad].core]} · ${open ? 'press <b>1–7</b> to build' : 'press <b>B</b> for the build deck'}`
-        : `${BUILDABLES[kind].name} ${'★'.repeat(here!.tier)} · ${Math.round((here?.health ?? 0) * 100)}% · <b>${DECK.indexOf(kind as never) + 1}</b> upgrade · <b>G</b> recycle`;
+        ? `Build pad ${CORE_LETTERS[world.coop.pads[pad].core]} · ${open ? 'press <b>1–7</b> to build' : `press <b>${KL.deck}</b> for the build deck`}`
+        : `${BUILDABLES[kind].name} ${'★'.repeat(here!.tier)} · ${Math.round((here?.health ?? 0) * 100)}% · <b>${DECK.indexOf(kind as never) + 1}</b> upgrade · <b>${KL.recycle}</b> recycle`;
     } else {
       hud.padhint.textContent = c.phase === Phase.Build ? 'Stand on a stitched pad to build' : '';
     }
-    hud.deckhint.innerHTML = open ? '<b>1–7</b> build or upgrade · <b>Q</b> build again · <b>B</b> close' : '<b>B</b> build deck · <b>Q</b> build again';
+    hud.deckhint.innerHTML = open ? `<b>1–7</b> build or upgrade · <b>${KL.rebuild}</b> build again · <b>${KL.deck}</b> close` : `<b>${KL.deck}</b> build deck · <b>${KL.rebuild}</b> build again`;
   } else {
     hud.wave.textContent = mode === 'tdm' ? 'TEAM DEATHMATCH' : mode === 'koth' ? 'KING OF THE SPOOL' : 'FREE-FOR-ALL';
     hud.phase.innerHTML = mode === 'tdm' ? teamScoreText() : mode === 'koth' ? kothText() : '';
@@ -768,7 +810,7 @@ function kothText(): string {
   const k = net.koth;
   if (!k) return '';
   const held = k.holder === 2 ? '<b>CONTESTED!</b>' : k.holder >= 0 ? `${TEAM_NAMES[k.holder]} holds the spool` : 'The spool is free';
-  return `<b style="color:#e8742a">Cotton ${Math.floor(k.scores[0])}</b> · <b style="color:#6fb4ff">Wool ${Math.floor(k.scores[1])}</b> / ${KOTH.target} · ${held} · moves in ${Math.ceil(k.timer)} s`;
+  return `<b style="color:${hexOf(PAL.team[0])}">Cotton ${Math.floor(k.scores[0])}</b> · <b style="color:${hexOf(PAL.team[1])}">Wool ${Math.floor(k.scores[1])}</b> / ${KOTH.target} · ${held} · moves in ${Math.ceil(k.timer)} s`;
 }
 
 const MODE_NAMES: Record<GameMode, string> = { coop: 'Co-op', pvp: 'Free-for-all', tdm: 'Team Deathmatch', koth: 'King of the Spool' };
@@ -785,11 +827,11 @@ function presenceText(): string {
 function teamScoreText(): string {
   const score = [0, 0];
   for (const p of net.latest?.players ?? []) score[net.roster.get(p.id)?.team ?? 0] += p.kos;
-  return `<b style="color:#e8742a">Team Cotton ${score[0]}</b> · <b style="color:#6fb4ff">Team Wool ${score[1]}</b>`;
+  return `<b style="color:${hexOf(PAL.team[0])}">Team Cotton ${score[0]}</b> · <b style="color:${hexOf(PAL.team[1])}">Team Wool ${score[1]}</b>`;
 }
 
 const pickupsView = new PickupsView(scene, world);
-const spoolHill = mode === 'koth' ? new SpoolHill(scene, world) : null;
+const spoolHill = mode === 'koth' ? new SpoolHill(scene, world, PAL.team) : null;
 const traversal = new TraversalView(scene, world, new Set(profile.collected));
 const music = new CombatMusic();
 
@@ -962,7 +1004,7 @@ function frame(): void {
     camera.lookAt(c[3], c[4], c[5]);
   }
   if (fx.shake > 0.01 && !fixedCam) {
-    const k = fx.shake * fx.shake * 0.25;
+    const k = fx.shake * fx.shake * 0.25 * (settings.reduceShake ? 0.15 : 1);
     eye.x += (Math.random() - 0.5) * k; eye.y += (Math.random() - 0.5) * k; eye.z += (Math.random() - 0.5) * k;
   }
   if (p && thirdPerson) {

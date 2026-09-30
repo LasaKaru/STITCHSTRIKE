@@ -48,7 +48,8 @@ export class EnemyRenderer {
   private readonly m = new THREE.Matrix4();
   private lastT = 0;
 
-  constructor(private scene: THREE.Scene) {
+  /** `health` = bar colours [empty, full] (swapped for colour-blind palettes). */
+  constructor(private scene: THREE.Scene, health: [number, number] = [0xe6261a, 0x8cd940]) {
     const barMat = new THREE.ShaderMaterial({
       vertexShader: /* glsl */ `
         attribute float health;
@@ -62,12 +63,15 @@ export class EnemyRenderer {
           gl_Position = projectionMatrix * centre;
         }`,
       fragmentShader: /* glsl */ `
+        uniform vec3 lowColor;
+        uniform vec3 highColor;
         varying float vHealth;
         varying vec2 vUv;
         void main() {
-          vec3 col = vUv.x < vHealth ? mix( vec3( 0.9, 0.15, 0.1 ), vec3( 0.55, 0.85, 0.25 ), vHealth ) : vec3( 0.12 );
+          vec3 col = vUv.x < vHealth ? mix( lowColor, highColor, vHealth ) : vec3( 0.12 );
           gl_FragColor = vec4( col, 0.9 );
         }`,
+      uniforms: { lowColor: { value: new THREE.Color(health[0]) }, highColor: { value: new THREE.Color(health[1]) } },
       transparent: true,
       depthWrite: false,
     });

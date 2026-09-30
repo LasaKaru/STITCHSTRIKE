@@ -170,6 +170,15 @@
           <label class="set">Mouse sensitivity <input id="s-sens" type="range" min="0.0006" max="0.006" step="0.0001" /><output></output></label>
           <label class="set">Field of view <input id="s-fov" type="range" min="70" max="110" step="1" /><output></output></label>
           <label class="set check">Invert look <input id="s-invert" type="checkbox" /></label>
+          <h4>Key bindings <button id="s-keys-reset" class="mini">Reset</button></h4>
+          <div id="s-keys" class="keybinds"></div>
+          <p class="hint">Click an action, then press the new key (Esc cancels). Taking a key another action uses swaps them. Mouse: left fire, right yarn-swing.</p>
+          <h4>Accessibility</h4>
+          <label class="set">Colour-blind mode
+            <select id="s-cb"><option value="off">Off</option><option value="deuteranopia">Deuteranopia (red-green)</option><option value="protanopia">Protanopia (red-green)</option><option value="tritanopia">Tritanopia (blue-yellow)</option></select>
+          </label>
+          <label class="set check">Subtitles and sound captions <input id="s-subs" type="checkbox" /></label>
+          <label class="set check">Reduce camera shake <input id="s-shake" type="checkbox" /></label>
           <h4>Graphics</h4>
           <label class="set">Quality
             <select id="s-quality"><option value="low">Low (laptops)</option><option value="medium">Medium</option><option value="high">High</option></select>

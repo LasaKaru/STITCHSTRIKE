@@ -201,3 +201,9 @@ body.pvp .coop-only { display: none !important; }
 .hurt-arc { position: fixed; left: 50%; top: 50%; width: 260px; height: 260px; pointer-events: none; z-index: 2; border-radius: 50%;
   border-top: 10px solid rgba(255, 60, 50, .85); filter: blur(1px); animation: hurtFade .9s ease-out forwards; }
 @keyframes hurtFade { from { opacity: 1; } to { opacity: 0; } }
+
+/* Accessibility: subtitles off hides printed briefing lines; captions for sound cues. */
+#briefing[data-nosubs] .line { display: none; }
+#captions { position: fixed; left: 50%; bottom: 118px; transform: translateX(-50%); z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none; }
+#captions div { background: rgba(10,12,18,.72); color: var(--ink); font-size: 14px; font-style: italic; padding: 3px 12px; border-radius: 8px; animation: capfade 2.8s forwards; }
+@keyframes capfade { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }

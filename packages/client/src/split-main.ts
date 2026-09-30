@@ -25,7 +25,7 @@ import { buildWoolBathroom } from './scene/woolBathroom.ts';
 import { buildWoolToyStore } from './scene/woolToyStore.ts';
 import { buildWoolGarden } from './scene/woolGarden.ts';
 import { buildWoolRoom } from './scene/woolRoom.ts';
-import { loadSettings } from './settings.ts';
+import { loadSettings, palette } from './settings.ts';
 import { QUALITY_LAYERS, setWoolLayers, updateShellLod } from './wool/woolMaterial.ts';
 
 /**
@@ -68,7 +68,7 @@ scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnviron
 scene.environmentIntensity = world.outdoor ? 0.5 : 0.22;
 const env = world.outdoor ? buildWoolGarden(scene, world, 'medium') : world.id === 'garage' ? buildWoolGarage(scene, world) : world.id === 'bathroom' ? buildWoolBathroom(scene, world) : world.id === 'toystore' ? buildWoolToyStore(scene, world) : buildWoolRoom(scene, world);
 const coopProps = mode === 'coop' ? new CoopProps(scene, world) : null;
-const enemyRenderer = mode === 'coop' ? new EnemyRenderer(scene) : null;
+const enemyRenderer = mode === 'coop' ? new EnemyRenderer(scene, [palette(settings.colorblind).healthLow, palette(settings.colorblind).healthHigh]) : null;
 const fx = new Fx(scene);
 const pickups = new PickupsView(scene, world);
 const sfx = new Sfx();
@@ -138,7 +138,7 @@ const main = locals[0].net;
 
 const avatars = new Map<number, Avatar>();
 const yarnRopes = new YarnRopes(scene);
-const spoolHill = mode === 'koth' ? new SpoolHill(scene, world) : null;
+const spoolHill = mode === 'koth' ? new SpoolHill(scene, world, palette(settings.colorblind).team) : null;
 const ropeSpecs: RopeSpec[] = [];
 function syncAvatars(): void {
   for (const [id, a] of avatars) if (!main.roster.has(id)) { scene.remove(a.root); avatars.delete(id); }
@@ -250,17 +250,18 @@ document.addEventListener('keydown', (e) => {
   if (e.repeat) return;
   if (digit && l.deck && digit <= DECK.length) { l.lastBuild = DECK[digit - 1]; l.action = l.lastBuild; }
   else if (digit && digit <= WEAPONS.length) l.weapon = digit - 1;
-  else if (e.code === 'KeyB') l.deck = !l.deck;
-  else if (e.code === 'KeyQ') l.action = l.lastBuild;
-  else if (e.code === 'KeyG') l.action = 20;
-  else if (e.code === 'Enter' || e.code === 'KeyF') l.action = 21;
+  else if (e.code === settings.keys.deck) l.deck = !l.deck;
+  else if (e.code === settings.keys.rebuild) l.action = l.lastBuild;
+  else if (e.code === settings.keys.recycle) l.action = 20;
+  else if (e.code === settings.keys.ready) l.action = 21;
 });
 document.addEventListener('keyup', (e) => keys.delete(e.code));
 
+const K = settings.keys;
 const KEYMAP: [string[], number][] = [
-  [['KeyW'], Buttons.Forward], [['KeyS'], Buttons.Back], [['KeyA'], Buttons.Left], [['KeyD'], Buttons.Right],
-  [['Space'], Buttons.Jump], [['ShiftLeft'], Buttons.Sprint], [['KeyC'], Buttons.Crouch], [['KeyR'], Buttons.Reload], [['KeyE'], Buttons.Use],
-  [['KeyX'], Buttons.Grapple],
+  [[K.forward], Buttons.Forward], [[K.back], Buttons.Back], [[K.left], Buttons.Left], [[K.right], Buttons.Right],
+  [[K.jump], Buttons.Jump], [[K.sprint], Buttons.Sprint], [[K.crouch], Buttons.Crouch], [[K.reload], Buttons.Reload], [[K.use], Buttons.Use],
+  [[K.grapple], Buttons.Grapple],
 ];
 
 /**
@@ -370,7 +371,7 @@ function frame(): void {
     if (p) {
       const e = eyePosition(p, (buttons & Buttons.Crouch) !== 0);
       l.camera.position.set(e[0] + l.net.correction.x, e[1] + l.net.correction.y, e[2] + l.net.correction.z);
-      if (fx.shake > 0.01) l.camera.position.x += (Math.random() - 0.5) * fx.shake * 0.2;
+      if (fx.shake > 0.01) l.camera.position.x += (Math.random() - 0.5) * fx.shake * (settings.reduceShake ? 0.03 : 0.2);
       l.camera.rotation.set(l.pitch, l.yaw, 0);
       if (p.weapon !== l.lastWeapon) { l.viewModel.setWeapon(p.weapon); l.lastWeapon = p.weapon; }
       l.viewModel.update(dt, Math.hypot(p.vx, p.vz), p.onGround);

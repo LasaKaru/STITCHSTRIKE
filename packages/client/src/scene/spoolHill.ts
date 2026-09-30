@@ -16,7 +16,7 @@ export class SpoolHill {
   private beam: THREE.Mesh;
   private target = new THREE.Vector3();
 
-  constructor(scene: THREE.Scene, private world: World) {
+  constructor(scene: THREE.Scene, private world: World, private teams: readonly number[] = TEAM_COLORS) {
     const gold = metal(0xd9b24a, 0.3);
     const flangeGeo = new THREE.CylinderGeometry(1.1, 1.1, 0.18, 32);
     const top = new THREE.Mesh(flangeGeo, gold);
@@ -51,7 +51,7 @@ export class SpoolHill {
     this.group.position.lerp(this.target, Math.min(1, dt * 3));
     this.reel.rotation.y = t * 0.8;
     this.reel.position.y = 1.2 + Math.sin(t * 2) * 0.15;
-    const col = k.holder === 2 ? (Math.floor(t * 4) % 2 ? TEAM_COLORS[0] : TEAM_COLORS[1]) : k.holder >= 0 ? TEAM_COLORS[k.holder] : 0xffe08a;
+    const col = k.holder === 2 ? (Math.floor(t * 4) % 2 ? this.teams[0] : this.teams[1]) : k.holder >= 0 ? this.teams[k.holder] : 0xffe08a;
     this.ringMat.color.setHex(col);
     this.ringMat.opacity = 0.45 + Math.sin(t * 5) * 0.12;
   }

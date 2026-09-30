@@ -118,10 +118,12 @@ export class Briefing {
   private ctx: AudioContext | null = null;
   private portraits: Record<Speaker, string> = { sarge: portrait('sarge'), baron: portrait('baron') };
 
-  constructor(private volume: () => number) {
+  /** With subtitles off, the speaker's portrait and voice stay but the line isn't printed. */
+  constructor(private volume: () => number, subtitles = true) {
     this.el = document.createElement('div');
     this.el.id = 'briefing';
     this.el.className = 'hud hidden';
+    if (!subtitles) this.el.dataset.nosubs = '1';
     this.el.innerHTML = '<img alt="" /><div class="who"></div><div class="line"></div>';
     document.body.appendChild(this.el);
     this.text = this.el.querySelector('.line')!;

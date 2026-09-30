@@ -153,6 +153,12 @@ body:not(.online) .online-only { display: none; }
 .start:hover, .start:focus-visible { transform: translateY(-2px) scale(1.01); box-shadow: 0 14px 40px rgba(255, 180, 40, .4), inset 0 -4px 0 rgba(0, 0, 0, .15); }
 
 .settings-grid { display: grid; grid-template-columns: 1fr; }
+.keybinds { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 14px; padding: 6px 2px; }
+.keybinds button { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,.04); color: var(--ink);
+  border: 1px dashed rgba(243,236,221,.18); border-radius: 8px; padding: 6px 10px; font: inherit; cursor: pointer; }
+.keybinds button kbd { font: 800 13px/1 inherit; background: rgba(0,0,0,.35); border-radius: 5px; padding: 4px 8px; color: var(--gold); }
+.keybinds button.listening kbd { color: var(--lime); animation: pulse .8s infinite alternate; }
+@keyframes pulse { to { opacity: .4; } }
 .set input[type=range] { margin-left: auto; }
 .set { justify-content: space-between; padding: 8px 2px; border-bottom: 1px dashed rgba(243, 236, 221, .1); }
 .set input:not([type]) , .set select { width: min(280px, 55%); }

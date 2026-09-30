@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { MenuMusic } from './audio/music.ts';
 import { buildCinematic, type Cinematic } from './scene/cinematic.ts';
-import { desktop, loadSettings, saveSettings, type QualitySetting } from './settings.ts';
+import { BIND_ACTIONS, DEFAULT_KEYS, desktop, keyLabel, loadSettings, rebind, saveSettings, type BindAction, type ColorblindMode, type QualitySetting } from './settings.ts';
 import { CustomiseScreen, renderProgress } from './menu-customise.ts';
 import { levelOf, loadProfile } from './profile.ts';
 import { setPresence, syncAchievements } from './platform.ts';
@@ -207,6 +207,44 @@ netBox.addEventListener('change', () => { settings.showNet = netBox.checked; sav
 const qualitySel = $<HTMLSelectElement>('#s-quality');
 qualitySel.value = settings.quality;
 qualitySel.addEventListener('change', () => { settings.quality = qualitySel.value as QualitySetting; saveSettings(settings); });
+// Accessibility.
+const cbSel = $<HTMLSelectElement>('#s-cb');
+cbSel.value = settings.colorblind;
+cbSel.addEventListener('change', () => { settings.colorblind = cbSel.value as ColorblindMode; saveSettings(settings); });
+const subsBox = $<HTMLInputElement>('#s-subs');
+subsBox.checked = settings.subtitles;
+subsBox.addEventListener('change', () => { settings.subtitles = subsBox.checked; saveSettings(settings); });
+const shakeBox = $<HTMLInputElement>('#s-shake');
+shakeBox.checked = settings.reduceShake;
+shakeBox.addEventListener('change', () => { settings.reduceShake = shakeBox.checked; saveSettings(settings); });
+
+// Key bindings: click an action, press a key.
+let listening: BindAction | null = null;
+function renderKeys(): void {
+  const box = $('#s-keys');
+  box.innerHTML = (Object.keys(BIND_ACTIONS) as BindAction[]).map((a) =>
+    `<button data-bind="${a}" class="${listening === a ? 'listening' : ''}"><span>${BIND_ACTIONS[a]}</span><kbd>${listening === a ? 'press a key…' : keyLabel(settings.keys[a])}</kbd></button>`).join('');
+  box.querySelectorAll<HTMLButtonElement>('button').forEach((b) => b.addEventListener('click', (e) => {
+    e.preventDefault();
+    listening = b.dataset.bind as BindAction;
+    renderKeys();
+  }));
+}
+// Capture phase, so the menu's own keyboard navigation never sees the key being bound.
+window.addEventListener('keydown', (e: KeyboardEvent) => {
+  if (!listening) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  if (e.code !== 'Escape' && !/^(Digit[1-9]|Tab|F\d+|MetaLeft|MetaRight)$/.test(e.code)) {
+    rebind(settings, listening, e.code);
+    saveSettings(settings);
+  }
+  listening = null;
+  renderKeys();
+}, true);
+$('#s-keys-reset').addEventListener('click', (e) => { e.preventDefault(); settings.keys = { ...DEFAULT_KEYS }; saveSettings(settings); renderKeys(); });
+renderKeys();
+
 const serverInput = $<HTMLInputElement>('#s-server');
 serverInput.value = settings.server;
 serverInput.addEventListener('change', () => {
