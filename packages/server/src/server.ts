@@ -104,7 +104,7 @@ export function startGameServer(o: GameServerOptions): Promise<GameServer> {
     const botParam = url.searchParams.get('bots');
     const fill = botParam === null ? fillBots : Math.max(0, Math.min(8, Number(botParam) || 0));
     const m = url.searchParams.get('mode');
-    const mode: GameMode = m === 'pvp' || m === 'tdm' ? m : 'coop';
+    const mode: GameMode = m === 'pvp' || m === 'tdm' || m === 'koth' ? m : 'coop';
     const wavesParam = Number(url.searchParams.get('waves') ?? 10);
     const waves = [0, 5, 10].includes(wavesParam) ? wavesParam : 10;
     const difficulty = Math.max(0, Math.min(3, Math.floor(Number(url.searchParams.get('difficulty') ?? 1)) || 0));

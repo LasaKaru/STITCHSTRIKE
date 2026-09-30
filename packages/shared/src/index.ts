@@ -1,4 +1,5 @@
 export * from './constants.ts';
+export * from './koth.ts';
 export * from './world.ts';
 export * from './movement.ts';
 export * from './weapons.ts';

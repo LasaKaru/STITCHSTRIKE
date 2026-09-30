@@ -3,7 +3,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import {
   BUILDABLES, Buttons, createWorld, DIFFICULTIES, ENEMIES, eyePosition, lookDirection, MAPS, MAX_PITCH, pelletDirections, Phase, PLAYER,
   randomLook, rayWorld, ShotKind, TURRET, TURRET_SHOT_BASE, WEAPONS, ENEMY_SHOT_ID, RoomHost, DECK,
-  type GameMode, type MapId, type PlayerState,
+  KOTH, type GameMode, type MapId, type PlayerState,
 } from '@stitchstrike/shared';
 import { CombatMusic, type Intensity } from './audio/combatMusic.ts';
 import { Sfx } from './audio/sfx.ts';
@@ -14,6 +14,7 @@ import { loopbackTransport } from './net/transport.ts';
 import { loadProfile } from './profile.ts';
 import { createAvatar, type Avatar } from './scene/avatar.ts';
 import { YarnRopes, type RopeSpec } from './scene/yarnRopes.ts';
+import { SpoolHill } from './scene/spoolHill.ts';
 import { CoopProps } from './scene/coopProps.ts';
 import { EnemyRenderer, type EnemyView } from './scene/enemyRenderer.ts';
 import { Fx } from './scene/fx.ts';
@@ -37,7 +38,7 @@ import { QUALITY_LAYERS, setWoolLayers, updateShellLod } from './wool/woolMateri
 const params = new URLSearchParams(location.search);
 const map: MapId = MAPS.some((m) => m.id === params.get('map')) ? (params.get('map') as MapId) : 'garden';
 const modeParam = params.get('mode');
-const mode: GameMode = modeParam === 'pvp' || modeParam === 'tdm' ? modeParam : 'coop';
+const mode: GameMode = modeParam === 'pvp' || modeParam === 'tdm' || modeParam === 'koth' ? modeParam : 'coop';
 const waves = [0, 5, 10].includes(Number(params.get('waves'))) ? Number(params.get('waves')) : 10;
 const difficulty = Math.max(0, Math.min(3, Number(params.get('difficulty') ?? 1) || 0));
 const settings = loadSettings();
@@ -120,6 +121,7 @@ const main = locals[0].net;
 
 const avatars = new Map<number, Avatar>();
 const yarnRopes = new YarnRopes(scene);
+const spoolHill = mode === 'koth' ? new SpoolHill(scene, world) : null;
 const ropeSpecs: RopeSpec[] = [];
 function syncAvatars(): void {
   for (const [id, a] of avatars) if (!main.roster.has(id)) { scene.remove(a.root); avatars.delete(id); }
@@ -296,9 +298,10 @@ function updateHud(): void {
     $('phase').innerHTML = c.phase === Phase.Build ? `Build · <b>${Math.ceil(c.timer)}s</b> · ${c.buttons} buttons · ${DIFFICULTIES[c.difficulty].name}` : `${c.buttons} buttons${c.boss >= 0 ? ` · BOSS ${Math.round(c.boss * 100)}%` : ''}`;
     $('cores-line').textContent = c.cores.map((k, i) => `${'ABC'[i]} ${Math.round(k.health * 100)}%`).join(' · ');
   } else {
-    $('wave').textContent = mode === 'tdm' ? 'TEAM DEATHMATCH' : 'FREE-FOR-ALL';
+    $('wave').textContent = mode === 'tdm' ? 'TEAM DEATHMATCH' : mode === 'koth' ? 'KING OF THE SPOOL' : 'FREE-FOR-ALL';
     $('phase').textContent = locals.map((l) => `${l.net.roster.get(l.net.id)?.name ?? '?'} ${l.net.me()?.kos ?? 0} KO`).join(' · ');
-    $('cores-line').textContent = '';
+    const k = main.koth;
+    $('cores-line').textContent = k ? `Cotton ${Math.floor(k.scores[0])} · Wool ${Math.floor(k.scores[1])} / ${KOTH.target}${k.holder === 2 ? ' · CONTESTED' : ''}` : '';
   }
 }
 
@@ -384,6 +387,7 @@ function frame(): void {
     }
   }
   yarnRopes.update(ropeSpecs, dt);
+  spoolHill?.update(main.koth, t, dt);
 
   if (enemyRenderer) {
     const views: EnemyView[] = main.enemySamples(now).map((e) => {

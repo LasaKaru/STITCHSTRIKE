@@ -1,5 +1,6 @@
 import { WORLD_BOUNDS } from './constants.ts';
 import type { InputCmd, PlayerState } from './movement.ts';
+import type { KothState } from './koth.ts';
 import type { MapId, Vec3 } from './world.ts';
 
 /**
@@ -7,7 +8,12 @@ import type { MapId, Vec3 } from './world.ts';
  * messages (hello, roster, events, ping) are JSON text frames.
  */
 
-export type GameMode = 'coop' | 'pvp' | 'tdm';
+export type GameMode = 'coop' | 'pvp' | 'tdm' | 'koth';
+
+/** Modes played in two teams (no friendly fire, team colours). */
+export function isTeamMode(mode: GameMode): boolean {
+  return mode === 'tdm' || mode === 'koth';
+}
 
 /**
  * A toy's cosmetic look: small indices into the client's cosmetics catalogue
@@ -70,6 +76,9 @@ export type GameEvent =
   | { type: 'drum'; x: number; z: number }
   /** A Jack-in-the-Box springs out at a toy. */
   | { type: 'pop'; x: number; z: number }
+  /** King of the Spool: the spool hopped to another spot / a team won the round. */
+  | { type: 'hillMove'; hill: number }
+  | { type: 'kothWin'; team: number }
   | { type: 'snap'; pad: number };
 
 export type ClientText =
@@ -255,6 +264,8 @@ export interface Snapshot {
   pickups: number;
   drops: NetDrop[];
   coop: CoopState | null;
+  /** King of the Spool round state. */
+  koth?: KothState | null;
 }
 
 /** Bytes per record, for bandwidth maths: player 21, shot 9 (15 with a start point), enemy 8, projectile 7. */
@@ -386,6 +397,15 @@ export function encodeSnapshot(s: Snapshot): Uint8Array {
       w.u8(Math.max(0, Math.min(255, Math.round(e.y * 20))));
     }
   }
+  w.u8(s.koth ? 1 : 0);
+  if (s.koth) {
+    const k = s.koth;
+    w.u8(k.hill);
+    w.u8(k.holder + 1);
+    w.u16(Math.round(k.scores[0] * 10));
+    w.u16(Math.round(k.scores[1] * 10));
+    w.u8(Math.min(255, Math.ceil(k.timer)));
+  }
   return w.done();
 }
 
@@ -477,7 +497,13 @@ export function decodeSnapshot(buf: Uint8Array): Snapshot | null {
       }
       coop = { phase, wave, totalWaves, timer, buttons, ready, cores, pads, difficulty, boss, enemies };
     }
-    return { tick, ack, self, respawn, players, shots, projectiles, pickups, drops, coop };
+    let koth: KothState | null = null;
+    if (r.left > 0 && r.u8() === 1) {
+      const hill = r.u8(), holder = r.u8() - 1;
+      const a = r.u16() / 10, b = r.u16() / 10;
+      koth = { hill, holder, scores: [a, b], timer: r.u8() };
+    }
+    return { tick, ack, self, respawn, players, shots, projectiles, pickups, drops, coop, koth };
   } catch {
     return null;
   }

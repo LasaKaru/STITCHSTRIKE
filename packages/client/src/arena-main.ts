@@ -3,7 +3,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import {
   BUILD_RANGE, Buildable, BUILDABLES, Buttons, createWorld, ENEMIES, ENEMY_INTERP_DELAY_MS, eyePosition, lookDirection, MAX_PITCH,
   pelletDirections, Phase, PLAYER, rayBox, rayPlayer, rayWorld, TURRET, TURRET_SHOT_BASE, WEAPONS,
-  GRAPPLE, MAPS, type GameMode, type MapId, type PlayerState, type Vec3,
+  GRAPPLE, KOTH, MAPS, TEAM_NAMES, type GameMode, type MapId, type PlayerState, type Vec3,
   Action, DECK, DIFFICULTIES, ENEMY_SHOT_ID, EnemyType, launchProjectile, LAUNCHER, MAX_TIER, PICKUPS, PickupKind, ShotKind, upgradeCost, WEAPON_COUNT,
 } from '@stitchstrike/shared';
 import { CombatMusic, type Intensity } from './audio/combatMusic.ts';
@@ -17,6 +17,7 @@ import { CORE_COLORS, CORE_LETTERS, CoopProps } from './scene/coopProps.ts';
 import { EnemyRenderer, type EnemyView } from './scene/enemyRenderer.ts';
 import { Fx } from './scene/fx.ts';
 import { YarnRopes, type RopeSpec } from './scene/yarnRopes.ts';
+import { SpoolHill } from './scene/spoolHill.ts';
 import { createPost, type Post } from './scene/post.ts';
 import { ViewModel } from './scene/viewModel.ts';
 import { buildWoolGarden } from './scene/woolGarden.ts';
@@ -44,7 +45,7 @@ const params = new URLSearchParams(location.search);
 const map: MapId = MAPS.some((m) => m.id === params.get('map')) ? (params.get('map') as MapId) : 'bedroom';
 const world = createWorld(map);
 const modeParam = params.get('mode');
-const mode: GameMode = modeParam === 'pvp' || modeParam === 'tdm' ? modeParam : 'coop';
+const mode: GameMode = modeParam === 'pvp' || modeParam === 'tdm' || modeParam === 'koth' ? modeParam : 'coop';
 const wavesParam = Number(params.get('waves') ?? 10);
 const waves = [0, 5, 10].includes(wavesParam) ? wavesParam : 10;
 const difficulty = Math.max(0, Math.min(3, Math.floor(Number(params.get('difficulty') ?? 1)) || 0));
@@ -62,8 +63,9 @@ const name = (params.get('name') ?? settings.name).slice(0, 16);
 document.body.classList.add(mode);
 document.getElementById('modeline')!.textContent = mode === 'coop'
   ? `Co-op defence · ${waves === 0 ? 'Endless' : `${waves} waves`} · ${DIFFICULTIES[difficulty].name}`
-  : mode === 'tdm' ? 'Team Deathmatch · Team Cotton vs Team Wool' : 'PvP free-for-all · first to unravel the most toys';
-if (mode === 'tdm') document.body.classList.add('pvp');
+  : mode === 'tdm' ? 'Team Deathmatch · Team Cotton vs Team Wool'
+  : mode === 'koth' ? `King of the Spool · hold the Golden Spool · first to ${KOTH.target}` : 'PvP free-for-all · first to unravel the most toys';
+if (mode === 'tdm' || mode === 'koth') document.body.classList.add('pvp');
 
 // ---------------------------------------------------------------- transport
 
@@ -322,6 +324,16 @@ net.onEvent = (e) => {
         setTimeout(() => resultsCard(false), 2500);
       }
       break;
+    case 'hillMove':
+      banner('THE GOLDEN SPOOL HAS MOVED!', '', 2200);
+      sfx.play('spring');
+      break;
+    case 'kothWin': {
+      const mine = net.roster.get(net.id)?.team === e.team;
+      banner(`${TEAM_NAMES[e.team].toUpperCase()} WINS THE ROUND!`, mine ? 'good' : 'bad', 4000);
+      sfx.play(mine ? 'win' : 'lose');
+      break;
+    }
     case 'coreDown':
       banner(`HEARTSPOOL ${CORE_LETTERS[e.core]} UNRAVELLED!`, 'bad');
       sfx.play('alarm');
@@ -707,8 +719,8 @@ function updateHud(): void {
     }
     hud.deckhint.innerHTML = open ? '<b>1–7</b> build or upgrade · <b>Q</b> build again · <b>B</b> close' : '<b>B</b> build deck · <b>Q</b> build again';
   } else {
-    hud.wave.textContent = mode === 'tdm' ? 'TEAM DEATHMATCH' : 'FREE-FOR-ALL';
-    hud.phase.innerHTML = mode === 'tdm' ? teamScoreText() : '';
+    hud.wave.textContent = mode === 'tdm' ? 'TEAM DEATHMATCH' : mode === 'koth' ? 'KING OF THE SPOOL' : 'FREE-FOR-ALL';
+    hud.phase.innerHTML = mode === 'tdm' ? teamScoreText() : mode === 'koth' ? kothText() : '';
   }
 
   if (net.status === 'connecting') hud.status.textContent = `Connecting to ${solo ? 'solo worker' : 'server'}…`;
@@ -749,6 +761,13 @@ function resultsCard(won: boolean | null): void {
     <div class="fine">Rewards are cosmetic. Unlock heads, yarns and packaging in the Customise menu. Ages 5 and up.</div>`;
 }
 
+function kothText(): string {
+  const k = net.koth;
+  if (!k) return '';
+  const held = k.holder === 2 ? '<b>CONTESTED!</b>' : k.holder >= 0 ? `${TEAM_NAMES[k.holder]} holds the spool` : 'The spool is free';
+  return `<b style="color:#e8742a">Cotton ${Math.floor(k.scores[0])}</b> · <b style="color:#6fb4ff">Wool ${Math.floor(k.scores[1])}</b> / ${KOTH.target} · ${held} · moves in ${Math.ceil(k.timer)} s`;
+}
+
 function teamScoreText(): string {
   const score = [0, 0];
   for (const p of net.latest?.players ?? []) score[net.roster.get(p.id)?.team ?? 0] += p.kos;
@@ -756,6 +775,7 @@ function teamScoreText(): string {
 }
 
 const pickupsView = new PickupsView(scene, world);
+const spoolHill = mode === 'koth' ? new SpoolHill(scene, world) : null;
 const traversal = new TraversalView(scene, world, new Set(profile.collected));
 const music = new CombatMusic();
 
@@ -967,6 +987,7 @@ function frame(): void {
   muzzleFlash.intensity = flash > 0 ? 3 : 0;
 
   // Co-op set pieces: Heartspools spin, turrets track the nearest enemy, pad under you glows.
+  spoolHill?.update(net.koth, t, dt);
   if (coopProps) {
     const highlight = p ? coopProps.nearestPad(p.x, p.z, BUILD_RANGE) : -1;
     coopProps.update(net.coop, t, highlight, (x, z) => {

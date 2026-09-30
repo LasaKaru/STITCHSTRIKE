@@ -1,3 +1,4 @@
+import { isTeamMode } from './protocol.ts';
 import { INPUT_RATE, TICK_RATE } from './constants.ts';
 import { Buildable, BUILDABLES, DECK, MAX_TIER, Phase, upgradeCost } from './coop.ts';
 import { ENEMIES } from './enemies.ts';
@@ -62,6 +63,12 @@ export class Bot {
       const p = pads[Math.floor(Math.random() * pads.length)];
       return p ? p.pos : c;
     }
+    const koth = this.room.koth;
+    if (koth && Math.random() < 0.75) {
+      // Mostly go and stand on the spool.
+      const h = koth.hills[koth.hill];
+      return [h[0] + (Math.random() - 0.5) * 5, h[1], h[2] + (Math.random() - 0.5) * 5];
+    }
     const w = this.room.world.waypoints;
     return w[Math.floor(Math.random() * w.length)];
   }
@@ -89,7 +96,7 @@ export class Bot {
       }
     } else {
       for (const o of this.room.players.values()) {
-        if (o.id !== me.id && o.alive) consider({ key: `p${o.id}`, x: o.state.x, y: o.state.y + 1.0, z: o.state.z });
+        if (o.id !== me.id && o.alive && !(isTeamMode(this.room.mode) && o.team === me.team)) consider({ key: `p${o.id}`, x: o.state.x, y: o.state.y + 1.0, z: o.state.z });
       }
     }
     return best;
@@ -141,6 +148,22 @@ export class Bot {
       if (dist > 10) buttons |= Buttons.Forward;
       if (dist < 4) buttons |= Buttons.Back;
       this.weapon = this.chooseWeapon(target, dist);
+      const koth = this.room.koth;
+      if (koth) {
+        // King of the Spool: fight on the move, but keep heading for the spool.
+        const h = koth.hills[koth.hill];
+        const hx = h[0] - s.x, hz = h[2] - s.z;
+        const hd = Math.hypot(hx, hz);
+        if (hd > 3) {
+          buttons &= ~(Buttons.Forward | Buttons.Back | Buttons.Left | Buttons.Right);
+          const fwd = (-Math.sin(this.yaw) * hx - Math.cos(this.yaw) * hz) / hd;
+          const right = (Math.cos(this.yaw) * hx - Math.sin(this.yaw) * hz) / hd;
+          if (fwd > 0.35) buttons |= Buttons.Forward;
+          if (fwd < -0.35) buttons |= Buttons.Back;
+          if (right > 0.35) buttons |= Buttons.Right;
+          if (right < -0.35) buttons |= Buttons.Left;
+        }
+      }
       const yawErr = Math.abs(wrapAngle(desiredYaw - this.yaw));
       if (this.reaction <= 0 && yawErr < 0.2) buttons |= Buttons.Fire;
     } else {
@@ -149,7 +172,7 @@ export class Bot {
       const dx = this.goal[0] - s.x;
       const dz = this.goal[2] - s.z;
       if (Math.hypot(dx, dz) < 1.2) {
-        if (!this.room.coop || Math.random() < 0.01) this.goal = this.pickGoal();
+        if ((!this.room.coop && !this.room.koth) || Math.random() < 0.01) this.goal = this.pickGoal();
       } else {
         desiredYaw = Math.atan2(-dx, -dz);
         buttons |= Buttons.Forward;
