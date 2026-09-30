@@ -311,3 +311,176 @@ export function createBoss(): FigureInstance {
   f.root.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true; });
   return f;
 }
+
+// ---------------------------------------------------------------- Tin Drummer
+
+export function drummerOptions(): HumanoidOptions {
+  return {
+    name: 'tin-drummer',
+    headwear: 'helmet', beard: 'mustache', gloves: true, eyes: 'glow', eyeColor: 0xffc94a,
+    jacketButtons: true, belt: true, muscle: 0.95, belly: 1.25, cell: 0.016, merged: true, scale: 0.95,
+    colors: { skin: 0xd8c8b0, jacket: 0xb3262c, trim: 0xd9b24a, pants: 0xefe3c8, boots: 0x111114, gloves: 0xefe3c8, hat: 0x1e1e24, belt: 0xefe3c8, mustache: 0x2a1c14 },
+    patterns: { jacket: 'garter', pants: 'rib' },
+  };
+}
+
+/** A marching drum slung at the hips, with two sticks that beat the rhythm (named for posing). */
+export function createDrummer(): FigureInstance {
+  const f = spawnFigure(drummerOptions());
+  const hips = f.bones.get('hips');
+  if (hips) {
+    const S = 0.95;
+    const g = new THREE.Group();
+    const shell = new THREE.Mesh(new THREE.CylinderGeometry(0.13 * S, 0.13 * S, 0.14 * S, 24, 1, true), createWoolMaterial({ color: 0x2f5a9a, pattern: 'rib', uvSize: [0.8, 0.14], gauge: 1.6 }));
+    (shell.material as THREE.Material).side = THREE.DoubleSide;
+    const skin = new THREE.Mesh(new THREE.CircleGeometry(0.13 * S, 24), createWoolMaterial({ color: 0xf6f1e4, pattern: 'felt', uvSize: [0.3, 0.3] }));
+    skin.rotation.x = -Math.PI / 2;
+    skin.position.y = 0.07 * S;
+    const rim = metal(0xd9b24a, 0.25);
+    for (const y of [-0.07, 0.07]) {
+      const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.132 * S, 0.01 * S, 8, 28), rim);
+      hoop.rotation.x = Math.PI / 2;
+      hoop.position.y = y * S;
+      g.add(hoop);
+    }
+    // Zig-zag tension cords knitted round the shell.
+    const cord = createWoolMaterial({ color: 0xefe3c8, pattern: 'rib', uvSize: [0.2, 0.2], gauge: 2 });
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const c = new THREE.Mesh(new THREE.CylinderGeometry(0.005 * S, 0.005 * S, 0.15 * S, 6), cord);
+      c.position.set(Math.cos(a) * 0.134 * S, 0, Math.sin(a) * 0.134 * S);
+      c.rotation.set(Math.sin(a) * 0.5, 0, Math.cos(a) * 0.5);
+      g.add(c);
+    }
+    g.add(shell, skin);
+    for (const sx of [-1, 1]) {
+      const stick = new THREE.Group();
+      stick.name = sx < 0 ? 'stickL' : 'stickR';
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.006 * S, 0.008 * S, 0.22 * S, 8), metal(0xc89a68, 0.6));
+      shaft.rotation.x = Math.PI / 2;
+      shaft.position.z = -0.1 * S;
+      const tip = new THREE.Mesh(new THREE.SphereGeometry(0.016 * S, 10, 8), createWoolMaterial({ color: 0xd8262e, pattern: 'felt', uvSize: [0.1, 0.1] }));
+      tip.position.z = -0.21 * S;
+      stick.add(shaft, tip);
+      stick.position.set(0.07 * sx * S, 0.16 * S, 0.02 * S);
+      g.add(stick);
+    }
+    g.position.set(0, -0.02 * S, -0.16 * S);
+    g.rotation.x = 0.25;
+    hips.add(g);
+  }
+  f.root.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true; });
+  return f;
+}
+
+/** Beat the drum: the sticks rise and fall in turn. */
+export function beatDrum(f: FigureInstance, t: number): void {
+  const beat = t * 7;
+  f.root.traverse((o) => {
+    if (o.name === 'stickL') o.rotation.x = -0.3 - Math.max(0, Math.sin(beat)) * 0.9;
+    if (o.name === 'stickR') o.rotation.x = -0.3 - Math.max(0, Math.sin(beat + Math.PI)) * 0.9;
+  });
+}
+
+// ---------------------------------------------------------------- Jack-in-the-Box
+
+function jackDef(): FigureDef {
+  const bones: BoneDef[] = [{ name: 'body', parent: null, head: [0, 0.02, 0], tail: [0, 0.7, 0], radius: 0.35 }];
+  const P: Prim[] = [
+    roundBox([0, 0.32, 0], [0.34, 0.3, 0.34], 0.05, { bone: 'body', region: 'box', k: 0.02 }),
+    // Knitted panels proud of each face, and a crank on the side.
+    roundBox([0, 0.32, -0.36], [0.26, 0.22, 0.025], 0.02, { bone: 'body', region: 'panel', k: 0.01 }),
+    roundBox([0, 0.32, 0.36], [0.26, 0.22, 0.025], 0.02, { bone: 'body', region: 'panel', k: 0.01 }),
+    roundBox([-0.36, 0.32, 0], [0.025, 0.22, 0.26], 0.02, { bone: 'body', region: 'panel2', k: 0.01 }),
+    roundBox([0.36, 0.32, 0], [0.025, 0.22, 0.26], 0.02, { bone: 'body', region: 'panel2', k: 0.01 }),
+    limb([0.36, 0.34, 0], [0.46, 0.34, 0], 0.025, 0.025, { bone: 'body', region: 'trim', k: 0.01 }),
+    limb([0.46, 0.34, 0], [0.46, 0.2, 0.04], 0.022, 0.022, { bone: 'body', region: 'trim', k: 0.01 }),
+    sphere([0.46, 0.19, 0.05], 0.04, { bone: 'body', region: 'panel', k: 0.01 }),
+  ];
+  return {
+    name: 'jack', bones, prims: P, cell: 0.012, density: 12,
+    regions: {
+      box: { pattern: 'garter', color: 0xffc94a, gauge: 1.3 },
+      panel: { pattern: 'crochet', color: 0xd8262e, gauge: 1.4 },
+      panel2: { pattern: 'crochet', color: 0x2f7fe0, gauge: 1.4 },
+      trim: { pattern: 'rib', color: 0x20242e, gauge: 1.8 },
+    },
+    accessories: [{ bone: 'body', build: () => {
+      // The lid, the spring and the clown: animated by name when it springs.
+      const g = new THREE.Group();
+      g.name = 'jackPop';
+      g.position.y = 0.62;
+      const lid = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.05, 0.7), createWoolMaterial({ color: 0x2f7fe0, pattern: 'garter', uvSize: [0.7, 0.7], gauge: 1.3 }));
+      lid.name = 'jackLid';
+      // Hinged along the back edge (+Z; the face looks down -Z).
+      lid.geometry.translate(0, 0, -0.35);
+      lid.position.set(0, 0.02, 0.35);
+      const spring = new THREE.Group();
+      spring.name = 'jackSpring';
+      const coil = metal(0xc9ccd2, 0.25);
+      for (let i = 0; i < 8; i++) {
+        const turn = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.014, 6, 18), coil);
+        turn.rotation.x = Math.PI / 2;
+        turn.position.y = i * 0.06;
+        spring.add(turn);
+      }
+      const clown = new THREE.Group();
+      clown.name = 'jackHead';
+      clown.position.y = 0.5;
+      const face = new THREE.Mesh(new THREE.SphereGeometry(0.17, 20, 16), createWoolMaterial({ color: 0xf6f1e4, pattern: 'felt', uvSize: [0.5, 0.5] }));
+      const nose = new THREE.Mesh(new THREE.SphereGeometry(0.045, 14, 10), createWoolMaterial({ color: 0xd8262e, pattern: 'crochet', uvSize: [0.15, 0.15], gauge: 2 }));
+      nose.position.set(0, 0, -0.17);
+      const ruff = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.05, 10, 22), createWoolMaterial({ color: 0x8bcb3a, pattern: 'rib', uvSize: [0.8, 0.1], gauge: 2 }));
+      ruff.rotation.x = Math.PI / 2;
+      ruff.position.y = -0.15;
+      const hat = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.26, 18), createWoolMaterial({ color: 0xb46fd6, pattern: 'stocking', uvSize: [0.4, 0.3], gauge: 1.6 }));
+      hat.position.y = 0.26;
+      hat.rotation.z = 0.25;
+      const pom = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 8), createWoolMaterial({ color: 0xffc94a, pattern: 'wound', uvSize: [0.1, 0.1], gauge: 2 }));
+      pom.position.set(-0.06, 0.39, 0);
+      const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.012, 8, 16, Math.PI), bead(0x6a1010));
+      mouth.position.set(0, -0.06, -0.15);
+      mouth.rotation.set(0, 0, Math.PI);
+      clown.add(face, nose, ruff, hat, pom, mouth);
+      for (const sx of [-1, 1]) {
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 8), bead(0x111111));
+        eye.position.set(0.06 * sx, 0.05, -0.15);
+        (eye.material as THREE.MeshPhysicalMaterial).emissive = new THREE.Color(0xff4030);
+        (eye.material as THREE.MeshPhysicalMaterial).emissiveIntensity = 1.5;
+        clown.add(eye);
+      }
+      spring.add(clown);
+      g.add(lid, spring);
+      return g;
+    } }],
+  };
+}
+
+export function createJack(): FigureInstance {
+  const f = cached(jackDef, 'jack');
+  f.root.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true; });
+  return f;
+}
+
+/**
+ * Waddle the box along; the clown peeks now and then, and `pop` (0..1, 1 =
+ * just sprang) shoots it out on its spring.
+ */
+export function poseJack(f: FigureInstance, t: number, phase: number, amp: number, pop: number): void {
+  const p = f.poser;
+  p.reset();
+  p.setHips(0, Math.abs(Math.sin(phase * 2)) * 0.05 * amp, 0);
+  p.rotate('body', 0, 0, Math.sin(phase * 2) * 0.12 * amp);
+  const peek = Math.max(0, Math.sin(t * 0.9) - 0.85) * 3;
+  const out = Math.max(pop > 0 ? Math.sin(Math.min(1, (1 - pop) * 4) * Math.PI * 0.5) * (pop > 0.2 ? 1 : pop * 5) : 0, peek * 0.4);
+  const spring = f.root.getObjectByName('jackSpring');
+  const lid = f.root.getObjectByName('jackLid');
+  if (spring) {
+    spring.scale.y = 0.08 + out * 1.2;
+    spring.position.y = -0.3 + out * 0.3;
+    const head = spring.getObjectByName('jackHead');
+    if (head) { head.scale.y = 1 / Math.max(0.08, spring.scale.y) * (0.6 + out * 0.4); head.scale.x = head.scale.z = 0.6 + out * 0.4; head.rotation.z = Math.sin(t * 10) * 0.2 * out; }
+    spring.visible = out > 0.05;
+  }
+  if (lid) lid.rotation.x = Math.min(1.9, out * 3);
+}

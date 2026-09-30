@@ -188,6 +188,8 @@ main.onEvent = (e) => {
     else if (e.phase === Phase.Won) { banner('THE HEARTSPOOLS ARE SAFE!', 'good'); sfx.play('win'); }
     else if (e.phase === Phase.Lost) { banner('THE HEARTSPOOLS UNRAVELLED', 'bad'); sfx.play('lose'); }
   } else if (e.type === 'boss') banner(e.state === 'arrive' ? 'THE UNRAVELLER APPROACHES!' : 'THE UNRAVELLER IS UNPICKED!', e.state === 'arrive' ? 'bad' : 'good');
+  else if (e.type === 'drum') sfx.play('drum', 0.4);
+  else if (e.type === 'pop') { enemyRenderer?.popNear(e.x, e.z); sfx.play('pop', 0.6); }
   else if (e.type === 'stomp') { fx.stomp(new THREE.Vector3(e.x, 0, e.z)); fx.shake = 1; sfx.play('stomp'); }
   else if (e.type === 'snap') coopProps?.snap(e.pad);
   else if (e.type === 'kill' && locals.some((l) => l.net.id === e.by)) sfx.play('kill', 0.7);

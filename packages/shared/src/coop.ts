@@ -1,4 +1,4 @@
-import { BOSS_STOMP, DRONE_DROP, ENEMIES, EnemyType, NavGrid, pushOutOfBoxes, SNIP_CUT, SOLDIER_ACCURACY, type Enemy } from './enemies.ts';
+import { BOSS_STOMP, DRONE_DROP, DRUM, ENEMIES, JACK_POP, EnemyType, NavGrid, pushOutOfBoxes, SNIP_CUT, SOLDIER_ACCURACY, type Enemy } from './enemies.ts';
 import type { GameEvent, Shot } from './protocol.ts';
 import { hasLineOfSight } from './raycast.ts';
 import type { Vec3, World } from './world.ts';
@@ -83,6 +83,7 @@ interface SpawnGroup { type: number; count: number; spawn: number; delay: number
 
 const G = EnemyType.Grunt, S = EnemyType.Scuttler, M = EnemyType.Moth, B = EnemyType.Brute;
 const T = EnemyType.Teeth, P = EnemyType.Top, O = EnemyType.Soldier, D = EnemyType.Drone, X = EnemyType.Snip, Z = EnemyType.Boss;
+const R = EnemyType.Drummer, J = EnemyType.Jack;
 const g = (type: number, count: number, delay = 0, interval = 1, spawn = -1): SpawnGroup => ({ type, count, spawn, delay, interval });
 
 /** The ten waves of a full mission: each introduces something new, and the Unraveller closes it. */
@@ -92,15 +93,15 @@ export const WAVES: SpawnGroup[][] = [
   [g(G, 12, 0, 1.0), g(S, 8, 6, 0.8), g(M, 6, 4, 1.0)],
   [g(G, 10, 0, 1.0), g(O, 6, 3, 1.6), g(T, 20, 8, 0.2)],
   [g(G, 14, 0, 0.8), g(P, 6, 4, 1.2), g(M, 8, 8, 0.8), g(B, 1, 15)],
-  [g(O, 8, 0, 1.2), g(X, 3, 6, 3), g(T, 24, 4, 0.2), g(S, 10, 12, 0.5)],
-  [g(G, 16, 0, 0.8), g(D, 3, 6, 4), g(M, 10, 10, 0.7), g(P, 8, 14, 0.9)],
-  [g(B, 2, 0, 8), g(X, 4, 4, 3), g(O, 10, 6, 1), g(T, 30, 10, 0.15)],
-  [g(G, 20, 0, 0.7), g(D, 4, 5, 4), g(P, 10, 8, 0.8), g(M, 12, 12, 0.6), g(B, 2, 18, 6)],
-  [g(Z, 1, 4, 1, 0), g(G, 14, 0, 1), g(T, 30, 10, 0.2), g(O, 8, 16, 1.4), g(X, 3, 24, 4)],
+  [g(O, 8, 0, 1.2), g(X, 3, 6, 3), g(T, 24, 4, 0.2), g(S, 10, 12, 0.5), g(J, 3, 10, 3)],
+  [g(G, 16, 0, 0.8), g(R, 1, 4), g(D, 3, 6, 4), g(M, 10, 10, 0.7), g(P, 8, 14, 0.9)],
+  [g(B, 2, 0, 8), g(X, 4, 4, 3), g(O, 10, 6, 1), g(T, 30, 10, 0.15), g(J, 4, 8, 2)],
+  [g(G, 20, 0, 0.7), g(R, 2, 3, 8), g(D, 4, 5, 4), g(P, 10, 8, 0.8), g(M, 12, 12, 0.6), g(B, 2, 18, 6)],
+  [g(Z, 1, 4, 1, 0), g(G, 14, 0, 1), g(T, 30, 10, 0.2), g(O, 8, 16, 1.4), g(X, 3, 24, 4), g(R, 2, 12, 6), g(J, 3, 20, 3)],
 ];
 /** A skirmish is five waves; its last wave brings a Brute pack instead of the boss. */
 const SKIRMISH: SpawnGroup[][] = [WAVES[0], WAVES[1], WAVES[2], WAVES[3],
-  [g(G, 18, 0, 0.7), g(S, 12, 4, 0.4), g(M, 10, 8, 0.6), g(B, 3, 12, 5), g(O, 6, 6, 1.5)]];
+  [g(G, 18, 0, 0.7), g(S, 12, 4, 0.4), g(M, 10, 8, 0.6), g(B, 3, 12, 5), g(O, 6, 6, 1.5), g(J, 2, 10, 3)]];
 
 /** Endless: loop the mission waves, each loop tougher, a boss every tenth wave. */
 function endlessWave(n: number): { groups: SpawnGroup[]; hp: number; count: number } {
@@ -379,7 +380,7 @@ export class CoopDirector {
       id: this.nextEnemyId, type, x, y, z, vx: 0, vz: 0, yaw: 0, hp, maxHp: hp,
       core: alive[Math.floor(Math.random() * alive.length)] ?? 0,
       node: -1, cooldown: 0, kx: 0, kz: 0, slow: 0,
-      special: type === EnemyType.Drone ? DRONE_DROP.every * 0.5 : type === EnemyType.Boss ? BOSS_STOMP.every : 0,
+      special: type === EnemyType.Drone ? DRONE_DROP.every * 0.5 : type === EnemyType.Boss ? BOSS_STOMP.every : type === EnemyType.Jack ? 1.5 : 0,
     };
     this.enemies.push(e);
     this.nextEnemyId = (this.nextEnemyId % 65535) + 1;
@@ -436,6 +437,7 @@ export class CoopDirector {
     const aliveCores = this.cores.map((c, i) => (c.alive ? i : -1)).filter((i) => i >= 0);
     if (aliveCores.length === 0) return;
     const spawned: Enemy[] = [];
+    const drummers = this.enemies.filter((d) => d.hp > 0 && d.type === EnemyType.Drummer);
 
     for (const e of this.enemies) {
       if (e.hp <= 0) continue;
@@ -446,6 +448,8 @@ export class CoopDirector {
       e.special -= dt;
 
       let slow = e.slow > 0 ? 0.5 : 1;
+      // Marching to the drum: faster within earshot of a Tin Drummer.
+      if (e.type !== EnemyType.Drummer && drummers.some((d) => Math.hypot(d.x - e.x, d.z - e.z) < DRUM.radius)) slow *= DRUM.boost;
       if (!def.flying) {
         pads.forEach((p, i) => {
           if (this.pads[i].kind === Buildable.Mat && Math.hypot(p.pos[0] - e.x, p.pos[2] - e.z) < MAT_RADIUS) slow = Math.min(slow, MAT_SLOW / tierPower(this.pads[i].tier));
@@ -548,6 +552,29 @@ export class CoopDirector {
         for (let k = 0; k < DRONE_DROP.count && this.enemies.length + spawned.length < MAX_ALIVE; k++) {
           const t = this.spawnEnemyDeferred(EnemyType.Teeth, e.x + (Math.random() - 0.5), 0, e.z + (Math.random() - 0.5), e.maxHp / def.hp);
           spawned.push(t);
+        }
+      }
+      if (e.type === EnemyType.Drummer && e.special <= 0) {
+        e.special = DRUM.every;
+        this.emit({ type: 'drum', x: e.x, z: e.z });
+      }
+      if (e.type === EnemyType.Jack && e.special <= 0) {
+        let prey: (typeof players)[number] | null = null;
+        let best = JACK_POP.range;
+        for (const p of players) {
+          const d = Math.hypot(p.x - e.x, p.z - e.z);
+          if (d < best && Math.abs(p.y - e.y) < 2.5) { best = d; prey = p; }
+        }
+        if (prey) {
+          e.special = JACK_POP.every;
+          this.emit({ type: 'pop', x: e.x, z: e.z });
+          const l = best || 1;
+          e.kx = ((prey.x - e.x) / l) * JACK_POP.lunge;
+          e.kz = ((prey.z - e.z) / l) * JACK_POP.lunge;
+          for (const p of players) {
+            const d = Math.hypot(p.x - e.x, p.z - e.z);
+            if (d < JACK_POP.radius + 1 && Math.abs(p.y - e.y) < 2.5) host.damagePlayer(p.id, JACK_POP.damage * (1 - (d / (JACK_POP.radius + 1)) * 0.5), e.type, knock(p.x, p.z));
+          }
         }
       }
       if (def.boss && e.special <= 0) {

@@ -66,6 +66,10 @@ export type GameEvent =
   | { type: 'pickup'; id: number; kind: number }
   | { type: 'boss'; state: 'arrive' | 'down' }
   | { type: 'stomp'; x: number; z: number }
+  /** A Tin Drummer beats the march (nearby invaders speed up). */
+  | { type: 'drum'; x: number; z: number }
+  /** A Jack-in-the-Box springs out at a toy. */
+  | { type: 'pop'; x: number; z: number }
   | { type: 'snap'; pad: number };
 
 export type ClientText =

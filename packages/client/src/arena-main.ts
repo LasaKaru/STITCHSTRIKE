@@ -166,7 +166,7 @@ function colorOf(id: number): number {
 interface EnemyVisual { yaw: number; phase: number; speed: number; hitAge: number; last: THREE.Vector3 }
 const enemyVisuals = new Map<number, EnemyVisual>();
 let enemies: EnemySample[] = [];
-const ENEMY_COLORS = [0xb3262c, 0x6a3c9a, 0xb8a58a, 0x3e5a3a, 0xf6f1e4, 0x2f7fe0, 0x2f5a9a, 0x2a2a30, 0xe8742a, 0x8a5a3a];
+const ENEMY_COLORS = [0xb3262c, 0x6a3c9a, 0xb8a58a, 0x3e5a3a, 0xf6f1e4, 0x2f7fe0, 0x2f5a9a, 0x2a2a30, 0xe8742a, 0x8a5a3a, 0xb3262c, 0xffc94a];
 
 net.onEnemyGone = (e) => {
   // Show the unravel when the interpolated view reaches that moment, not when the packet lands.
@@ -358,6 +358,16 @@ net.onEvent = (e) => {
       fx.stomp(at);
       sfx.play('stomp', attenuation(at));
       fx.shake = Math.max(fx.shake, 1.2 * attenuation(at));
+      break;
+    }
+    case 'drum':
+      sfx.play('drum', attenuation(new THREE.Vector3(e.x, 1, e.z)) * 0.8);
+      break;
+    case 'pop': {
+      const at = new THREE.Vector3(e.x, 0.8, e.z);
+      enemyRenderer?.popNear(e.x, e.z);
+      fx.puff(at, 0xffc94a, 1.5);
+      sfx.play('pop', attenuation(at));
       break;
     }
     case 'snap': {

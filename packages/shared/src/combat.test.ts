@@ -380,6 +380,42 @@ describe('the Mass-Knit Army', () => {
     expect(room.coopState()!.boss).toBeGreaterThan(0.9);
   });
 
+  it('a Tin Drummer speeds up the invaders marching near it', () => {
+    const speedOf = (withDrummer: boolean) => {
+      const room = arena();
+      const coop = room.coop!;
+      // A grunt far from any toy, walking toward a Heartspool.
+      const g = enemy(70, EnemyType.Grunt, 0, 14);
+      coop.enemies.push(g);
+      if (withDrummer) coop.enemies.push(enemy(71, EnemyType.Drummer, 2, 15));
+      for (let i = 0; i < 20; i++) room.update();
+      return Math.hypot(g.vx, g.vz);
+    };
+    const plain = speedOf(false);
+    expect(speedOf(true)).toBeGreaterThan(plain * 1.25);
+  });
+
+  it('a Jack-in-the-Box springs at a nearby toy', () => {
+    const room = arena();
+    const p = room.addPlayer('Poked')!;
+    p.protect = 0;
+    const jack = enemy(80, EnemyType.Jack, p.state.x + 2.5, p.state.z);
+    jack.special = 0;
+    room.coop!.enemies.push(jack);
+    room.update();
+    expect(room.drainEvents().some((e) => e.type === 'pop')).toBe(true);
+    expect(p.health).toBeLessThan(PLAYER.maxHealth);
+    // It lunged toward the toy and has to wind up again.
+    expect(Math.sign(jack.kx)).toBe(Math.sign(p.state.x - jack.x));
+    expect(jack.special).toBeGreaterThan(4);
+  });
+
+  it('Drummers and Jacks march in the later waves', () => {
+    const types = new Set(WAVES.flat().map((g) => g.type));
+    expect(types.has(EnemyType.Drummer)).toBe(true);
+    expect(types.has(EnemyType.Jack)).toBe(true);
+  });
+
   it('endless mode keeps going past wave 10 with tougher invaders', () => {
     const host = new RoomHost({ code: 'END', fillTo: 0, mode: 'coop', waves: 0, difficulty: 0 });
     const coop = host.room.coop!;

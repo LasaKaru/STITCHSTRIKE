@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { ENEMIES, EnemyType } from '@stitchstrike/shared';
 import { bruteOptions, gruntOptions, heldBlaster, spawnFigure } from '../figures/cast.ts';
 import { createMoth, createScuttler, poseMoth, poseScuttler } from '../figures/creatures.ts';
-import { createBoss, createDrone, createSnip, createTeeth, createTop, poseDrone, poseSnip, poseTeeth, poseTop, soldierOptions } from '../figures/invaders.ts';
+import { beatDrum, createBoss, createDrone, createDrummer, createJack, createSnip, createTeeth, createTop, poseDrone, poseJack, poseSnip, poseTeeth, poseTop, soldierOptions } from '../figures/invaders.ts';
 import { poseHumanoid } from '../figures/humanoid.ts';
 import type { FigureInstance } from '../figures/rig.ts';
 
@@ -35,6 +35,8 @@ interface Pooled {
   figure: FigureInstance;
   gun?: THREE.Object3D;
   type: number;
+  /** Jack-in-the-Box: seconds since it last sprang. */
+  popAge: number;
 }
 
 const MAX_BARS = 128;
@@ -44,6 +46,7 @@ export class EnemyRenderer {
   private free = new Map<number, Pooled[]>();
   private bars: THREE.InstancedMesh;
   private readonly m = new THREE.Matrix4();
+  private lastT = 0;
 
   constructor(private scene: THREE.Scene) {
     const barMat = new THREE.ShaderMaterial({
@@ -76,7 +79,7 @@ export class EnemyRenderer {
     this.bars.renderOrder = 20;
     scene.add(this.bars);
     // Knit the common templates up front so the first waves don't hitch (the boss knits on arrival).
-    for (const type of [EnemyType.Grunt, EnemyType.Scuttler, EnemyType.Moth, EnemyType.Brute, EnemyType.Teeth, EnemyType.Top, EnemyType.Soldier, EnemyType.Drone, EnemyType.Snip]) this.release(this.make(type));
+    for (const type of [EnemyType.Grunt, EnemyType.Scuttler, EnemyType.Moth, EnemyType.Brute, EnemyType.Teeth, EnemyType.Top, EnemyType.Soldier, EnemyType.Drone, EnemyType.Snip, EnemyType.Drummer, EnemyType.Jack]) this.release(this.make(type));
   }
 
   private make(type: number): Pooled {
@@ -104,6 +107,10 @@ export class EnemyRenderer {
       figure = createDrone();
     } else if (type === EnemyType.Snip) {
       figure = createSnip();
+    } else if (type === EnemyType.Drummer) {
+      figure = createDrummer();
+    } else if (type === EnemyType.Jack) {
+      figure = createJack();
     } else {
       figure = createBoss();
     }
@@ -112,7 +119,7 @@ export class EnemyRenderer {
     if (type === EnemyType.Moth) figure.root.position.y = -0.35;
     const root = new THREE.Group();
     root.add(body);
-    return { root, body, figure, gun, type };
+    return { root, body, figure, gun, type, popAge: 9 };
   }
 
   private acquire(type: number): Pooled {
@@ -128,7 +135,21 @@ export class EnemyRenderer {
     this.free.get(p.type)!.push(p);
   }
 
+  /** A Jack-in-the-Box sprang near here: shoot the nearest one's clown out. */
+  popNear(x: number, z: number): void {
+    let best: Pooled | null = null;
+    let bestD = 3;
+    for (const p of this.live.values()) {
+      if (p.type !== EnemyType.Jack) continue;
+      const d = Math.hypot(p.root.position.x - x, p.root.position.z - z);
+      if (d < bestD) { bestD = d; best = p; }
+    }
+    if (best) best.popAge = 0;
+  }
+
   update(list: EnemyView[], t: number): void {
+    const dt = Math.min(0.1, Math.max(0, t - this.lastT));
+    this.lastT = t;
     const seen = new Set<number>();
     for (const e of list) {
       seen.add(e.id);
@@ -172,6 +193,14 @@ export class EnemyRenderer {
           break;
         case EnemyType.Snip:
           poseSnip(p.figure, t + e.id, e.phase * 1.4, Math.max(0.2, speed), speed < 0.1);
+          break;
+        case EnemyType.Drummer:
+          poseHumanoid(p.figure, { t: t + e.id, speed: speed * 0.9, phase: e.phase, pitch: 0, crouch: 0, airborne: false, aiming: false }, 0.95);
+          beatDrum(p.figure, t + e.id * 0.3);
+          break;
+        case EnemyType.Jack:
+          p.popAge += dt;
+          poseJack(p.figure, t + e.id, e.phase * 1.2, Math.max(0.2, speed), Math.max(0, 1 - p.popAge / 1.2));
           break;
         default:
           poseHumanoid(p.figure, { t: t + e.id, speed: speed * 0.7, phase: e.phase, pitch: 0, crouch: 0, airborne: false, aiming: false, hunch: 0.25 }, 3.05);

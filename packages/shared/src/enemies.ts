@@ -19,6 +19,10 @@ export const EnemyType = {
   Snip: 8,
   /** Boss: The Unraveller, Baron von Ravel's giant felted bear. */
   Boss: 9,
+  /** Tin Drummer: beats the march, speeding up every invader around it. */
+  Drummer: 10,
+  /** Jack-in-the-Box: waddles up in its box, then springs out at toys nearby. */
+  Jack: 11,
 } as const;
 
 export interface EnemyDef {
@@ -55,6 +59,8 @@ export const ENEMIES: EnemyDef[] = [
   { name: 'RC Drone', hp: 90, speed: 3.2, radius: 0.6, height: 0.5, damage: 10, attackRate: 1, reward: 14, flying: true, breaksBuildables: false, altitude: 5.5 },
   { name: 'Scissor Snip', hp: 110, speed: 3, radius: 0.55, height: 0.8, damage: 12, attackRate: 1, reward: 16, flying: false, breaksBuildables: false, cutsBuildables: true },
   { name: 'The Unraveller', hp: 4200, speed: 1.2, radius: 1.6, height: 4.6, damage: 50, attackRate: 0.5, reward: 300, flying: false, breaksBuildables: true, boss: true, knockback: 9 },
+  { name: 'Tin Drummer', hp: 150, speed: 1.9, radius: 0.5, height: 1.45, damage: 8, attackRate: 0.8, reward: 18, flying: false, breaksBuildables: false },
+  { name: 'Jack-in-the-Box', hp: 90, speed: 2.8, radius: 0.55, height: 1.1, damage: 26, attackRate: 0.5, reward: 15, flying: false, breaksBuildables: false, knockback: 8 },
 ];
 
 /** Damage scissor snips do to buildables per cut. */
@@ -63,6 +69,10 @@ export const SNIP_CUT = 60;
 export const DRONE_DROP = { every: 6, count: 3 };
 /** The boss stomps every few seconds: damage and radius. */
 export const BOSS_STOMP = { every: 6, damage: 30, radius: 5 };
+/** Tin Drummers speed up every other invader within radius, and beat the drum this often (seconds). */
+export const DRUM = { radius: 7, boost: 1.35, every: 2 };
+/** Jack-in-the-Box: springs when a toy is within range, hurting toys within radius and lunging at them. */
+export const JACK_POP = { range: 4, radius: 3, damage: 26, every: 5, lunge: 9 };
 /** Tin soldiers' chance to hit a toy per shot (they are toys, after all). */
 export const SOLDIER_ACCURACY = 0.55;
 

@@ -6,7 +6,7 @@
 
 export type Sound = 'popper' | 'buster' | 'hit' | 'kill' | 'build' | 'sell' | 'hurt' | 'wave' | 'alarm' | 'win' | 'lose' | 'switch' | 'turret'
   | 'lance' | 'hook' | 'launch' | 'blast' | 'zap' | 'snap' | 'pickup' | 'downed' | 'revived' | 'stomp' | 'boss' | 'enemyShot' | 'upgrade' | 'spring' | 'collect'
-  | 'yarnShot' | 'yarnMiss' | 'mantle' | 'glue' | 'sock' | 'splat';
+  | 'yarnShot' | 'yarnMiss' | 'mantle' | 'glue' | 'sock' | 'splat' | 'drum' | 'pop';
 
 export class Sfx {
   private ctx: AudioContext | null = null;
@@ -82,6 +82,8 @@ export class Sfx {
       case 'glue': this.tone(160, 0.12, 'sine', 0.3 * v, 0.6); this.hiss(0.1, 0.18 * v, 1200, 2); break;
       case 'splat': this.hiss(0.18, 0.3 * v, 500, 0.8); this.tone(90, 0.15, 'sine', 0.3 * v, 0.7); break;
       case 'sock': this.hiss(0.08, 0.25 * v, 5200, 4); this.tone(1400, 0.06, 'square', 0.06 * v, 0.4); this.tone(60, 0.08, 'sawtooth', 0.12 * v, 1.2); break;
+      case 'drum': this.tone(90, 0.12, 'sine', 0.35 * v, 0.7); this.hiss(0.06, 0.2 * v, 900, 1); this.tone(90, 0.1, 'sine', 0.25 * v, 0.7, 0.18); this.hiss(0.05, 0.15 * v, 900, 1, 0.18); break;
+      case 'pop': this.tone(300, 0.25, 'triangle', 0.3 * v, 3); this.tone(900, 0.2, 'sine', 0.12 * v, 0.5, 0.05); this.hiss(0.1, 0.2 * v, 2000, 1); break;
       case 'yarnShot': this.hiss(0.12, 0.3 * v, 3200, 3); this.tone(700, 0.1, 'triangle', 0.14 * v, 2.2); this.tone(180, 0.08, 'sine', 0.2 * v, 0.6, 0.09); break;
       case 'yarnMiss': this.hiss(0.14, 0.18 * v, 2600, 3); this.tone(500, 0.12, 'triangle', 0.08 * v, 0.5); break;
       case 'mantle': this.hiss(0.12, 0.22 * v, 700, 1.2); this.tone(140, 0.1, 'sine', 0.2 * v, 1.4); break;
