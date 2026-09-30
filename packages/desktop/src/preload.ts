@@ -6,4 +6,9 @@ contextBridge.exposeInMainWorld('stitchstrikeDesktop', {
   toggleFullscreen: () => ipcRenderer.send('ss:fullscreen'),
   version: ipcRenderer.sendSync('ss:version') as string,
   lanAddresses: () => ipcRenderer.invoke('ss:lan') as Promise<string[]>,
+  steam: {
+    ...(ipcRenderer.sendSync('ss:steam') as { available: boolean; name: string }),
+    achievement: (id: string) => ipcRenderer.send('ss:achievement', id),
+    presence: (status: string) => ipcRenderer.send('ss:presence', status),
+  },
 });

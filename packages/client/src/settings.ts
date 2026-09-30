@@ -62,6 +62,8 @@ export interface DesktopBridge {
   toggleFullscreen(): void;
   version: string;
   lanAddresses(): Promise<string[]>;
+  /** Steamworks, when the desktop build runs under Steam (no-ops otherwise). */
+  steam?: { available: boolean; name: string; achievement(id: string): void; presence(status: string): void };
 }
 
 export function desktop(): DesktopBridge | null {

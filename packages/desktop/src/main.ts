@@ -4,6 +4,7 @@ import { networkInterfaces } from 'node:os';
 import { join } from 'node:path';
 import { DEFAULT_PORT } from '@stitchstrike/shared';
 import { startGameServer, type GameServer } from '@stitchstrike/server/src/server.ts';
+import { initSteam, type Steam } from './steam.ts';
 
 /**
  * STITCHSTRIKE desktop (the build that ships on Steam).
@@ -14,7 +15,8 @@ import { startGameServer, type GameServer } from '@stitchstrike/server/src/serve
  * runs the server in a Web Worker as on the web, so it needs no network.
  *
  * Flags: --lan (host rooms for other PCs on the network) · --windowed ·
- *        --steam-overlay (in-process GPU so the Steam overlay can hook the window)
+ *        --steam-overlay (in-process GPU so the Steam overlay can hook the window) ·
+ *        --no-steam (skip Steamworks even when it is installed)
  */
 
 const LAN = process.argv.includes('--lan') || process.env.STITCHSTRIKE_LAN === '1';
@@ -30,6 +32,7 @@ app.commandLine.appendSwitch('disable-background-timer-throttling');
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 
 let server: GameServer | null = null;
+let steam: Steam | null = null;
 let win: BrowserWindow | null = null;
 
 function clientDir(): string {
@@ -101,6 +104,9 @@ ipcMain.on('ss:quit', () => app.quit());
 ipcMain.on('ss:fullscreen', () => win?.setFullScreen(!win.isFullScreen()));
 ipcMain.on('ss:version', (e) => { e.returnValue = app.getVersion(); });
 ipcMain.handle('ss:lan', () => lanAddresses());
+ipcMain.on('ss:steam', (e) => { e.returnValue = { available: !!steam?.available, name: steam?.name ?? '' }; });
+ipcMain.on('ss:achievement', (_e, id: unknown) => { if (typeof id === 'string' && /^[a-z0-9_-]{1,40}$/i.test(id)) steam?.achievement(id); });
+ipcMain.on('ss:presence', (_e, status: unknown) => { if (typeof status === 'string') steam?.presence(status); });
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -110,6 +116,7 @@ if (!app.requestSingleInstanceLock()) {
   });
   Menu.setApplicationMenu(null);
   void app.whenReady().then(async () => {
+    steam = initSteam((m) => console.log(m));
     server = await startServer();
     console.log(`STITCHSTRIKE ${app.getVersion()} · game server on ${LAN ? '0.0.0.0' : '127.0.0.1'}:${server.port}`);
     createWindow(server.port);

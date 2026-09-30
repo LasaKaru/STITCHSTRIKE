@@ -4,6 +4,7 @@ import { buildCinematic, type Cinematic } from './scene/cinematic.ts';
 import { desktop, loadSettings, saveSettings, type QualitySetting } from './settings.ts';
 import { CustomiseScreen, renderProgress } from './menu-customise.ts';
 import { levelOf, loadProfile } from './profile.ts';
+import { setPresence, syncAchievements } from './platform.ts';
 
 /**
  * Main menu: "press any key" title over a live in-engine cinematic, then a
@@ -13,6 +14,8 @@ import { levelOf, loadProfile } from './profile.ts';
 
 const params = new URLSearchParams(location.search);
 const settings = loadSettings();
+setPresence('In the menus');
+syncAchievements(loadProfile().medals);
 const bridge = desktop();
 const music = new MenuMusic();
 const $ = <T extends HTMLElement = HTMLElement>(sel: string) => document.querySelector(sel) as T;

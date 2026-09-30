@@ -19,7 +19,8 @@ const common = {
   target: 'node22',
   sourcemap: 'linked',
   // ws works without its optional native speedups.
-  external: ['electron', 'bufferutil', 'utf-8-validate'],
+  // steamworks.js is optional and native: required at runtime only if installed.
+  external: ['electron', 'bufferutil', 'utf-8-validate', 'steamworks.js'],
   logLevel: 'info',
 };
 await build({ ...common, entryPoints: [join(root, 'src/main.ts')], outfile: join(root, 'dist/main.cjs') });

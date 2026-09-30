@@ -52,6 +52,34 @@ Launch flags:
 6. **Review.** Valve reviews the store page and the build (a few business days each). Plan a demo for **Steam Next Fest**.
 7. **Code signing (recommended).** An unsigned `.exe` triggers Windows SmartScreen warnings outside Steam. Set `CSC_LINK` / `CSC_KEY_PASSWORD` before `pnpm desktop:win`, or sign on Windows. Games launched through Steam are not affected.
 
+## Steamworks: achievements and rich presence
+
+The desktop app talks to Steam through the optional [`steamworks.js`](https://github.com/ceifa/steamworks.js) package. It is **not** installed by default, so the same build runs on itch.io, as a direct download, or anywhere without Steam: every call is a no-op.
+
+To switch it on for the Steam build:
+
+1. `pnpm add steamworks.js` in `packages/desktop` (electron-builder ships it outside the asar, with its native binaries).
+2. Put your app id in `packages/desktop/steam/steam_appid.txt` for local testing (it ships 480, Valve's Spacewar test app). Under the Steam client, Steam supplies the id itself; you can also set `STITCHSTRIKE_STEAM_APPID`.
+3. In the Steamworks partner site, create these achievements (API names on the left). Each one unlocks when the matching in-game medal is earned; medals earned earlier (or offline) are re-sent at start-up and Steam ignores repeats.
+
+| API name | Name | Description |
+| --- | --- | --- |
+| `ACH_FIRST` | First Stitch | Unravel your first invader |
+| `ACH_SOLDIER` | Toy Soldier | Unravel 250 invaders |
+| `ACH_SEAMSTRESS` | Seamstress | Re-stitch 10 teammates |
+| `ACH_UNPICKED` | Unpicked | Take down The Unraveller |
+| `ACH_SURVIVOR` | Moth-proof | Win a mission on Moth-eaten or harder |
+| `ACH_ENDLESS` | Endless Yarn | Reach wave 15 in Endless |
+| `ACH_COLLECTOR` | Collector | Find every secret on one map |
+| `ACH_VETERAN` | Veteran | Play 10 matches |
+| `ACH_BUILDER` | Master Builder | Win a mission |
+| `ACH_DUELIST` | Duelist | Knock out 25 toys in PvP |
+
+4. Rich presence: add a localisation token `#Status` with the value `%status%` (English). The game sets `status` to things like "Defending The Garage · wave 3 of 10", "King of the Spool in The Toy Store Aisle" or "In the menus", so friends see what you're doing.
+5. Launch with `--steam-overlay` if the overlay doesn't appear (it forces in-process GPU so the overlay can hook the window). `--no-steam` skips Steamworks entirely.
+
+The main process logs `Steam ready (app N)` or `Steam not available (...)` at start-up.
+
 ## Legal checklist before selling
 
 - Keep every name, logo and character original. STITCHSTRIKE's Heartspools, knitted cast and wool look are its own. Do **not** reuse another game's terms or characters (for example Hypercharge's "Hypercore", "Sgt. Max Ammo" or "Major Evil").

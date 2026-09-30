@@ -10,6 +10,7 @@ import { CombatMusic, type Intensity } from './audio/combatMusic.ts';
 import { PickupsView } from './scene/pickupsView.ts';
 import { Sfx } from './audio/sfx.ts';
 import { loadSettings } from './settings.ts';
+import { setPresence, syncAchievements, unlockAchievement } from './platform.ts';
 import { NetClient, type EnemySample } from './net/netClient.ts';
 import { withFakeLag, workerTransport, wsTransport, type Transport } from './net/transport.ts';
 import { createAvatar, type Avatar } from './scene/avatar.ts';
@@ -280,6 +281,7 @@ function progress(xp: number, credits: number, stats: Parameters<typeof award>[3
   session.credits += a.credits;
   if (xp >= 40) popup(`+${xp} XP${credits ? ` · +${credits} credits` : ''}`);
   if (a.levelUp) setTimeout(() => { banner(`LEVEL UP! LEVEL ${a.levelUp}`, 'good', 3000); sfx.play('win', 0.6); }, 600);
+  for (const m of a.medals) unlockAchievement(m.id);
   a.medals.forEach((m, i) => setTimeout(() => { banner(`MEDAL: ${m.name.toUpperCase()}`, 'good', 3000); sfx.play('collect'); }, 1400 + i * 1600));
   if (a.unlocks.length) setTimeout(() => feed(`<span>Unlocked:</span> ${a.unlocks.map(escapeHtml).join(', ')}`, true), 900);
 }
@@ -769,6 +771,17 @@ function kothText(): string {
   return `<b style="color:#e8742a">Cotton ${Math.floor(k.scores[0])}</b> · <b style="color:#6fb4ff">Wool ${Math.floor(k.scores[1])}</b> / ${KOTH.target} · ${held} · moves in ${Math.ceil(k.timer)} s`;
 }
 
+const MODE_NAMES: Record<GameMode, string> = { coop: 'Co-op', pvp: 'Free-for-all', tdm: 'Team Deathmatch', koth: 'King of the Spool' };
+/** Rich presence (Steam): what this toy is up to. */
+function presenceText(): string {
+  const c = net.coop;
+  if (mode === 'coop' && c) {
+    if (c.phase === Phase.Won) return `Saved the Heartspools in ${world.name}!`;
+    return `Defending ${world.name} · ${c.wave === 0 ? 'building' : `wave ${c.wave}${c.totalWaves ? ` of ${c.totalWaves}` : ' (endless)'}`}`;
+  }
+  return `${MODE_NAMES[mode]} in ${world.name}`;
+}
+
 function teamScoreText(): string {
   const score = [0, 0];
   for (const p of net.latest?.players ?? []) score[net.roster.get(p.id)?.team ?? 0] += p.kos;
@@ -785,6 +798,7 @@ let springSounded = false;
 let last = performance.now();
 let flash = 0;
 let hudTimer = 0;
+syncAchievements(profile.medals);
 let lastHealth: number = PLAYER.maxHealth;
 let lastWeapon = 0;
 const eye = new THREE.Vector3();
@@ -1029,6 +1043,7 @@ function frame(): void {
   if (hudTimer <= 0) {
     hudTimer = 0.1;
     updateHud();
+    if (!autopilot) setPresence(presenceText());
   }
   if (post) post.render(t);
   else renderer.render(scene, camera);

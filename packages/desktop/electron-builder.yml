@@ -11,7 +11,11 @@ files:
   - build/icon.png
   - package.json
   - "!**/*.map"
+  # Optional Steamworks (pnpm add steamworks.js here); its native binaries live outside the asar.
+  - node_modules/steamworks.js/**
 asar: true
+asarUnpack:
+  - node_modules/steamworks.js/**
 # Everything is bundled by esbuild, so no node_modules ship.
 npmRebuild: false
 nodeGypRebuild: false
