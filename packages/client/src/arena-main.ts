@@ -107,7 +107,7 @@ scene.background = new THREE.Color(world.outdoor ? 0xcfdfea : 0x2a2f3a);
 scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environmentIntensity = world.outdoor ? 0.5 : 0.22;
 const room = world.outdoor ? buildWoolGarden(scene, world, quality) : world.id === 'garage' ? buildWoolGarage(scene, world) : world.id === 'bathroom' ? buildWoolBathroom(scene, world) : world.id === 'toystore' ? buildWoolToyStore(scene, world) : buildWoolRoom(scene, world);
-(window as unknown as { __stitchstrike: unknown }).__stitchstrike = { net, scene, renderer };
+(window as unknown as { __stitchstrike: unknown }).__stitchstrike = { net, scene, renderer, get enemyRenderer() { return enemyRenderer; } };
 
 const camera = new THREE.PerspectiveCamera(settings.fov, window.innerWidth / window.innerHeight, 0.03, world.outdoor ? 900 : 200);
 camera.rotation.order = 'YXZ';
@@ -128,6 +128,8 @@ const sfx = new Sfx();
 sfx.volume = settings.sfxVolume;
 const coopProps = mode === 'coop' ? new CoopProps(scene, world) : null;
 const enemyRenderer = mode === 'coop' ? new EnemyRenderer(scene, [PAL.healthLow, PAL.healthHigh]) : null;
+// Distance LOD for invaders (?lod=0 turns it off, for comparisons).
+if (enemyRenderer && params.get('lod') !== '0') enemyRenderer.lodFrom = [camera.position];
 
 // ---------------------------------------------------------------- players
 
@@ -709,7 +711,7 @@ function updateHud(): void {
   hud.net.textContent = `${st.transport} · ping ${Math.round(st.rtt)} ms · ${st.snapshotHz.toFixed(0)} Hz · ${st.kbpsIn.toFixed(0)} kbps`;
   netPanel.innerHTML = `tick ${net.latest?.tick ?? 0} · render tick ${net.renderTick().toFixed(1)}<br>
     pending inputs ${st.pending} · last correction ${st.lastCorrection.toFixed(4)} u<br>
-    enemies drawn ${enemies.length}`;
+    enemies drawn ${enemies.length} · fully posed ${enemyRenderer?.posed ?? 0} (the rest are distance proxies)`;
 
   const c = net.coop;
   if (c) {

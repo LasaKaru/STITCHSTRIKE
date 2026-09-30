@@ -37,7 +37,16 @@ interface Pooled {
   type: number;
   /** Jack-in-the-Box: seconds since it last sprang. */
   popAge: number;
+  /** Distance LOD: a cheap knitted stand-in used far from the camera. */
+  proxy?: THREE.Mesh;
+  far: boolean;
 }
+
+/** Beyond this distance invaders are drawn as proxies and not posed; they come back a little closer (hysteresis). */
+export const LOD_FAR = 38;
+const LOD_NEAR = 33;
+/** Stand-in colours per type (body yarn). */
+const PROXY_COLORS = [0x3a4a34, 0x6a3c9a, 0xb8a58a, 0x7a4a2e, 0xf6f1e4, 0x2f7fe0, 0x2f5a9a, 0x2a2a30, 0xe8742a, 0x8a5a3a, 0xb3262c, 0xffc94a];
 
 const MAX_BARS = 128;
 
@@ -47,6 +56,31 @@ export class EnemyRenderer {
   private bars: THREE.InstancedMesh;
   private readonly m = new THREE.Matrix4();
   private lastT = 0;
+  private proxyGeo = new THREE.SphereGeometry(0.5, 10, 8);
+  private proxyMats = new Map<number, THREE.Material>();
+  /** Camera positions for distance LOD (split-screen has several; empty = always full detail). */
+  lodFrom: THREE.Vector3[] = [];
+  /** How many invaders were fully posed last frame (for the perf overlay). */
+  posed = 0;
+
+  private proxyFor(p: Pooled): THREE.Mesh {
+    if (!p.proxy) {
+      let mat = this.proxyMats.get(p.type);
+      if (!mat) {
+        mat = new THREE.MeshStandardMaterial({ color: PROXY_COLORS[p.type] ?? 0x888888, roughness: 0.95 });
+        this.proxyMats.set(p.type, mat);
+      }
+      const def = ENEMIES[p.type];
+      const m = new THREE.Mesh(this.proxyGeo, mat);
+      m.scale.set(def.radius * 2, def.height, def.radius * 2);
+      m.position.y = def.height * 0.5;
+      m.castShadow = true;
+      m.visible = false;
+      p.root.add(m);
+      p.proxy = m;
+    }
+    return p.proxy;
+  }
 
   /** `health` = bar colours [empty, full] (swapped for colour-blind palettes). */
   constructor(private scene: THREE.Scene, health: [number, number] = [0xe6261a, 0x8cd940]) {
@@ -123,7 +157,7 @@ export class EnemyRenderer {
     if (type === EnemyType.Moth) figure.root.position.y = -0.35;
     const root = new THREE.Group();
     root.add(body);
-    return { root, body, figure, gun, type, popAge: 9 };
+    return { root, body, figure, gun, type, popAge: 9, far: false };
   }
 
   private acquire(type: number): Pooled {
@@ -154,6 +188,7 @@ export class EnemyRenderer {
   update(list: EnemyView[], t: number): void {
     const dt = Math.min(0.1, Math.max(0, t - this.lastT));
     this.lastT = t;
+    this.posed = 0;
     const seen = new Set<number>();
     for (const e of list) {
       seen.add(e.id);
@@ -165,6 +200,24 @@ export class EnemyRenderer {
       }
       p.root.position.set(e.x, e.y, e.z);
       p.root.rotation.y = e.yaw;
+      if (this.lodFrom.length) {
+        let d = Infinity;
+        for (const c of this.lodFrom) d = Math.min(d, c.distanceTo(p.root.position));
+        // The boss is always drawn in full: it is the whole point of the wave.
+        p.far = e.type !== EnemyType.Boss && (p.far ? d > LOD_NEAR : d > LOD_FAR);
+      } else {
+        p.far = false;
+      }
+      p.body.visible = !p.far;
+      if (p.far) {
+        const proxy = this.proxyFor(p);
+        proxy.visible = true;
+        // A little bob so distant crowds still read as walking.
+        proxy.position.y = ENEMIES[e.type].height * 0.5 + Math.abs(Math.sin(e.phase * 2)) * 0.05;
+        continue;
+      }
+      if (p.proxy) p.proxy.visible = false;
+      this.posed++;
       // Soft wobble when struck: wool squashes instead of cracking.
       const w = e.hitAge < 0.18 ? Math.sin(e.hitAge * 40) * (0.18 - e.hitAge) * 0.8 : 0;
       p.body.scale.set(1 + w, 1 - w, 1 + w);

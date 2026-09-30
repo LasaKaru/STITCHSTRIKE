@@ -130,6 +130,8 @@ function viewRect(i: number): [number, number, number, number] {
 }
 
 const locals = Array.from({ length: PLAYERS }, (_, i) => makeLocal(i));
+// Invaders far from every player's camera drop to cheap proxies.
+if (enemyRenderer && params.get('lod') !== '0') enemyRenderer.lodFrom = locals.map((l) => l.camera.position);
 /** Three players: the spare quadrant slowly orbits the battle. */
 const spectator = PLAYERS === 3 ? new THREE.PerspectiveCamera(50, 1, 0.1, world.outdoor ? 900 : 200) : null;
 const main = locals[0].net;
