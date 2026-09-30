@@ -10,7 +10,9 @@ export type Unlock =
   | { kind: 'free' }
   | { kind: 'level'; level: number }
   | { kind: 'credits'; price: number }
-  | { kind: 'medal'; medal: string };
+  | { kind: 'medal'; medal: string }
+  /** Weapon parts found as secrets around the maps. */
+  | { kind: 'parts'; parts: number };
 
 export interface CosmeticItem { name: string; unlock: Unlock; color?: number }
 
@@ -18,6 +20,7 @@ const free: Unlock = { kind: 'free' };
 const lvl = (level: number): Unlock => ({ kind: 'level', level });
 const cr = (price: number): Unlock => ({ kind: 'credits', price });
 const medal = (m: string): Unlock => ({ kind: 'medal', medal: m });
+const parts = (n: number): Unlock => ({ kind: 'parts', parts: n });
 
 export const COSMETICS: Record<keyof Look, CosmeticItem[]> = {
   head: [
@@ -53,6 +56,18 @@ export const COSMETICS: Record<keyof Look, CosmeticItem[]> = {
   packaging: [
     { name: 'Classic blister card', unlock: free }, { name: 'Saturday Special', unlock: lvl(3) }, { name: 'Deluxe window box', unlock: lvl(6) },
     { name: "Collector's tin", unlock: lvl(10) }, { name: 'Boss-buster edition', unlock: medal('unpicked') }, { name: 'Gold foil limited run', unlock: cr(1000) },
+  ],
+  // Weapon parts: purely cosmetic attachments on every weapon you carry.
+  charm: [
+    { name: 'No charm', unlock: free }, { name: 'Pom-pom', unlock: parts(1), color: 0xe8742a }, { name: 'Brass bell', unlock: parts(2), color: 0xd9b24a },
+    { name: 'Coat button', unlock: lvl(2), color: 0x6a3a22 }, { name: 'Felt star', unlock: parts(3), color: 0xffc94a }, { name: 'Tiny heart', unlock: parts(4), color: 0xd8262e },
+    { name: 'Mini thimble', unlock: parts(6), color: 0xc9ccd2 }, { name: 'Golden spool', unlock: parts(8), color: 0xffd24a },
+    { name: "Baron's monocle", unlock: medal('unpicked'), color: 0xd9b24a },
+  ],
+  wrap: [
+    { name: 'Bare grip', unlock: free }, { name: 'Tangerine wrap', unlock: free, color: 0xe8742a }, { name: 'Denim wrap', unlock: free, color: 0x3a5da8 },
+    { name: 'Candy stripe', unlock: parts(1), color: 0xff7ab8 }, { name: 'Moss wrap', unlock: parts(2), color: 0x5a8a3a }, { name: 'Midnight wrap', unlock: parts(3), color: 0x1e2a4a },
+    { name: 'Sunflower wrap', unlock: lvl(4), color: 0xffc94a }, { name: 'Gold thread wrap', unlock: parts(5), color: 0xd9b24a }, { name: 'Veteran olive wrap', unlock: medal('survivor'), color: 0x6a6a3a },
   ],
 };
 

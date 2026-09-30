@@ -3,6 +3,8 @@ import { addShellFuzz, createWoolMaterial } from '../wool/woolMaterial.ts';
 import { wood } from './materials.ts';
 import { createFpArms } from '../figures/fpArms.ts';
 import { createPopper } from './pip.ts';
+import type { Look } from '@stitchstrike/shared';
+import { dressGun, swingCharm } from './charms.ts';
 import { createGlueGun, createHook, createLance, createLauncher, createStaticSock } from './weaponModels.ts';
 
 /** Button Buster: double knitted barrels on a wooden stock with a big sewing-button drum. */
@@ -43,6 +45,8 @@ export class ViewModel {
   private bob = 0;
   private arms: THREE.Object3D;
   private jacket = 0xe8742a;
+  private lookKey = '';
+  private time = 0;
 
   constructor(camera: THREE.Camera) {
     const popper = createPopper();
@@ -75,6 +79,19 @@ export class ViewModel {
     this.group.add(this.arms);
   }
 
+  /** Hang the player's charm and grip wrap on every weapon. */
+  setLook(look: Look | undefined): void {
+    const key = look ? `${look.charm}:${look.wrap}` : '';
+    if (key === this.lookKey) return;
+    this.lookKey = key;
+    // Each gun sits under its holder, modelled along +Z with the grip near the origin.
+    for (const holder of this.guns) {
+      const gun = holder.children[0];
+      dressGun(gun, look, new THREE.Vector3(0, -0.09, -0.05), 1, new THREE.Vector3(0.09, 0, 0.16));
+      gun.traverse((o) => { o.renderOrder = 5; });
+    }
+  }
+
   setWeapon(i: number): void {
     if (i === this.weapon) return;
     this.weapon = i;
@@ -97,6 +114,8 @@ export class ViewModel {
     const dip = Math.sin(this.switchT * Math.PI);
     this.guns.forEach((g, i) => { g.visible = i === this.weapon; });
     this.bob += dt * speed * 2.2 * (grounded ? 1 : 0);
+    this.time += dt;
+    swingCharm(this.guns[this.weapon].children[0], this.time, Math.min(1, speed / 5 + this.recoil));
     this.recoil = Math.max(0, this.recoil - dt * 6);
     this.group.position.x = 0.26 + Math.sin(this.bob) * 0.012;
     this.group.position.y = -0.26 + Math.abs(Math.cos(this.bob)) * 0.012 - dip * 0.25;

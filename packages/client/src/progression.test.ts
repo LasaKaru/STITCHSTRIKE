@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { COSMETICS, LOOK_SLOTS, randomLook } from '@stitchstrike/shared';
 import { levelOf, type Profile } from './profile.ts';
-import { award, buy, isUnlocked, wearable } from './progression.ts';
+import { award, buy, isUnlocked, partsFound, wearable } from './progression.ts';
 
 function fresh(): Profile {
   return {
@@ -17,6 +17,20 @@ describe('progression (zero pay-to-win)', () => {
     const a = award(p, 600, 0);
     expect(a.levelUp).toBe(2);
     expect(a.unlocks).toContain('Bobble beanie');
+  });
+
+  it('weapon charms and wraps unlock from weapon parts found around the maps', () => {
+    const p = fresh();
+    const heart = COSMETICS.charm.find((c) => c.name === 'Tiny heart')!;
+    expect(isUnlocked(p, heart)).toBe(false);
+    // Thimbles and credits secrets don't count; parts do.
+    p.collected = ['toy-top-left', 'toy-trolley', 'toy-mid-shelf', 'bath-tp'];
+    expect(partsFound(p)).toBe(3);
+    expect(isUnlocked(p, heart)).toBe(false);
+    p.collected.push('bath-behind-toilet');
+    expect(isUnlocked(p, heart)).toBe(true);
+    p.look.charm = COSMETICS.charm.indexOf(COSMETICS.charm.find((c) => c.name === 'Golden spool')!);
+    expect(wearable(p, p.look).charm).toBe(0);
   });
 
   it('medals come from milestones and unlock their cosmetics', () => {

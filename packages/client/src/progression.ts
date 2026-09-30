@@ -1,4 +1,4 @@
-import { COSMETICS, LOOK_SLOTS, MEDALS, type CosmeticItem, type Look, type MedalDef } from '@stitchstrike/shared';
+import { CollectibleKind, COSMETICS, createWorld, LOOK_SLOTS, MAPS, MEDALS, type CosmeticItem, type Look, type MedalDef } from '@stitchstrike/shared';
 import { levelOf, saveProfile, type Profile } from './profile.ts';
 
 /**
@@ -11,9 +11,17 @@ export const XP = { kill: 10, pvpKo: 50, wave: 100, revive: 40, boss: 500, win: 
 
 export interface Award { xp: number; credits: number; levelUp: number | null; medals: MedalDef[]; unlocks: string[] }
 
+let partIds: Set<string> | null = null;
+/** Weapon parts this profile has found (secrets of the Part kind, across every map). */
+export function partsFound(p: Profile): number {
+  partIds ??= new Set(MAPS.flatMap((m) => createWorld(m.id).collectibles.filter((c) => c.kind === CollectibleKind.Part).map((c) => c.id)));
+  return p.collected.filter((id) => partIds!.has(id)).length;
+}
+
 export function isUnlocked(p: Profile, item: CosmeticItem): boolean {
   const u = item.unlock;
   if (u.kind === 'free') return true;
+  if (u.kind === 'parts') return partsFound(p) >= u.parts;
   if (u.kind === 'level') return levelOf(p.xp).level >= u.level;
   if (u.kind === 'medal') return p.medals.includes(u.medal);
   return p.unlocked.includes(item.name);
@@ -24,6 +32,7 @@ export function unlockText(item: CosmeticItem): string {
   if (u.kind === 'free') return 'Unlocked';
   if (u.kind === 'level') return `Reach level ${u.level}`;
   if (u.kind === 'credits') return `${u.price} credits`;
+  if (u.kind === 'parts') return `Find ${u.parts} weapon part${u.parts > 1 ? 's' : ''}`;
   return `Medal: ${MEDALS.find((m) => m.id === u.medal)?.name ?? u.medal}`;
 }
 

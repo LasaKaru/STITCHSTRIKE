@@ -29,7 +29,7 @@ export interface Profile {
 
 const KEY = 'ss-profile';
 
-export const DEFAULT_LOOK: Look = { head: 0, hat: 0, beard: 0, glasses: 0, pattern: 0, skin: 0, jacket: 0, pants: 0, packaging: 0 };
+export const DEFAULT_LOOK: Look = { head: 0, hat: 0, beard: 0, glasses: 0, pattern: 0, skin: 0, jacket: 0, pants: 0, packaging: 0, charm: 0, wrap: 0 };
 
 function fresh(): Profile {
   return {

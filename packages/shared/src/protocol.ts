@@ -30,8 +30,11 @@ export interface Look {
   jacket: number;
   pants: number;
   packaging: number;
+  /** Weapon parts: a knitted charm dangling from every weapon, and the yarn wrapped round the grips. */
+  charm: number;
+  wrap: number;
 }
-export const LOOK_KEYS: (keyof Look)[] = ['head', 'hat', 'beard', 'glasses', 'pattern', 'skin', 'jacket', 'pants', 'packaging'];
+export const LOOK_KEYS: (keyof Look)[] = ['head', 'hat', 'beard', 'glasses', 'pattern', 'skin', 'jacket', 'pants', 'packaging', 'charm', 'wrap'];
 
 export function sanitizeLook(raw: unknown): Look | undefined {
   if (!raw || typeof raw !== 'object') return undefined;

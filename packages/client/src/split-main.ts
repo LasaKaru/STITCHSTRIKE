@@ -132,6 +132,7 @@ function syncAvatars(): void {
     if (localIndex >= 0) {
       a.root.traverse((o) => o.layers.set(3 + localIndex));
       locals[localIndex].viewModel.setJacket(jacketColor(r.look, r.color));
+      locals[localIndex].viewModel.setLook(r.look);
     }
     scene.add(a.root);
     avatars.set(id, a);

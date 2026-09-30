@@ -147,6 +147,7 @@ function syncAvatars(): void {
         ownAvatar.root.visible = false;
         scene.add(ownAvatar.root);
         viewModel.setJacket(jacketColor(r.look, r.color));
+        viewModel.setLook(r.look);
       }
       continue;
     }

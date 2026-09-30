@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { COSMETICS, LOOK_SLOTS, MAPS, MEDALS, createWorld, type Look } from '@stitchstrike/shared';
 import { heldBlaster, spawnFigure } from './figures/cast.ts';
+import { dressGun, swingCharm } from './scene/charms.ts';
 import { poseHumanoid } from './figures/humanoid.ts';
 import { lookOptions } from './figures/looks.ts';
 import type { FigureInstance } from './figures/rig.ts';
@@ -16,7 +17,7 @@ import { buy, isUnlocked, unlockText } from './progression.ts';
 
 const SLOT_NAMES: Record<keyof Look, string> = {
   head: 'Head', hat: 'Hat & hair yarn', beard: 'Beard', glasses: 'Glasses', pattern: 'Knit pattern',
-  skin: 'Skin', jacket: 'Jacket yarn', pants: 'Trousers', packaging: 'Packaging',
+  skin: 'Skin', jacket: 'Jacket yarn', pants: 'Trousers', packaging: 'Packaging', charm: 'Weapon charm', wrap: 'Grip wrap',
 };
 const PREVIEW_COLOR = 0xe8742a;
 
@@ -80,6 +81,7 @@ export class CustomiseScreen {
     }
     this.turntable.rotation.y = Math.sin(t * 0.6) * 0.8;
     if (this.figure) poseHumanoid(this.figure, { t, speed: 0, phase: 0, pitch: Math.sin(t * 0.7) * 0.15, crouch: 0, airborne: false, aiming: true }, 1, this.gun ?? undefined);
+    if (this.gun) swingCharm(this.gun, t, 0.3);
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -92,6 +94,7 @@ export class CustomiseScreen {
       if (this.figure) this.turntable.remove(this.figure.root);
       this.figure = spawnFigure(lookOptions(this.profile.look, PREVIEW_COLOR, 'game'));
       this.gun = heldBlaster(0x8bcb3a);
+      dressGun(this.gun, this.profile.look, new THREE.Vector3(0, -0.04, 0.03), 1.2);
       this.figure.root.add(this.gun);
       this.turntable.add(this.figure.root);
       knitting.classList.remove('on');
@@ -137,7 +140,8 @@ export class CustomiseScreen {
       this.blip('select');
       this.renderItems();
       this.refreshPackage();
-      if (this.slot !== 'packaging') this.reknit();
+      if (this.slot === 'charm' || this.slot === 'wrap') { if (this.gun) dressGun(this.gun, this.profile.look, new THREE.Vector3(0, -0.04, 0.03), 1.2); }
+      else if (this.slot !== 'packaging') this.reknit();
     }));
   }
 }

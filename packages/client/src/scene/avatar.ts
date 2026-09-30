@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { PLAYER, type Look } from '@stitchstrike/shared';
 import { lookOptions } from '../figures/looks.ts';
 import { heldBlaster, heroOptions, spawnFigure } from '../figures/cast.ts';
+import { dressGun, swingCharm } from './charms.ts';
 import { poseHumanoid } from '../figures/humanoid.ts';
 import type { FigureInstance } from '../figures/rig.ts';
 
@@ -23,6 +24,7 @@ export function createAvatar(color: number, variant = 0, look?: Look): Avatar {
   const figure: FigureInstance = spawnFigure(look ? lookOptions(look, color) : heroOptions(color, variant));
   tip.add(figure.root);
   const gun = heldBlaster(variant % 2 ? 0xe8742a : 0x8bcb3a);
+  dressGun(gun, look, new THREE.Vector3(0, -0.04, 0.03), 1.2);
   figure.root.add(gun);
   let phase = Math.random() * 6;
   let down = 0;
@@ -35,6 +37,7 @@ export function createAvatar(color: number, variant = 0, look?: Look): Avatar {
       crouchBlend += ((crouch ? 1 : 0) - crouchBlend) * Math.min(1, dt * 10);
       poseHumanoid(figure, { t, speed, phase, pitch, crouch: crouchBlend * 0.6, airborne, aiming: down < 0.5, downed: down }, 1, gun);
       gun.visible = down < 0.5;
+      swingCharm(gun, t, Math.min(1, speed));
       // Unravelled: topple onto the back.
       tip.rotation.x = -down * 1.45;
       tip.position.y = down * 0.12;
