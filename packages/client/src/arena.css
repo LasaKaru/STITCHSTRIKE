@@ -195,3 +195,7 @@ body.pvp .coop-only { display: none !important; }
 #briefing.sarge .who { color: #3a5a3a; }
 @keyframes popIn { from { transform: scale(.6) rotate(-3deg); opacity: 0; } }
 @media (max-width: 700px) { #briefing { bottom: 170px; } }
+
+.hurt-arc { position: fixed; left: 50%; top: 50%; width: 260px; height: 260px; pointer-events: none; z-index: 2; border-radius: 50%;
+  border-top: 10px solid rgba(255, 60, 50, .85); filter: blur(1px); animation: hurtFade .9s ease-out forwards; }
+@keyframes hurtFade { from { opacity: 1; } to { opacity: 0; } }

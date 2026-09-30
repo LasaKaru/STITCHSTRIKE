@@ -8,6 +8,7 @@ import * as THREE from 'three';
 interface Projectile { mesh: THREE.Mesh; from: THREE.Vector3; to: THREE.Vector3; t: number; dur: number; spin: number }
 interface Puff { mesh: THREE.Mesh; t: number; life: number }
 interface Arc { line: THREE.Line; t: number; life: number }
+interface Piece { mesh: THREE.Mesh; v: THREE.Vector3; spin: THREE.Vector3; t: number; life: number }
 interface Ring { mesh: THREE.Mesh; t: number; life: number; size: number }
 
 const FLUFF = 1500;
@@ -26,6 +27,8 @@ export class Fx {
   private fluffNext = 0;
   private fluff: THREE.Points;
   private arcs: Arc[] = [];
+  private pieces: Piece[] = [];
+  private pieceGeos = [new THREE.CapsuleGeometry(0.06, 0.18, 4, 8), new THREE.SphereGeometry(0.09, 8, 6), new THREE.BoxGeometry(0.14, 0.1, 0.1)];
   private rings: Ring[] = [];
   private ringGeo = new THREE.RingGeometry(0.8, 1, 40);
   /** Camera shake amount (decays); read by the arena. */
@@ -102,6 +105,29 @@ export class Fx {
     }
   }
 
+  /**
+   * Toy physics: an unravelled invader pops apart into knitted limbs and
+   * tufts that bounce like soft toys and settle, not ragdolls.
+   */
+  burstPieces(at: THREE.Vector3, color: number, count = 6, scale = 1): void {
+    const mat = this.mat('pom', color);
+    for (let i = 0; i < count; i++) {
+      const mesh = new THREE.Mesh(this.pieceGeos[i % this.pieceGeos.length], mat);
+      mesh.scale.setScalar(scale * (0.8 + Math.random() * 0.6));
+      mesh.position.copy(at);
+      mesh.castShadow = true;
+      this.scene.add(mesh);
+      const a = Math.random() * Math.PI * 2;
+      const sp = 2 + Math.random() * 3;
+      this.pieces.push({
+        mesh, t: 0, life: 2.5 + Math.random(),
+        v: new THREE.Vector3(Math.cos(a) * sp, 3 + Math.random() * 4, Math.sin(a) * sp),
+        spin: new THREE.Vector3(Math.random() * 10, Math.random() * 10, Math.random() * 10),
+      });
+    }
+    while (this.pieces.length > 160) { const p = this.pieces.shift()!; this.scene.remove(p.mesh); }
+  }
+
   /** A jagged electric arc (battery zapper). */
   zap(from: THREE.Vector3, to: THREE.Vector3, color = 0x9ad8ff): void {
     const pts: THREE.Vector3[] = [];
@@ -140,6 +166,25 @@ export class Fx {
 
   update(dt: number): void {
     this.shake = Math.max(0, this.shake - dt * 2.5);
+    for (let i = this.pieces.length - 1; i >= 0; i--) {
+      const p = this.pieces[i];
+      p.t += dt;
+      p.v.y -= 18 * dt;
+      p.mesh.position.addScaledVector(p.v, dt);
+      if (p.mesh.position.y < 0.08) {
+        // Soft bounce: wool squashes and loses most of its energy.
+        p.mesh.position.y = 0.08;
+        p.v.y = Math.abs(p.v.y) * 0.35;
+        p.v.x *= 0.6; p.v.z *= 0.6;
+        p.spin.multiplyScalar(0.5);
+      }
+      p.mesh.rotation.x += p.spin.x * dt; p.mesh.rotation.y += p.spin.y * dt; p.mesh.rotation.z += p.spin.z * dt;
+      if (p.t > p.life) {
+        const k = Math.max(0, 1 - (p.t - p.life) * 3);
+        p.mesh.scale.multiplyScalar(k > 0 ? 0.92 : 0);
+        if (k <= 0) { this.scene.remove(p.mesh); this.pieces.splice(i, 1); }
+      }
+    }
     for (let i = this.arcs.length - 1; i >= 0; i--) {
       const a = this.arcs[i];
       a.t += dt;

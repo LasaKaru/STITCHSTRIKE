@@ -4,6 +4,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import { bruteOptions, figureTemplate, grumbleOptions, gruntOptions, heldBlaster, heroOptions, spawnFigure } from './figures/cast.ts';
 import { createScuttler, createMoth, poseMoth, poseScuttler, type CreatureInstance } from './figures/creatures.ts';
+import { createBoss, createDrone, createSnip, createTeeth, createTop, poseDrone, poseSnip, poseTeeth, poseTop, soldierOptions } from './figures/invaders.ts';
 import { poseHumanoid } from './figures/humanoid.ts';
 import { addSkinnedShells, type FigureInstance } from './figures/rig.ts';
 import { createPost } from './scene/post.ts';
@@ -51,7 +52,7 @@ const camera = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.05, 1
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
-interface Entry { kind: 'human' | 'scuttler' | 'moth'; inst: FigureInstance | CreatureInstance; gun?: THREE.Object3D; scale: number; x: number; hunch?: number }
+interface Entry { kind: 'human' | 'scuttler' | 'moth' | 'teeth' | 'top' | 'drone' | 'snip'; inst: FigureInstance | CreatureInstance; gun?: THREE.Object3D; scale: number; x: number; hunch?: number }
 const cast: Entry[] = [];
 
 function addHuman(o: Parameters<typeof spawnFigure>[0], x: number, gunColor?: number, rifle = false, hunch = 0): FigureInstance {
@@ -78,6 +79,20 @@ if (focus === 'grumble') {
 } else if (focus === 'creatures') {
   const s = createScuttler(); s.root.position.x = -0.8; scene.add(s.root); cast.push({ kind: 'scuttler', inst: s, scale: 1, x: -0.8 });
   const m = createMoth(); m.root.position.set(0.8, 0.6, 0); scene.add(m.root); cast.push({ kind: 'moth', inst: m, scale: 1, x: 0.8 });
+} else if (focus === 'army') {
+  // The Mass-Knit Army lined up in front of their boss.
+  const boss = createBoss();
+  boss.root.position.set(0, 0, 3.2);
+  scene.add(boss.root);
+  cast.push({ kind: 'human', inst: boss, scale: 3.05, x: 0, hunch: 0.2 });
+  addHuman(soldierOptions(), -1.6, 0x6a6a74, true);
+  const put = (kind: Entry['kind'], inst: FigureInstance, x: number, y = 0, z = 0) => { inst.root.position.set(x, y, z); scene.add(inst.root); cast.push({ kind, inst, scale: 1, x }); };
+  put('teeth', createTeeth(), -0.6, 0, -0.6);
+  put('teeth', createTeeth(), -0.25, 0, -0.9);
+  put('top', createTop(), 0.55, 0, -0.4);
+  put('snip', createSnip(), 1.6, 0, -0.2);
+  put('drone', createDrone(), 2.4, 2.6, 0.8);
+  cast[cast.length - 1].inst.root.scale.setScalar(1.3);
 } else {
   addHuman(grumbleOptions('game'), -2.1, 0x8bcb3a);
   addHuman(heroOptions(0x3a5da8, 1), -1.05, 0xe8742a);
@@ -95,6 +110,7 @@ const CAM: Record<string, [number, number, number, number, number, number]> = {
   grunt: [-1.1, 1.3, -2.8, 0, 0.9, 0],
   brute: [-1.8, 2.2, -4.8, 0, 1.4, 0],
   creatures: [-0.4, 1.0, -3.2, 0, 0.4, 0],
+  army: [0.4, 3.4, -11.5, 0.2, 2.5, 1],
 };
 const c = CAM[focus] ?? CAM.all;
 camera.position.set(c[0], c[1], c[2]);
@@ -127,12 +143,20 @@ function frame(): void {
         hunch: e.hunch, downed: state.pose === 'downed' ? 1 : 0,
       }, e.scale, e.gun);
       if (e.gun) e.gun.visible = state.pose !== 'idle' && state.pose !== 'downed';
+    } else if (e.kind === 'teeth') {
+      poseTeeth(e.inst as FigureInstance, t, t * 6, 1);
+    } else if (e.kind === 'top') {
+      poseTop(e.inst as FigureInstance, t, 1);
+    } else if (e.kind === 'drone') {
+      poseDrone(e.inst as FigureInstance, t, 1, 0);
+    } else if (e.kind === 'snip') {
+      poseSnip(e.inst as FigureInstance, t, t * 4, 0.6, true);
     } else if (e.kind === 'scuttler') {
       poseScuttler(e.inst as CreatureInstance, t, speed > 0 ? phase * 1.4 : t * 2, speed > 0 ? 1 : 0.2);
     } else {
       poseMoth(e.inst as CreatureInstance, t);
     }
-    if (state.turntable) e.inst.root.rotation.y = Math.sin(t * 0.4) * 0.9;
+    if (state.turntable && focus !== 'army') e.inst.root.rotation.y = Math.sin(t * 0.4) * 0.9;
   }
   controls.update();
   post.render(t);

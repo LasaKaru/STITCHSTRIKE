@@ -167,6 +167,7 @@ net.onEnemyGone = (e) => {
     const big = e.type === EnemyType.Brute || e.type === EnemyType.Boss;
     fx.fluffBurst(at, ENEMY_COLORS[e.type], e.type === EnemyType.Boss ? 600 : big ? 140 : 45, big ? 6 : 3);
     fx.fluffBurst(at, 0xfff8ee, big ? 60 : 12, 2.5); // stuffing
+    fx.burstPieces(at, ENEMY_COLORS[e.type], e.type === EnemyType.Boss ? 24 : big ? 12 : e.type === EnemyType.Teeth ? 3 : 6, e.type === EnemyType.Boss ? 3 : big ? 1.8 : 1);
     fx.puff(at, 0xfff2e0, e.type === EnemyType.Boss ? 8 : big ? 3 : 1.5);
     enemyVisuals.delete(e.id);
   }, ENEMY_INTERP_DELAY_MS);
@@ -202,7 +203,7 @@ net.onShot = (s) => {
     const from = new THREE.Vector3(...s.from);
     fx.projectile(from, to, 0xff5040, true);
     sfx.play('enemyShot', attenuation(from) * 0.6);
-    if (s.hit === net.id) { damageFlash(); sfx.play('hurt'); }
+    if (s.hit === net.id) { damageFlash(); sfx.play('hurt'); hurtFrom(from); }
     return;
   }
   if (s.id === ENEMY_SHOT_ID) return;
@@ -236,7 +237,7 @@ net.onShot = (s) => {
     sfx.play(WEAPON_SOUNDS[weapon] ?? 'popper', attenuation(from) * 0.6);
   }
   fx.projectile(from, to, color, weapon === 1);
-  if (s.hit === net.id) { damageFlash(); sfx.play('hurt'); }
+  if (s.hit === net.id) { damageFlash(); sfx.play('hurt'); hurtFrom(from); }
   fx.puff(to, s.hit || s.enemy ? 0xfff2cc : 0xcfd6e6, 0.8);
 };
 
@@ -523,6 +524,19 @@ function hitMarker(head: boolean): void {
   sfx.play('hit', 0.6);
 }
 let damageTimer = 0;
+/** A red arc on the screen edge pointing at whoever just hit you. */
+function hurtFrom(from: THREE.Vector3): void {
+  const p = net.predicted;
+  if (!p) return;
+  const el = document.createElement('div');
+  el.className = 'hurt-arc';
+  const angle = Math.atan2(from.x - p.x, from.z - p.z);
+  // Screen angle relative to where we look (yaw 0 looks down -Z).
+  const rel = -(angle - (yaw + Math.PI));
+  el.style.transform = `translate(-50%, -50%) rotate(${rel}rad)`;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 900);
+}
 function damageFlash(): void {
   damageTimer = 0.35;
 }

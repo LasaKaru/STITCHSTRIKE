@@ -1,20 +1,18 @@
 # STITCHSTRIKE
 
-**Soft toys. Hard fights.** A browser multiplayer toy shooter where everything is wool: the heroes, the enemies and the whole room. Knitted toys defend glowing **Heartspools** from waves of mass-knit invaders, out in a knitted **back garden** (yarn grass, sculpted trees, a treehouse, a shed and a very messy yard) or in a giant crocheted **bedroom**. Built with Three.js and TypeScript, with a server-authoritative netcode.
+**Soft toys. Hard fights.** An indie first- and third-person shooter that blends wave-based tower defence with intense action, and a love letter to 90s childhoods. You are a 5-inch knitted action figure in a giant house. Everything is wool: the heroes, Baron von Ravel's Mass-Knit Army, and every room. Defend the glowing **Heartspools** in a messy **bedroom**, the **back garden** or the **garage**: alone with bots, online with up to 4 friends, or two to a couch in split-screen. PvP Free-for-All and Team Deathmatch are in too. It's built with Three.js and TypeScript, with server-authoritative netcode, and ships as a desktop app ready for Steam.
 
 ![Main menu over the live in-engine cinematic](docs/screenshots/menu.jpg)
 
-| Title screen | Play setup | The knitted cast |
+| The Mass-Knit Army and The Unraveller | Wave 7 in the Garage | Customise your figure (earned, never bought) |
 |---|---|---|
-| ![](docs/screenshots/menu-title.jpg) | ![](docs/screenshots/menu-play.jpg) | ![](docs/screenshots/figure-cast.jpg) |
-
-| The Back Garden: knitted house, felt trees, treehouse, pond | First person in the yarn grass, Grunts incoming | Flamingos, sandcastle, parasol and mess on the lawn |
-|---|---|---|
-| ![](docs/screenshots/garden-overview.jpg) | ![](docs/screenshots/garden-firstperson.jpg) | ![](docs/screenshots/garden-lawn.jpg) |
-| **Grumble: a realistic knitted action figure** | **The messy all-wool bedroom** | **First person: knitted gloves on the Popper** |
-| ![](docs/screenshots/figure-grumble.jpg) | ![](docs/screenshots/coop-overview.jpg) | ![](docs/screenshots/coop-firstperson.jpg) |
-| **Heartspools A and B, pads, alphabet blocks** | **PvP free-for-all along the garden fence** | **Pip (wool shader lookdev)** |
-| ![](docs/screenshots/coop-window.jpg) | ![](docs/screenshots/garden-pvp.jpg) | ![](docs/screenshots/lookdev-hero.jpg) |
+| ![](docs/screenshots/army.jpg) | ![](docs/screenshots/garage-combat.jpg) | ![](docs/screenshots/customise.jpg) |
+| **Split-screen on one PC** | **Progress: level, medals, secrets** | **Play: mode, mission, difficulty, map** |
+| ![](docs/screenshots/split-screen.jpg) | ![](docs/screenshots/progress.jpg) | ![](docs/screenshots/menu-play.jpg) |
+| **The Back Garden** | **First person in the yarn grass** | **The messy bedroom** |
+| ![](docs/screenshots/garden-overview.jpg) | ![](docs/screenshots/garden-firstperson.jpg) | ![](docs/screenshots/coop-overview.jpg) |
+| **Grumble, a realistic knitted action figure** | **The knitted cast** | **PvP along the garden fence** |
+| ![](docs/screenshots/figure-grumble.jpg) | ![](docs/screenshots/figure-cast.jpg) | ![](docs/screenshots/garden-pvp.jpg) |
 
 _Screenshots are headless renders with SwiftShader, so real GPUs look sharper._
 
@@ -22,63 +20,110 @@ _Screenshots are headless renders with SwiftShader, so real GPUs look sharper._
 
 ```bash
 pnpm install
-pnpm dev          # game server on :8787 + Vite on :5173 (the /ws path is proxied to the server)
+pnpm dev          # game server on :8787 + Vite on :5173 (/ws and /health are proxied to the server)
+pnpm desktop      # or: the Electron desktop app (fullscreen; F11 toggles)
 ```
 
-Open http://localhost:5173 for the main menu: press any key over the live cinematic, then **Play** (mode, map, offline with bots or an online room), **Quick match**, **Toy Box**, **Settings** (name, sensitivity, FOV, invert, quality, volumes, game server), **How to play** and **Credits**. Mouse, keyboard (↑↓, Enter, Esc) and gamepads all work. The arena reads the same settings, and Esc in a match is the pause screen. Arena links work directly too:
+Open http://localhost:5173. Press any key over the live cinematic to reach the main menu:
+- **Play:** choose a mode, a mission (Skirmish 5 waves, Mission 10 waves with the boss, or Endless), a difficulty (Cosy, Scratchy, Moth-eaten, Unravelled) and a map. Then play offline with bots, in an online room, or split-screen.
+- **Quick match**
+- **Customise**
+- **Progress**
+- **Toy Box**
+- **Settings**
+- **How to play**
+- **Credits**
+- **Quit** (desktop only)
 
-| Mode | Link | What happens |
-|---|---|---|
-| **Co-op defence** (1–4 players) | `/arena.html?mode=coop` | Build phase, then waves. Protect Heartspools A, B and C through 5 waves. Bots fill empty slots; they fight and build too. |
-| **Co-op solo** | `/arena.html?mode=coop&solo=1` | The same server code runs in a Web Worker in your browser, so no server is needed. |
-| **PvP free-for-all** (up to 8) | `/arena.html?mode=pvp` | Lag-compensated shooting in the garden or the bedroom. |
-| **Toy Box** | `/figures.html` | Every sculpted, rigged character on a turntable (`?focus=grumble\|grunt\|brute\|creatures`, `?pose=idle\|walk\|run\|aim\|crouch\|jump\|downed`). |
-| **Wool lookdev** | `/wool.html` | Pip the crocheted seal under a sunbeam, with every wool-shader layer adjustable live. |
+The menu works with mouse, keyboard and gamepad.
 
-Add `&map=garden` or `&map=bedroom` to any arena link (default: bedroom). Friends join the same match with the same room code and map: `/arena.html?mode=coop&map=garden&room=ABCD` (the landing page has a join form). If you join a room that runs another map, the client reloads on that map.
+| Mode | Direct link |
+|---|---|
+| Co-op defence, 1–4 players; bots fill empty slots and fight, build and re-stitch | `/arena.html?mode=coop&map=garage&waves=10&difficulty=1` |
+| Co-op solo; the real server runs in a Web Worker, no network needed | `/arena.html?mode=coop&solo=1` |
+| PvP Free-for-All (up to 8) / Team Deathmatch (Team Cotton vs Team Wool) | `/arena.html?mode=pvp` / `?mode=tdm` |
+| Local split-screen for two players on one PC | `/split.html?mode=coop&map=garden` |
+| Toy Box: every sculpted character; `?focus=army` for the Mass-Knit Army | `/figures.html` |
+| Wool shader lookdev | `/wool.html` |
 
-### Desktop app (Windows .exe, Steam)
-
-```bash
-pnpm desktop        # build and launch the Electron app (fullscreen; -- --windowed for a window)
-pnpm desktop:win    # packages/desktop/release: win-unpacked/STITCHSTRIKE.exe (upload this folder to Steam) + portable .exe
-```
-
-The app embeds the game server, so solo, online rooms and LAN hosting (`--lan`) all work from the one exe. See [docs/DESKTOP_AND_STEAM.md](docs/DESKTOP_AND_STEAM.md) for the full Steam checklist and [docs/ROADMAP.md](docs/ROADMAP.md) for what to build next: weapons, enemies, bosses, missions, maps, customisation, split-screen and Steam lobbies.
+Friends join with the same room code, mode, map and mission settings. The desktop app hosts rooms itself, and `--lan` opens them to your network. See [docs/DESKTOP_AND_STEAM.md](docs/DESKTOP_AND_STEAM.md) for building the Windows `.exe` and releasing on Steam.
 
 ### Controls
 
-WASD move · mouse look/fire · Space jump (double jump) · Shift sprint · C crouch · R reload · **1/2** Pom-Pom Popper / Button Buster · **3/4/5** build Turret / Pin Wall / Tangle Mat on the pad you stand on · **G** recycle (50% refund) · **Enter** ready up (skip build time) · V first/third person · Tab scores · F3 net stats.
+| Keyboard and mouse | Gamepad | Action |
+|---|---|---|
+| WASD · mouse | left stick · right stick | move · look |
+| hold mouse button | RT | fire |
+| Space (twice) · Shift · C | A · L3 · B | jump (double) · sprint · crouch |
+| 1–5 · mouse wheel | LB / RB | weapons |
+| R | X | reload |
+| B, then 1–7 · Q | D-pad up, left/right, then LT | build deck: build or upgrade on your pad · build again |
+| G · Enter / F | D-pad down · Start | recycle (50%) · ready up |
+| hold E | hold Y | re-stitch a downed teammate |
+| walk into fabric or bark | push the stick into it | climb |
+| V · Tab · Esc | R3 · View | camera · scores · pause |
 
-### Co-op rules
+### The game
 
-- **Toys** have 150 stitches. After 4 s without taking damage they knit themselves back together (**Stitch-up**), and they spawn with 2 s of protection. Enemy hits on toys are softened in co-op, because the Heartspools are the invaders' real target.
-- **Heartspools** (A, B, C) have a blue thread shield that absorbs damage first and regrows during build phases. Lose all three and the match is lost.
-- **Build pads** are the embroidered patches around each Heartspool. Costs are paid in **buttons**, a team pool you earn by unravelling enemies and clearing waves:
-  - **Pom-Pom Turret** (150): auto-fires at the nearest enemy in sight.
-  - **Pin Wall** (80): a felt pin-cushion that blocks the lane until chewed through.
-  - **Tangle Mat** (100): slows walking enemies by 60%.
-- **Enemies**, all knitted:
-  - **Knit Grunt**: acrylic soldier.
-  - **Scuttler**: fast crocheted spider-crab.
-  - **Moth**: felted flyer that goes straight for the wool.
-  - **Felted Brute**: a tank that flattens buildables.
-- **Pathing:** ground enemies follow flow fields over a nav grid to their target Heartspool. They turn on nearby toys and push through walls.
-- **Scaling:** 5 waves, with enemy count and HP growing with the number of players. Victory or defeat restarts the match after 12 s.
+- **Weapons:**
+  - **Pom-Pom Popper:** assault
+  - **Button Buster:** shotgun
+  - **Needle Lance:** sniper that pierces 3 toys
+  - **Crochet Hook:** SMG
+  - **Yarn-Ball Launcher:** a lobbed yarn ball that bursts, knocks back and tangles crowds
 
-Balance check (full simulated matches, bots only, on both maps): 1–4 bots lose around waves 4–5, so a human team has to build well to win. Server cost is about 60–80 µs per tick for a full wave.
+  Every weapon is available from the start.
+- **Toys** have 150 stitches, plus up to 100 thimble armour.
+  - **Stitch-up:** after 4 s out of combat you knit yourself back together.
+  - **Down and re-stitch (co-op):** you go down instead of out, and a teammate holds E to re-stitch you. Clearing a wave re-stitches everyone.
+  - **Pickups:** stuffing heals, thimbles armour you, and Power Poms give ×1.5 damage. Invaders sometimes drop stuffing.
+- **Heartspools** (A, B, C): a thread shield absorbs damage first and regrows between waves. Lose all three and the memories are gone.
+- **Build phase:** spend the team's **buttons** on the embroidered pads. Building the same trap again upgrades it to tier 2 and then tier 3.
+  - **Pom-Pom Turret:** auto-fires at the nearest invader.
+  - **Pin Wall:** a tough blockade.
+  - **Brick Barricade:** a cheap blockade for mazing.
+  - **Tangle Mat:** slows walkers by 60%.
+  - **Battery Zapper:** chains a shock through up to 4 invaders.
+  - **Mousetrap:** one huge snap, then it re-arms.
+  - **Spring Pad:** launches toys up to high ground.
+- **Mazing:** blockades re-bake the invaders' flow fields, so they walk the long way round. They only chew through when there is no way round.
+- **The Mass-Knit Army:**
+  - **Knit Grunts**
+  - **Scuttler** spider-crabs
+  - felt **Moths**
+  - **Felted Brutes**, which flatten traps
+  - **Chatter Teeth** swarms
+  - **Spinning Tops**, which bowl toys over
+  - **Tin Soldiers**, which shoot from range
+  - **RC Drones**, which drop teeth
+  - **Scissor Snips**, which cut traps apart
+  - **The Unraveller**, the boss: a giant felted bear in a top hat that stomps
+- **Missions:** 10 waves with the boss, a 5-wave skirmish, or endless (every loop tougher, a boss every 10th wave).
+  - Four difficulties scale invader health, numbers, damage and starting buttons.
+  - Sgt. Tuft Buttonsworth briefs you and Baron von Ravel taunts you, Saturday-morning-cartoon style.
+  - Solo practice can start at any wave: `&wave=8`.
+- **Traversal and secrets:** climb bedsheets, curtains, tree bark, hedges, the pegboard and the ladder. Spring toys launch you onto shelves, desks and roofs. Every map hides 8 golden thimbles, weapon parts and credit stashes.
+- **Progression, with zero pay-to-win:** XP, levels, credits and ten medals unlock heads, hat and hair yarns, beards, glasses, knit patterns, jacket and trouser yarns, and six 90s packaging styles. Your figure appears on the end-of-match results card in its blister-pack packaging. Nothing affects combat, and nothing is for sale.
+- **Maps:**
+  - **The Bedroom:** bed, desk, bookshelf, climbable curtain.
+  - **The Back Garden:** house, shed, treehouse, pond, yarn grass.
+  - **The Garage:** a car you crawl under and climb onto, steel shelving, a workbench and pegboard, and a roll-up door stuck half open.
+- **Sound:** every sound is synthesized, with no audio files. There's a music-box menu theme, a garage-rock combat score that follows the match, and weapon and invader effects.
+
+Balance check (full simulated matches, bots only, 2-second build phases): 4 bots hold out to around wave 5 of 10 on Scratchy on every map. A human team has to build and maze well to reach the boss.
 
 ### URL options
 
-`?mode=coop|pvp` · `?map=garden|bedroom` · `?room=ABCD` · `?solo=1` · `?bots=0..7` (fill-to count) · `?lag=150` (fake round-trip ms) · `?name=Pip` · `?quality=low|medium|high` · `?server=ws://host:8787` · `?cam=overview|window|core|coreA|tree` (fixed spectator camera) · `?autopilot=1` (headless smoke tests).
+`?mode=coop|pvp|tdm` · `?map=bedroom|garden|garage` · `?waves=5|10|0` · `?difficulty=0..3` · `?wave=N` (solo practice start) · `?room=ABCD` · `?solo=1` · `?bots=0..7` · `?lag=150` · `?name=Pip` · `?quality=low|medium|high` · `?server=ws://host:8787` · `?cam=overview|core|…` (fixed spectator camera) · `?autopilot=1` (headless smoke tests).
 
-Server env: `PORT` (8787), `FILL_BOTS` (4), `FAKE_LAG_MS` (one-way per direction).
+Server env: `PORT` (8787), `FILL_BOTS` (4), `FAKE_LAG_MS` (one-way per direction), `STATIC_DIR` (also serve the built client).
 
 ```bash
-pnpm test         # 43 tests: simulation (movement, protocol, lag comp, prediction, co-op on every map) + SDF mesher and figure rig
+pnpm test         # 76 tests: movement, weapons, pickups, down/re-stitch, invaders, traps, mazing, missions,
+                  # protocol, lag comp, prediction, co-op on every map, traversal, progression, SDF mesher, rig
 pnpm typecheck    # tsc -b across all packages
 pnpm build        # production client -> packages/client/dist
-pnpm loadtest -- --clients 4 --seconds 30 --mode coop   # headless clients against a running server
+pnpm loadtest -- --url ws://localhost:8787 --clients 4 --seconds 30 --mode coop
 ```
 
 ## How it's built
@@ -97,6 +142,10 @@ packages/
                          building blocks and clutter), enemyRenderer (knitted enemies),
                          coopProps (Heartspools, pads, buildables), fx, viewModel, avatars, Pip, post chain
             src/menu-main.ts + scene/cinematic.ts   main menu over a live six-shot in-engine cinematic; audio/music.ts
+            src/menu-customise.ts, progression.ts, profile.ts   customise, progress, XP/medals/unlocks (local profile)
+            src/split-main.ts   local split-screen · src/input/gamepad.ts · src/briefing.ts (cartoon briefings)
+            src/scene/   woolGarage, traversalView (jump pads, secrets), pickupsView, weaponModels
+            src/figures/invaders.ts   teeth, top, drone, snip, tin soldier, The Unraveller
             src/net/     transports (WebSocket / Worker / fake lag) and the predicting NetClient
             src/audio/   synthesized sound effects (Web Audio, no files)
   tools/    headless load tester
@@ -162,24 +211,26 @@ The second map (`shared/src/garden.ts` for collision and co-op layout, `client/s
 
 Everything is walkable and fightable. Enemies path around the shed, pool and sandbox. The treehouse is a sniper nest, and the three Heartspools sit by the deck, the lawn and the shed. Grass density and shadow resolution follow `?quality=`.
 
-Enemies are drawn with one `InstancedMesh` per body part per type, animated per instance (walk swing, wing flaps, hit squash). A full wave costs a few dozen draw calls. When an enemy unravels, it bursts into curls of yarn fluff in its own colour.
+Enemies are sculpted, rigged figures pooled per type, each animated from its own movement: walk cycles, snapping jaws, spinning tops, whirring rotors and snipping blades. When one unravels, it pops apart into knitted pieces that bounce like soft toys, plus curls of yarn fluff and a puff of stuffing.
 
 ### Netcode (plan §17)
 
 - **Inputs:** fixed 1/60 s commands sent in pairs. The server runs the shared step under a real-time budget, which stops speed hacks.
 - **Snapshots** at 20 Hz:
   - your own state at full precision, for exact replays
-  - quantised players
-  - 9-byte shots
-  - a co-op block: phase, wave, timer, buttons, cores and pads
-  - enemies at 9 bytes each, sent at **10 Hz** (every other snapshot) to fit the budget
+  - quantised players (with armour, downed and re-stitch state)
+  - 9-byte shots (15 with a start point for zaps and invader fire)
+  - yarn balls in flight, a pickup availability mask and stuffing drops
+  - a co-op block: phase, wave, timer, buttons, cores, pads (kind, tier, health), difficulty and boss health
+  - enemies at 8 bytes each, sent at **10 Hz** (every other snapshot) to fit the budget
+- **Inputs** carry a weapon byte and a one-shot action byte (build kind, recycle, ready).
 - **Client:** prediction and reconciliation for your own toy. Other players are interpolated 100 ms in the past, enemies 160 ms.
 - **Lag compensation** rewinds players (PvP) or enemies (co-op) to the time stamped on your input, capped at 200 ms.
 - **Measured:**
-  - 4-player co-op through waves: ~44 kbps per client (budget 64)
-  - 8-player PvP: ~46 kbps (budget 96)
+  - 4-player co-op through waves: ~47 kbps per client (budget 64)
+  - 8-player PvP: ~47 kbps (budget 96)
   - two real browser clients at 120 ms RTT: 0.000 u reconciliation error over 40 s
 
 ## Roadmap from here
 
-See **[docs/ROADMAP.md](docs/ROADMAP.md)**. It covers survivability and game feel, 9 weapon ideas, new traps and mazing, the Mass-Knit Army with bosses, missions and modes, split-screen, 7 new maps, customisation without pay-to-win, Steam lobbies and performance. It ends with a suggested order: a vertical slice for the Steam page, then Early Access, then 1.0.
+See **[docs/ROADMAP.md](docs/ROADMAP.md)** for the design brief, the development pillars, and a build-status checklist of what is done and what comes next (Steam lobbies and achievements, more maps, bosses per map, and more).

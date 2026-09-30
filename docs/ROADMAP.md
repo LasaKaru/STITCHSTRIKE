@@ -53,7 +53,55 @@ The other pillars of level design:
 
 The checklist tracks what is in the game (✅) and what is still ahead (⬜).
 
-<!-- STATUS -->
+**In the game now**
+- ✅ Hero-shooter × tower-defence loop: build phase, then waves, three Heartspools
+- ✅ Single-player with bot teammates who fight, build, upgrade and re-stitch
+- ✅ Online co-op up to 4 (server-authoritative, lag-compensated)
+- ✅ LAN hosting from the desktop app
+- ✅ Local split-screen for 2 players, keyboard + mouse and gamepads
+- ✅ PvP: Free-for-All (up to 8) and Team Deathmatch
+- ✅ Missions: 10 waves with a boss, a 5-wave skirmish and Endless, at four difficulties
+- ✅ Survivability: 150 stitches, Stitch-up regeneration, spawn protection, thimble armour, down and re-stitch, pickups and drops
+- ✅ Weapons: Pom-Pom Popper, Button Buster, Needle Lance (pierces), Crochet Hook, Yarn-Ball Launcher (lobbed splash, tangle)
+- ✅ Traps: Turret, Pin Wall, Brick Barricade, Tangle Mat, Battery Zapper, Mousetrap and Spring Pad, all upgradable to tier 3
+- ✅ Dynamic mazing: flow fields re-bake whenever a blockade changes
+- ✅ Mass-Knit Army:
+  - ground swarms: chatter teeth, scuttlers
+  - rushers: spinning tops
+  - ranged: tin soldiers
+  - flyers: moths, RC drones that drop teeth
+  - saboteurs: scissor snips
+  - tanks: brutes
+  - boss: The Unraveller
+- ✅ Maps at toy scale: The Bedroom, The Back Garden, The Garage
+- ✅ Verticality: climbable fabric and bark, jump pads, book and crate steps, shelves and roofs
+- ✅ Collectibles: 8 secrets per map (golden thimbles, weapon parts, credit stashes)
+- ✅ Customisation with zero pay-to-win:
+  - 9 cosmetic slots, 6 packaging styles
+  - levels, credits and 10 medals
+  - Customise and Progress screens, and an end-of-match packaging card
+- ✅ Saturday-morning framing: Sgt. Tuft Buttonsworth's briefings and tips, Baron von Ravel's taunts
+- ✅ Synthesized audio: music-box menu theme, garage-rock combat score that follows the match, all effects
+- ✅ Toy physics: knitted pieces pop off and bounce, stuffing puffs; damage-direction arcs; camera shake
+- ✅ AAA-style cinematic main menu with gamepad navigation
+- ✅ Electron desktop app: Windows `.exe`, unpacked build ready for SteamPipe, portable exe
+
+**Still ahead**
+- ⬜ Steam integration (needs your App ID): steamworks.js achievements mapped to medals, lobbies and invites, relay networking, cloud saves
+- ⬜ More maps: bathroom, kitchen counter, toy store aisle, sewing room, attic, a seasonal Christmas living room
+- ⬜ A boss per map (only The Unraveller exists)
+- ⬜ Mission variety: escort, salvage and daily challenges
+- ⬜ PvP variety: Capture the Yarn, King of the Spool
+- ⬜ Traversal extras: ledge mantle and the yarn-swing grapple
+- ⬜ Weapon parts as real attachments (found parts currently pay out credits)
+- ⬜ Split-screen for 3–4 players; gamepad aim assist; key rebinding
+- ⬜ More weapons: Static Sock, Glue Gun, Stuffing Blaster, Safety-Pin Crossbow; gadgets
+- ⬜ More invaders: Tin Drummer, Yo-Yo Slinger, Paper-Plane squadron, Jack-in-the-Box, Moth Queen
+- ⬜ More traps: Fan, Marble Chute, Sewing-Machine Turret, Hot-Water-Bottle Mortar, Healing Sewing Kit
+- ⬜ Performance: figure LODs, per-room occlusion culling, baked lighting, meshing in a Web Worker
+- ⬜ Presentation: a commissioned rock soundtrack and voice acting, a trailer, store capsules, code signing
+- ⬜ Accessibility: colour-blind palettes, subtitles for the briefings, toggle vs hold options
+- ⬜ Dedicated servers, matchmaking and reconnect
 
 Priorities: **P1** makes the game fun enough to sell, **P2** makes it rich, **P3** is polish and long tail.
 
