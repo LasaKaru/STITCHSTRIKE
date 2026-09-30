@@ -33,8 +33,8 @@ function arena(): Room {
 }
 
 describe('weapons', () => {
-  it('has five weapons with their own magazines, switched by the weapon byte', () => {
-    expect(WEAPONS).toHaveLength(5);
+  it('has seven weapons with their own magazines, switched by the weapon byte', () => {
+    expect(WEAPONS).toHaveLength(7);
     const room = new Room(createBedroom(), 'pvp');
     const p = room.addPlayer('Pip')!;
     let seq = 0;
@@ -86,6 +86,54 @@ describe('weapons', () => {
     const hit = coop.enemies.filter((e) => e.hp < 500);
     expect(hit.length).toBeGreaterThanOrEqual(3);
     expect(hit.every((e) => e.slow > 0)).toBe(true);
+  });
+
+  it('a Glue Gun glob bursts on an invader and glues it (long slow)', () => {
+    const room = arena();
+    const p = room.addPlayer('Gluer')!;
+    p.state = createPlayerState([0, 0, 12]);
+    const coop = room.coop!;
+    coop.enemies.push(enemy(300, EnemyType.Grunt, 0, 5, 500));
+    room.update();
+    room.queueInputs(p.id, [cmd(1, 0, 5), cmd(2, 0, 5)]);
+    room.update();
+    p.state.cooldown = 0;
+    room.queueInputs(p.id, [cmd(3, Buttons.Fire, 5, 0, 0, -0.1, room.tick), cmd(4, 0, 5)]);
+    let blast = null;
+    for (let t = 0; t < TICK_RATE * 2 && !blast; t++) {
+      room.update();
+      blast = room.drainShots().find((s) => s.kind === ShotKind.Blast) ?? null;
+      for (const e of coop.enemies) { e.vx = e.vz = 0; e.cooldown = 99; }
+    }
+    expect(blast?.hit).toBe(5);
+    const e = coop.enemies[0];
+    expect(e.hp).toBeLessThan(500);
+    expect(e.slow).toBeGreaterThan(3.5);
+  });
+
+  it('the Static Sock chains to nearby invaders it can see, weaker each jump', () => {
+    const room = arena();
+    const p = room.addPlayer('Sock')!;
+    p.state = createPlayerState([0, 0, 12]);
+    p.protect = 0;
+    const coop = room.coop!;
+    // One in the crosshair, two within arc range of each other, one far away.
+    coop.enemies.push(enemy(400, EnemyType.Grunt, 0, 6, 500), enemy(401, EnemyType.Grunt, 4, 6, 500), enemy(402, EnemyType.Grunt, 8, 6, 500), enemy(403, EnemyType.Grunt, 25, 6, 500));
+    room.update();
+    room.queueInputs(p.id, [cmd(1, 0, 6), cmd(2, 0, 6)]);
+    room.update();
+    room.drainShots();
+    p.state.cooldown = 0;
+    room.queueInputs(p.id, [cmd(3, Buttons.Fire, 6, 0, 0, -0.05, room.tick), cmd(4, 0, 6)]);
+    room.update();
+    const shots = room.drainShots();
+    expect(shots.filter((s) => s.kind === ShotKind.Zap)).toHaveLength(2);
+    const dmg = (id: number) => 500 - coop.enemies.find((e) => e.id === id)!.hp;
+    expect(dmg(400)).toBeGreaterThan(0);
+    expect(dmg(401)).toBeGreaterThan(0);
+    expect(dmg(401)).toBeLessThan(dmg(400));
+    expect(dmg(402)).toBeLessThan(dmg(401));
+    expect(dmg(403)).toBe(0);
   });
 
   it('the Crochet Hook sprays deterministically inside its cone', () => {

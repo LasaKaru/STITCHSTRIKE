@@ -119,7 +119,7 @@ describe('protocol', () => {
         { id: 3, hit: 5, head: true, enemy: false, kind: 0, to: [4, 1.3, -2] as [number, number, number] },
         { id: 255, hit: 3, head: false, enemy: false, kind: 3, from: [1, 1, 1] as [number, number, number], to: [2, 1, 2] as [number, number, number] },
       ],
-      projectiles: [{ owner: 3, x: 1, y: 2, z: 3 }],
+      projectiles: [{ owner: 3, weapon: 5, x: 1, y: 2, z: 3 }],
       pickups: 0b1011,
       drops: [{ kind: 0, x: 5, y: 0, z: -5 }],
       coop: null,

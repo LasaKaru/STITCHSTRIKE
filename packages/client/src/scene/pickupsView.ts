@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { PickupKind, stepProjectile, WEAPONS, type NetDrop, type NetProjectile, type Projectile, type World } from '@stitchstrike/shared';
 import { addShellFuzz, createWoolMaterial } from '../wool/woolMaterial.ts';
 import { metal } from './materials.ts';
-import { yarnBall } from './weaponModels.ts';
+import { projectileMesh } from './weaponModels.ts';
 
 /**
  * Pickups (stuffing, thimble armour, Power Poms) and yarn balls in flight.
@@ -84,7 +84,7 @@ export class PickupsView {
 
   /** Predicted yarn ball for our own shot, so it leaves the muzzle instantly. */
   launchLocal(p: Projectile): void {
-    const mesh = yarnBall(WEAPONS[p.weapon].color);
+    const mesh = projectileMesh(p.weapon, WEAPONS[p.weapon].color);
     mesh.position.set(p.x, p.y, p.z);
     this.scene.add(mesh);
     this.local.push({ p, mesh });
@@ -117,14 +117,25 @@ export class PickupsView {
     // Other players' yarn balls glide toward their latest positions.
     const others = projectiles.filter((p) => p.owner !== me);
     while (this.balls.length < others.length) {
-      const m = yarnBall(WEAPONS[4].color);
+      const m = projectileMesh(4, WEAPONS[4].color);
       m.visible = false;
+      m.userData.weapon = 4;
       this.scene.add(m);
       this.balls.push(m);
     }
-    this.balls.forEach((m, i) => {
+    this.balls.forEach((m0, i) => {
       const p = others[i];
-      if (!p) { m.visible = false; return; }
+      if (!p) { m0.visible = false; return; }
+      let m = m0;
+      if (m.userData.weapon !== p.weapon && WEAPONS[p.weapon]?.projectile) {
+        // A different kind of shot in this slot: swap the mesh.
+        this.scene.remove(m);
+        m = projectileMesh(p.weapon, WEAPONS[p.weapon].color);
+        m.userData.weapon = p.weapon;
+        m.visible = false;
+        this.scene.add(m);
+        this.balls[i] = m;
+      }
       if (!m.visible) m.position.set(p.x, p.y, p.z);
       m.visible = true;
       m.position.lerp(new THREE.Vector3(p.x, p.y, p.z), Math.min(1, dt * 18));

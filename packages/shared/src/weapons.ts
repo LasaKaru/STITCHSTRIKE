@@ -28,6 +28,8 @@ export interface WeaponDef {
   pierce: number;
   /** Projectile weapons: launch speed and splash. */
   projectile?: { speed: number; gravity: number; radius: number; slowSeconds: number };
+  /** Chain-zap weapons: after the first hit, arc to this many more targets within radius, each hit scaled by falloff. */
+  chain?: { count: number; radius: number; falloff: number };
   /** Tracer colour. */
   color: number;
 }
@@ -54,10 +56,22 @@ export const WEAPONS: WeaponDef[] = [
     reloadSeconds: 2.4, range: 80, pellets: 1, spread: 0, knockback: 3, pierce: 1, color: 0x8bcb3a,
     projectile: { speed: 26, gravity: 14, radius: 3.2, slowSeconds: 3 },
   },
+  {
+    id: 5, name: 'Glue Gun', role: 'Sticky · globs glue invaders in place', damage: 24, headshotMultiplier: 1, fireRate: 2.6, magazine: 10,
+    reloadSeconds: 1.9, range: 60, pellets: 1, spread: 0, knockback: 0.3, pierce: 1, color: 0xf3e6a0,
+    projectile: { speed: 38, gravity: 8, radius: 1.9, slowSeconds: 4.5 },
+  },
+  {
+    id: 6, name: 'Static Sock', role: 'Chain zap · arcs between toys', damage: 16, headshotMultiplier: 1.2, fireRate: 3.5, magazine: 18,
+    reloadSeconds: 1.7, range: 30, pellets: 1, spread: 0, knockback: 0.3, pierce: 1, color: 0x9fd8ff,
+    chain: { count: 3, radius: 6, falloff: 0.7 },
+  },
 ];
 
 export const WEAPON_COUNT = WEAPONS.length;
 export const LAUNCHER = 4;
+export const GLUE_GUN = 5;
+export const STATIC_SOCK = 6;
 export const SWITCH_SECONDS = 0.25;
 
 /** Cheap deterministic hash in [0, 1) from integers (no Math.random: prediction must agree). */

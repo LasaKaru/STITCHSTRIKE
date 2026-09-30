@@ -197,7 +197,8 @@ export class Bot {
     if (this.room.coop) {
       let crowd = 0;
       for (const e of this.room.coop.enemies) if (e.hp > 0 && Math.hypot(e.x - target.x, e.z - target.z) < 3) crowd++;
-      if (crowd >= 4 && dist > 8 && dist < 30) return 4;
+      if (crowd >= 4 && dist > 8 && dist < 30) return this.seq % 600 < 300 ? 4 : 5;
+      if (crowd >= 2 && dist < 24) return 6;
     }
     if (dist > 24) return 2;
     return dist < 12 ? 3 : 0;

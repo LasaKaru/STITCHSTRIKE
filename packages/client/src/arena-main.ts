@@ -196,15 +196,21 @@ function nearestEnemy(p: THREE.Vector3, within: number): EnemySample | null {
 net.onShot = (s) => {
   const to = new THREE.Vector3(...s.to);
   if (s.kind === ShotKind.Blast) {
-    fx.blast(to, WEAPONS[LAUNCHER].color);
-    sfx.play('blast', attenuation(to));
-    fx.shake = Math.max(fx.shake, 0.4 * attenuation(to));
+    // Blasts carry the weapon that burst in `hit`: a yarn ball, or a glob of hot glue.
+    const w = WEAPONS[s.hit]?.projectile ? WEAPONS[s.hit] : WEAPONS[LAUNCHER];
+    fx.blast(to, w.color, w.projectile!.radius);
+    sfx.play(w.id === LAUNCHER ? 'blast' : 'splat', attenuation(to));
+    fx.shake = Math.max(fx.shake, (w.id === LAUNCHER ? 0.4 : 0.12) * attenuation(to));
     if (s.id === net.id) { pickupsView.clearLocal(); if (s.enemy) hitMarker(false); }
     return;
   }
   if (s.kind === ShotKind.Zap && s.from) {
-    fx.zap(new THREE.Vector3(...s.from), to);
-    sfx.play('zap', attenuation(to) * 0.7);
+    const sock = s.id < TURRET_SHOT_BASE;
+    fx.zap(new THREE.Vector3(...s.from), to, sock ? WEAPONS[6].color : undefined);
+    sfx.play(sock ? 'sock' : 'zap', attenuation(to) * 0.7);
+    // Static Sock arcs: our chain hits mark, arcs that land on us hurt.
+    if (sock && s.id === net.id && (s.enemy || s.hit)) hitMarker(false);
+    if (sock && s.hit === net.id) { damageFlash(); sfx.play('hurt'); }
     return;
   }
   if (s.kind === ShotKind.Enemy && s.from) {
@@ -244,12 +250,13 @@ net.onShot = (s) => {
     color = weapon === 0 ? colorOf(s.id) : WEAPONS[weapon]?.color ?? colorOf(s.id);
     sfx.play(WEAPON_SOUNDS[weapon] ?? 'popper', attenuation(from) * 0.6);
   }
-  fx.projectile(from, to, color, weapon === 1);
+  if (WEAPONS[weapon]?.chain) fx.zap(from, to, color);
+  else fx.projectile(from, to, color, weapon === 1);
   if (s.hit === net.id) { damageFlash(); sfx.play('hurt'); hurtFrom(from); }
   fx.puff(to, s.hit || s.enemy ? 0xfff2cc : 0xcfd6e6, 0.8);
 };
 
-const WEAPON_SOUNDS = ['popper', 'buster', 'lance', 'hook', 'launch'] as const;
+const WEAPON_SOUNDS = ['popper', 'buster', 'lance', 'hook', 'launch', 'glue', 'sock'] as const;
 
 function attenuation(p: THREE.Vector3): number {
   return Math.max(0.05, 1 - camera.position.distanceTo(p) / 30);
@@ -845,7 +852,8 @@ function frame(): void {
       } else {
         for (const d of pelletDirections(weapon, aim, r.seq)) {
           const { to, enemy } = predictedHit(o, d, weapon.range);
-          fx.projectile(muzzle, to, r.weapon === 0 ? 0xe8742a : weapon.color, r.weapon === 1);
+          if (weapon.chain) fx.zap(muzzle, to, weapon.color);
+          else fx.projectile(muzzle, to, r.weapon === 0 ? 0xe8742a : weapon.color, r.weapon === 1);
           // Enemy hits shed fibres (from the server's verdict); misses puff dust off the wool.
           if (!enemy) fx.puff(to, 0xcfd6e6, r.weapon === 1 ? 0.4 : 0.55);
         }

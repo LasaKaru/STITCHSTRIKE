@@ -3,7 +3,7 @@ import { addShellFuzz, createWoolMaterial } from '../wool/woolMaterial.ts';
 import { wood } from './materials.ts';
 import { createFpArms } from '../figures/fpArms.ts';
 import { createPopper } from './pip.ts';
-import { createHook, createLance, createLauncher } from './weaponModels.ts';
+import { createGlueGun, createHook, createLance, createLauncher, createStaticSock } from './weaponModels.ts';
 
 /** Button Buster: double knitted barrels on a wooden stock with a big sewing-button drum. */
 export function createBuster(): THREE.Group {
@@ -48,7 +48,7 @@ export class ViewModel {
     const popper = createPopper();
     popper.scale.setScalar(0.9);
     const buster = createBuster();
-    this.guns = [popper, buster, createLance(), createHook(), createLauncher()].map((gun) => {
+    this.guns = [popper, buster, createLance(), createHook(), createLauncher(), createGlueGun(), createStaticSock()].map((gun) => {
       const holder = new THREE.Group();
       gun.rotation.y = Math.PI; // modelled along +Z; the camera looks down -Z
       holder.add(gun);
@@ -82,13 +82,13 @@ export class ViewModel {
   }
 
   fire(): void {
-    this.recoil = [0.4, 1, 1.3, 0.25, 1.1][this.weapon] ?? 0.4;
+    this.recoil = [0.4, 1, 1.3, 0.25, 1.1, 0.6, 0.35][this.weapon] ?? 0.4;
   }
 
   /** World position of the current muzzle. */
   muzzle(): THREE.Vector3 {
     this.group.updateWorldMatrix(true, true);
-    return this.guns[this.weapon].localToWorld(new THREE.Vector3(0, 0, [-0.3, -0.45, -0.95, -0.4, -0.42][this.weapon] ?? -0.3));
+    return this.guns[this.weapon].localToWorld(new THREE.Vector3(0, 0, [-0.3, -0.45, -0.95, -0.4, -0.42, -0.36, -0.42][this.weapon] ?? -0.3));
   }
 
   update(dt: number, speed: number, grounded: boolean): void {

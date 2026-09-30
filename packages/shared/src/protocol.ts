@@ -185,7 +185,7 @@ export interface Shot {
   head: boolean;
   /** True when the shot hit an enemy toy. */
   enemy: boolean;
-  /** ShotKind: 0 hitscan, 1 yarn-ball blast, 2 zapper arc, 3 invader fire. */
+  /** ShotKind: 0 hitscan, 1 blast (hit = the weapon that burst), 2 zap arc, 3 invader fire. */
   kind: number;
   /** Start point for zaps and invader fire (others start at the shooter). */
   from?: Vec3;
@@ -195,6 +195,7 @@ export interface Shot {
 /** A lobbed yarn ball in flight. */
 export interface NetProjectile {
   owner: number;
+  weapon: number;
   x: number;
   y: number;
   z: number;
@@ -345,6 +346,7 @@ export function encodeSnapshot(s: Snapshot): Uint8Array {
   w.u8(projectiles.length);
   for (const pr of projectiles) {
     w.u8(pr.owner);
+    w.u8(pr.weapon);
     w.u16(quantPos(pr.x, 0)); w.u16(quantPos(pr.y, 1)); w.u16(quantPos(pr.z, 2));
   }
   w.u32(s.pickups);
@@ -440,7 +442,7 @@ export function decodeSnapshot(buf: Uint8Array): Snapshot | null {
     }
     const projectiles: NetProjectile[] = [];
     for (let i = 0, n = r.u8(); i < n; i++) {
-      projectiles.push({ owner: r.u8(), x: dequantPos(r.u16(), 0), y: dequantPos(r.u16(), 1), z: dequantPos(r.u16(), 2) });
+      projectiles.push({ owner: r.u8(), weapon: r.u8(), x: dequantPos(r.u16(), 0), y: dequantPos(r.u16(), 1), z: dequantPos(r.u16(), 2) });
     }
     const pickups = r.u32();
     const drops: NetDrop[] = [];

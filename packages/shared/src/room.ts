@@ -4,7 +4,7 @@ import { ENEMIES, type Enemy } from './enemies.ts';
 import { Action, Buttons, createPlayerState, eyePosition, lookDirection, stepPlayer, type InputCmd, type PlayerState } from './movement.ts';
 import { DROP_CHANCE, DROP_SECONDS, MAX_DROPS, PICKUP_RADIUS, PickupKind, PICKUPS, POWER_MULTIPLIER, type Drop } from './pickups.ts';
 import type { CoopState, GameEvent, GameMode, Look, NetDrop, NetPlayer, NetProjectile, RosterEntry, Shot, Snapshot } from './protocol.ts';
-import { rayBox, rayPlayer, rayWorld } from './raycast.ts';
+import { hasLineOfSight, rayBox, rayPlayer, rayWorld } from './raycast.ts';
 import { launchProjectile, pelletDirections, stepProjectile, WEAPONS, type Projectile } from './weapons.ts';
 import type { Vec3, World } from './world.ts';
 
@@ -438,6 +438,7 @@ export class Room {
         const to: Vec3 = [o[0] + d[0] * t, o[1] + d[1] * t, o[2] + d[2] * t];
         const head = to[1] - tg.pos.y >= tg.h * (tg.player ? PLAYER.headHeight / PLAYER.height : 0.7);
         const dmg = weapon.damage * (head ? weapon.headshotMultiplier : 1) * boost;
+        if (weapon.chain) this.chainZap(shooter, weapon, targets, tg, to, weapon.damage * boost);
         if (tg.player) {
           this.shots.push({ id: shooter.id, hit: tg.player.id, head, enemy: false, kind: ShotKind.Hitscan, to });
           if (tg.player.alive) this.damage(shooter, tg.player, dmg);
@@ -451,6 +452,42 @@ export class Room {
       if (weapon.pierce > 1 && used.length < weapon.pierce) {
         this.shots.push({ id: shooter.id, hit: 0, head: false, enemy: false, kind: ShotKind.Hitscan, to: end });
       }
+    }
+  }
+
+  /** Static Sock: the charge jumps from the first target to the nearest others it can see. */
+  private chainZap(
+    shooter: RoomPlayer, weapon: (typeof WEAPONS)[number],
+    targets: { player?: RoomPlayer; enemyIndex?: number; pos: Pos; r: number; h: number }[],
+    first: (typeof targets)[number], from: Vec3, damage: number,
+  ): void {
+    const chain = weapon.chain!;
+    const hit = new Set([first]);
+    let at = from;
+    let dmg = damage;
+    for (let k = 0; k < chain.count; k++) {
+      let best: (typeof targets)[number] | null = null;
+      let bestD = chain.radius;
+      for (const tg of targets) {
+        if (hit.has(tg)) continue;
+        if (tg.player ? !tg.player.alive : this.coop!.enemies[tg.enemyIndex!].hp <= 0) continue;
+        const c: Vec3 = [tg.pos.x, tg.pos.y + tg.h * 0.5, tg.pos.z];
+        const dd = Math.hypot(c[0] - at[0], c[1] - at[1], c[2] - at[2]);
+        if (dd < bestD && hasLineOfSight(at, c, this.world.boxes)) { bestD = dd; best = tg; }
+      }
+      if (!best) return;
+      hit.add(best);
+      dmg *= chain.falloff;
+      const to: Vec3 = [best.pos.x, best.pos.y + best.h * 0.5, best.pos.z];
+      if (best.player) {
+        this.shots.push({ id: shooter.id, hit: best.player.id, head: false, enemy: false, kind: ShotKind.Zap, from: at, to });
+        this.damage(shooter, best.player, dmg);
+      } else if (this.coop) {
+        const e = this.coop.enemies[best.enemyIndex!];
+        this.shots.push({ id: shooter.id, hit: 0, head: false, enemy: true, kind: ShotKind.Zap, from: at, to });
+        this.creditKill(shooter, e, this.coop.damageEnemy(e, dmg, [0, 0, 0], weapon.knockback));
+      }
+      at = to;
     }
   }
 
@@ -512,7 +549,7 @@ export class Room {
         this.damage(owner, p, w.damage * 0.8 * Math.max(0.3, 1 - d / spec.radius) * boost);
       }
     }
-    this.shots.push({ id: pr.owner, hit: 0, head: false, enemy: any, kind: ShotKind.Blast, to: at });
+    this.shots.push({ id: pr.owner, hit: pr.weapon, head: false, enemy: any, kind: ShotKind.Blast, to: at });
   }
 
   // ------------------------------------------------------------ damage
@@ -566,7 +603,7 @@ export class Room {
   }
 
   netProjectiles(): NetProjectile[] {
-    return this.projectiles.map((p) => ({ owner: p.owner, x: p.x, y: p.y, z: p.z }));
+    return this.projectiles.map((p) => ({ owner: p.owner, weapon: p.weapon, x: p.x, y: p.y, z: p.z }));
   }
 
   netDrops(): NetDrop[] {

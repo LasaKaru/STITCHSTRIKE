@@ -158,8 +158,13 @@ function eyeOf(id: number): THREE.Vector3 | null {
 
 main.onShot = (s) => {
   const to = new THREE.Vector3(...s.to);
-  if (s.kind === ShotKind.Blast) { fx.blast(to, WEAPONS[4].color); sfx.play('blast', 0.7); return; }
-  if (s.kind === ShotKind.Zap && s.from) { fx.zap(new THREE.Vector3(...s.from), to); return; }
+  if (s.kind === ShotKind.Blast) {
+    const w = WEAPONS[s.hit]?.projectile ? WEAPONS[s.hit] : WEAPONS[4];
+    fx.blast(to, w.color, w.projectile!.radius);
+    sfx.play(w.id === 4 ? 'blast' : 'splat', 0.7);
+    return;
+  }
+  if (s.kind === ShotKind.Zap && s.from) { fx.zap(new THREE.Vector3(...s.from), to, s.id < 128 ? WEAPONS[6].color : undefined); return; }
   if (s.kind === ShotKind.Enemy && s.from) { fx.projectile(new THREE.Vector3(...s.from), to, 0xff5040, true); return; }
   if (s.id === ENEMY_SHOT_ID) return;
   let from: THREE.Vector3 | null;
@@ -323,10 +328,12 @@ function frame(): void {
         if (!weapon.projectile) {
           for (const d of pelletDirections(weapon, lookDirection(s.yaw, s.pitch), r.seq)) {
             const tt = rayWorld(o, d, world.boxes, weapon.range);
-            fx.projectile(l.viewModel.muzzle(), new THREE.Vector3(o[0] + d[0] * tt, o[1] + d[1] * tt, o[2] + d[2] * tt), weapon.color, r.weapon === 1);
+            const end = new THREE.Vector3(o[0] + d[0] * tt, o[1] + d[1] * tt, o[2] + d[2] * tt);
+            if (weapon.chain) fx.zap(l.viewModel.muzzle(), end, weapon.color);
+            else fx.projectile(l.viewModel.muzzle(), end, weapon.color, r.weapon === 1);
           }
         }
-        sfx.play((['popper', 'buster', 'lance', 'hook', 'launch'] as const)[r.weapon], 0.8);
+        sfx.play((['popper', 'buster', 'lance', 'hook', 'launch', 'glue', 'sock'] as const)[r.weapon], 0.8);
         l.viewModel.fire();
       }
       if (r.hook === 1) sfx.play('yarnShot', 0.8);
