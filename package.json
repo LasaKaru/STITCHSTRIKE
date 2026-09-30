@@ -1,0 +1,25 @@
+{
+  "name": "stitchstrike",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter @stitchstrike/server --filter @stitchstrike/client dev",
+    "dev:client": "pnpm --filter @stitchstrike/client dev",
+    "dev:server": "pnpm --filter @stitchstrike/server dev",
+    "build": "pnpm --filter @stitchstrike/client build",
+    "test": "vitest run",
+    "typecheck": "tsc -b",
+    "loadtest": "pnpm --filter @stitchstrike/tools loadtest"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

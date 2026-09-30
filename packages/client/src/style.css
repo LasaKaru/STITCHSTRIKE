@@ -1,0 +1,27 @@
+:root {
+  --bg: #20242e;
+  --panel: #2c3240;
+  --ink: #f3ecdd;
+  --muted: #b9b2a3;
+  --orange: #e8742a;
+  --lime: #8bcb3a;
+  --denim: #3a5da8;
+  --gold: #ffc94a;
+  --red: #d8262e;
+  --shield: #6fd6ff;
+  font-family: ui-rounded, 'SF Pro Rounded', 'Nunito', system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); }
+#app { position: fixed; inset: 0; }
+canvas { display: block; }
+.stats {
+  position: fixed; left: 12px; bottom: 10px; font: 12px/1.2 ui-monospace, monospace;
+  color: var(--muted); background: rgba(0,0,0,.35); padding: 4px 8px; border-radius: 6px; pointer-events: none;
+}
+.back {
+  position: fixed; left: 12px; top: 10px; color: var(--ink); text-decoration: none; font-size: 14px;
+  background: rgba(0,0,0,.35); padding: 6px 10px; border-radius: 8px; border: 2px dashed rgba(243,236,221,.4);
+}

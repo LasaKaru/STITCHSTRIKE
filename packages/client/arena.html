@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Stitchstrike Arena</title>
+    <link rel="stylesheet" href="/src/style.css" />
+    <link rel="stylesheet" href="/src/arena.css" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="crosshair"></div>
+    <div id="hitmarker"></div>
+    <div id="damage"></div>
+
+    <div class="hud bottom-left">
+      <div class="yarnbar"><div id="health-fill"></div></div>
+      <div id="health-text"></div>
+    </div>
+    <div class="hud bottom-right">
+      <div class="weapon">Pom-Pom Popper</div>
+      <div id="ammo"></div>
+    </div>
+    <div class="hud top-right"><div id="score"></div><div id="feed"></div></div>
+    <div class="hud top-center" id="status"></div>
+    <div class="hud net" id="net"></div>
+    <div class="hud netpanel hidden" id="netpanel"></div>
+    <div id="scoreboard" class="hidden"></div>
+
+    <div id="overlay">
+      <div class="card">
+        <h1>STITCHSTRIKE</h1>
+        <p class="sub">Phase 0 · networked grey-box arena</p>
+        <p class="go">Click to play</p>
+        <table class="keys">
+          <tr><td>WASD</td><td>move</td><td>Mouse</td><td>look / fire</td></tr>
+          <tr><td>Space</td><td>jump (×2)</td><td>Shift</td><td>sprint</td></tr>
+          <tr><td>C</td><td>crouch</td><td>R</td><td>reload</td></tr>
+          <tr><td>V</td><td>1st / 3rd person</td><td>Tab</td><td>scores</td></tr>
+          <tr><td>F3</td><td>net stats</td><td>Esc</td><td>release mouse</td></tr>
+        </table>
+        <p class="hint"><a href="/">← back</a></p>
+      </div>
+    </div>
+    <script type="module" src="/src/arena-main.ts"></script>
+  </body>
+</html>

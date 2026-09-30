@@ -1,0 +1,17 @@
+{
+  "name": "@stitchstrike/tools",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "loadtest": "tsx src/loadtest.ts"
+  },
+  "dependencies": {
+    "@stitchstrike/shared": "workspace:*",
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.2",
+    "tsx": "^4.23.15"
+  }
+}

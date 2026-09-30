@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>STITCHSTRIKE</title>
+    <link rel="stylesheet" href="/src/style.css" />
+    <style>
+      html, body { overflow: auto; }
+      main { max-width: 760px; margin: 0 auto; padding: 48px 16px; }
+      h1 { font-size: clamp(40px, 9vw, 76px); margin: 0; letter-spacing: 2px; color: var(--gold);
+           text-shadow: 3px 3px 0 var(--orange), 6px 6px 0 rgba(0,0,0,.35); }
+      .hook { font-size: 22px; margin: 8px 0 32px; color: var(--muted); }
+      .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+      a.card { display: block; text-decoration: none; color: var(--ink); background: var(--panel);
+               border: 3px dashed rgba(243,236,221,.35); border-radius: 18px; padding: 20px; transition: transform .15s; }
+      a.card:hover { transform: translateY(-3px) rotate(-.4deg); border-color: var(--gold); }
+      a.card h2 { margin: 0 0 6px; font-size: 22px; }
+      a.card p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.4; }
+      .tag { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 99px; margin-bottom: 10px; background: var(--denim); }
+      footer { margin-top: 36px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+      code { background: rgba(0,0,0,.3); padding: 1px 5px; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>STITCHSTRIKE</h1>
+      <p class="hook">Soft toys. Hard fights. — Phase 0 prototypes</p>
+      <div class="cards">
+        <a class="card" href="/wool.html">
+          <span class="tag">Phase 0 (a)</span>
+          <h2>Wool lookdev</h2>
+          <p>Pip, a crocheted seal, in a bedroom corner under a sunbeam. Toggle every layer of the wool shader live.</p>
+        </a>
+        <a class="card" href="/arena.html">
+          <span class="tag">Phase 0 (b)</span>
+          <h2>Networked arena</h2>
+          <p>Grey-box Sunbeam Bedroom. Authoritative server, prediction, interpolation, lag-compensated shooting, bots.</p>
+        </a>
+        <a class="card" href="/arena.html?solo=1">
+          <span class="tag">Solo</span>
+          <h2>Arena vs bots (no server)</h2>
+          <p>The same server code running in a Web Worker in your browser (plan §17.6).</p>
+        </a>
+      </div>
+      <footer>
+        Arena options: <code>?room=ABCD</code> private room · <code>?lag=150</code> fake round-trip lag ·
+        <code>?bots=0..7</code> bot fill · <code>?name=Pip</code>.<br />
+        Full design: <code>docs/BUILD_PLAN.md</code>
+      </footer>
+    </main>
+  </body>
+</html>

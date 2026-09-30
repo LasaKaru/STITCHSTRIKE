@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "../../node_modules/.tsc/server",
+    "types": ["node"]
+  },
+  "include": ["src"],
+  "references": [{ "path": "../shared" }]
+}
