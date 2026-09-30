@@ -144,20 +144,23 @@ document.addEventListener('click', (e) => {
 });
 
 const customise = new CustomiseScreen(() => settings.name, (k) => music.blip(k, settings.sfxVolume));
-const play = { mode: 'coop', map: 'garden', where: 'solo' };
+const play = { mode: 'coop', map: 'garden', where: 'solo', waves: '10', difficulty: '1' };
 function choose(el: HTMLElement): void {
   const group = el.parentElement!.dataset.group as keyof typeof play;
   for (const c of el.parentElement!.querySelectorAll('.choice')) c.classList.toggle('selected', c === el);
   play[group] = el.dataset.value!;
   document.body.classList.toggle('online', play.where === 'online');
+  document.body.classList.toggle('pvp-mode', play.mode !== 'coop');
   music.blip('select', settings.sfxVolume);
 }
 
 const bots = $<HTMLInputElement>('#bots');
 bots.addEventListener('input', () => { $('#bots-out').textContent = bots.value; });
 
-function arenaUrl(p: { mode: string; map: string; where: string }): string {
+function arenaUrl(p: { mode: string; map: string; where: string; waves?: string; difficulty?: string }): string {
   const q = new URLSearchParams({ mode: p.mode, map: p.map });
+  if (p.mode === 'coop') { q.set('waves', p.waves ?? '10'); q.set('difficulty', p.difficulty ?? '1'); }
+  if (p.where === 'split') return `/split.html?${q}`;
   if (p.where === 'solo') q.set('solo', '1');
   else q.set('room', ($<HTMLInputElement>('#room').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '') || 'LOBBY'));
   if (current === 'play') q.set('bots', bots.value);

@@ -91,6 +91,22 @@
           <div class="choice-row" data-group="mode">
             <button class="choice selected" data-value="coop"><b>Co-op Defence</b><span>1–4 players · hold the Heartspools for 5 waves</span></button>
             <button class="choice" data-value="pvp"><b>Free-for-All</b><span>up to 8 · unravel the most toys</span></button>
+            <button class="choice" data-value="tdm"><b>Team Deathmatch</b><span>Team Cotton vs Team Wool</span></button>
+          </div>
+          <div class="coop-opts">
+            <h4>Mission</h4>
+            <div class="choice-row" data-group="waves">
+              <button class="choice" data-value="5"><b>Skirmish</b><span>5 waves · a Brute pack finale</span></button>
+              <button class="choice selected" data-value="10"><b>Mission</b><span>10 waves · The Unraveller boss</span></button>
+              <button class="choice" data-value="0"><b>Endless</b><span>How long can the Heartspools hold?</span></button>
+            </div>
+            <h4>Difficulty</h4>
+            <div class="choice-row diff" data-group="difficulty">
+              <button class="choice" data-value="0"><b>Cosy</b><span>Softer invaders, more buttons</span></button>
+              <button class="choice selected" data-value="1"><b>Scratchy</b><span>The intended fight</span></button>
+              <button class="choice" data-value="2"><b>Moth-eaten</b><span>Tougher, hungrier toys</span></button>
+              <button class="choice" data-value="3"><b>Unravelled</b><span>For veteran squads</span></button>
+            </div>
           </div>
           <h4>Map</h4>
           <div class="choice-row maps" data-group="map">
@@ -102,6 +118,7 @@
           <div class="choice-row" data-group="where">
             <button class="choice selected" data-value="solo"><b>Offline with bots</b><span>No server needed</span></button>
             <button class="choice" data-value="online"><b>Online room</b><span id="server-state">Checking server…</span></button>
+            <button class="choice" data-value="split"><b>Split-screen</b><span>2 players on this PC (pads or keyboard + pad)</span></button>
           </div>
           <div class="row online-only">
             <label>Room code <input id="room" maxlength="8" placeholder="LOBBY" autocomplete="off" spellcheck="false" /></label>

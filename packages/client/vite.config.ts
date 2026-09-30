@@ -23,6 +23,7 @@ export default defineConfig({
         wool: resolve(import.meta.dirname, 'wool.html'),
         arena: resolve(import.meta.dirname, 'arena.html'),
         figures: resolve(import.meta.dirname, 'figures.html'),
+        split: resolve(import.meta.dirname, 'split.html'),
       },
     },
   },

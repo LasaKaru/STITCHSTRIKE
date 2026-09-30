@@ -77,3 +77,22 @@ export function withFakeLag(inner: Transport, rttMs: number): Transport {
   t.close = () => inner.close();
   return t;
 }
+
+/**
+ * Local split-screen: several players connect to one RoomHost running on this
+ * page. Frames are handed over on a microtask, like a zero-latency socket.
+ */
+export function loopbackTransport(host: import('@stitchstrike/shared').RoomHost): Transport {
+  const t = base('local');
+  const handlers = host.connect({
+    send: (d) => queueMicrotask(() => {
+      t.bytesIn += typeof d === 'string' ? d.length : d.byteLength;
+      t.onMessage(d);
+    }),
+    close: () => t.onClose('closed'),
+  });
+  t.send = (d) => handlers.onMessage(d);
+  t.close = () => handlers.onClose();
+  queueMicrotask(() => t.onOpen());
+  return t;
+}

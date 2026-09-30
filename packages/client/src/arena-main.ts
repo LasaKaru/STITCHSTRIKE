@@ -25,6 +25,8 @@ import { TraversalView } from './scene/traversalView.ts';
 import { levelOf, loadProfile } from './profile.ts';
 import { award, wearable, XP, type Award } from './progression.ts';
 import { jacketColor } from './figures/looks.ts';
+import { cycleCard, cycleWeapon, PadReader } from './input/gamepad.ts';
+import { Briefing, BOSS_LINE, BRIEFINGS, LOSE_LINE, nextTaunt, nextTip, WIN_LINE } from './briefing.ts';
 import { QUALITY_LAYERS, setWoolLayers, updateShellLod } from './wool/woolMaterial.ts';
 
 /**
@@ -246,6 +248,9 @@ function attenuation(p: THREE.Vector3): number {
 
 // ---------------------------------------------------------------- events
 
+const briefing = new Briefing(() => settings.sfxVolume);
+let briefed = false;
+
 /** This match, for the results card. */
 const session = { kills: 0, revives: 0, waves: 0, xp: 0, credits: 0 };
 
@@ -284,18 +289,19 @@ net.onEvent = (e) => {
       if (e.by === net.id) { sfx.play('kill'); popup(`+${e.reward} buttons`); session.kills++; progress(XP.kill, e.enemyType === EnemyType.Boss ? 100 : 1, { kills: 1 }); }
       break;
     case 'phase':
-      if (e.phase === Phase.Wave) { banner(`WAVE ${e.wave} INCOMING!`); sfx.play('wave'); resultsCard(null); }
+      if (e.phase === Phase.Wave) { banner(`WAVE ${e.wave} INCOMING!`); sfx.play('wave'); resultsCard(null); if (e.wave % 2 === 1 || e.wave === 1) briefing.say('baron', nextTaunt()); }
       else if (e.phase === Phase.Build && e.wave > 0) {
         banner(`WAVE ${e.wave} CLEARED!`, 'good');
+        if (e.wave % 2 === 0) briefing.say('sarge', nextTip());
         session.waves++;
         progress(XP.wave, 25, { waves: 1, ...(net.waves === 0 ? { bestEndless: e.wave } : {}) });
-      } else if (e.phase === Phase.Build) { banner('NEW MATCH · BUILD YOUR DEFENCE'); resultsCard(null); Object.assign(session, { kills: 0, revives: 0, waves: 0, xp: 0, credits: 0 }); }
+      } else if (e.phase === Phase.Build) { banner('NEW MATCH · BUILD YOUR DEFENCE'); resultsCard(null); briefing.clear(); for (const l of BRIEFINGS[world.id]) briefing.say('sarge', l); Object.assign(session, { kills: 0, revives: 0, waves: 0, xp: 0, credits: 0 }); }
       else if (e.phase === Phase.Won) {
-        banner('THE HEARTSPOOLS ARE SAFE!', 'good', 6000); sfx.play('win');
+        banner('THE HEARTSPOOLS ARE SAFE!', 'good', 6000); sfx.play('win'); briefing.say('sarge', WIN_LINE);
         progress(Math.round(XP.win * (1 + 0.25 * net.difficulty)), 300, { wins: 1, matches: 1 }, { medals: net.difficulty >= 2 ? ['survivor'] : [] });
         setTimeout(() => resultsCard(true), 2500);
       } else if (e.phase === Phase.Lost) {
-        banner('THE HEARTSPOOLS UNRAVELLED', 'bad', 6000); sfx.play('lose');
+        banner('THE HEARTSPOOLS UNRAVELLED', 'bad', 6000); sfx.play('lose'); briefing.say('sarge', LOSE_LINE);
         progress(XP.match, 50, { matches: 1 });
         setTimeout(() => resultsCard(false), 2500);
       }
@@ -328,7 +334,7 @@ net.onEvent = (e) => {
       }
       break;
     case 'boss':
-      if (e.state === 'arrive') { banner('THE UNRAVELLER APPROACHES!', 'bad', 4000); sfx.play('boss'); }
+      if (e.state === 'arrive') { banner('THE UNRAVELLER APPROACHES!', 'bad', 4000); sfx.play('boss'); briefing.say('baron', BOSS_LINE); }
       else { banner('THE UNRAVELLER IS UNPICKED!', 'good', 4000); sfx.play('win'); progress(XP.boss, 200, { bossKills: 1 }); }
       break;
     case 'stomp': {
@@ -360,7 +366,14 @@ const sensitivity = settings.sensitivity;
 const invertY = settings.invertY ? -1 : 1;
 
 const overlay = document.getElementById('overlay')!;
-const lock = () => { sfx.unlock(); music.start(settings.musicVolume); renderer.domElement.requestPointerLock(); };
+const lock = () => {
+  sfx.unlock();
+  music.start(settings.musicVolume);
+  briefing.unlock();
+  // The opening briefing plays once the player is in (audio is unlocked by the click).
+  if (!briefed && mode === 'coop') { briefed = true; for (const l of BRIEFINGS[world.id]) briefing.say('sarge', l); }
+  renderer.domElement.requestPointerLock();
+};
 renderer.domElement.addEventListener('click', lock);
 overlay.addEventListener('click', lock);
 document.addEventListener('pointerlockchange', () => {
@@ -431,6 +444,27 @@ document.addEventListener('wheel', (e) => {
   if (document.pointerLockElement !== renderer.domElement) return;
   wantWeapon = (wantWeapon + (e.deltaY > 0 ? 1 : WEAPON_COUNT - 1)) % WEAPON_COUNT;
 }, { passive: true });
+
+/** Gamepad: works without pointer lock; the first pad that moves takes over. */
+const pad = new PadReader(0);
+let padActive = false;
+
+function pollPad(dt: number): number {
+  const f = pad.poll(dt, sensitivity / 0.0022, settings.invertY);
+  if (!f.connected) return 0;
+  if (f.active && !padActive) { padActive = true; overlay.classList.add('hidden'); sfx.unlock(); music.start(settings.musicVolume); briefing.unlock(); }
+  if (!padActive) return 0;
+  yaw += f.dYaw;
+  pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, pitch + f.dPitch));
+  if (f.weaponDelta) wantWeapon = cycleWeapon(wantWeapon, f.weaponDelta);
+  if (f.toggleDeck) deckToggled = !deckToggled;
+  if (f.cardDelta) lastBuild = cycleCard(lastBuild, f.cardDelta);
+  if (pad.ltEdge && mode === 'coop') pendingAction = lastBuild;
+  if (f.action && mode === 'coop') pendingAction = f.action;
+  if (f.thirdPerson) thirdPerson = !thirdPerson;
+  scoreboard.classList.toggle('hidden', !f.scoreboard && !keys.has('Tab'));
+  return f.buttons;
+}
 
 function sampleButtons(): number {
   let b = 0;
@@ -751,10 +785,11 @@ function frame(): void {
 
   // Fixed 60 Hz input + prediction.
   acc += dt;
-  const locked = document.pointerLockElement === renderer.domElement;
+  const padButtons = pollPad(dt);
+  const locked = document.pointerLockElement === renderer.domElement || padActive;
   while (acc >= 1 / 60) {
     acc -= 1 / 60;
-    const buttons = autopilot ? autopilotButtons(now, net.predicted) : locked ? sampleButtons() : 0;
+    const buttons = autopilot ? autopilotButtons(now, net.predicted) : locked ? sampleButtons() | padButtons : 0;
     const action = pendingAction;
     pendingAction = 0;
     const r = net.input(buttons, yaw, pitch, now, wantWeapon, action);

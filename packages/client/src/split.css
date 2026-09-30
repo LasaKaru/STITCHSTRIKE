@@ -1,0 +1,25 @@
+body.split .divider { position: fixed; left: 0; right: 0; top: 50%; height: 4px; margin-top: -2px; z-index: 2;
+  background: repeating-linear-gradient(90deg, var(--gold) 0 14px, transparent 14px 22px); }
+.pview { position: fixed; left: 0; right: 0; height: 50%; pointer-events: none; z-index: 2; }
+#p0 { top: 0; }
+#p1 { top: 50%; }
+.pview .xh { position: absolute; left: 50%; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px; opacity: .85;
+  background: linear-gradient(var(--ink), var(--ink)) center / 2px 100% no-repeat, linear-gradient(var(--ink), var(--ink)) center / 100% 2px no-repeat; }
+.pview .phud { position: absolute; left: 14px; bottom: 10px; right: 14px; display: flex; justify-content: space-between; align-items: flex-end;
+  text-shadow: 0 2px 0 rgba(0,0,0,.5); font-size: 14px; }
+.pview .phud .name { font-weight: 900; }
+.pview .phud .bar { width: 180px; height: 12px; border-radius: 99px; background: rgba(0,0,0,.45); overflow: hidden; margin-top: 3px; }
+.pview .phud .bar i { display: block; height: 100%; background: repeating-linear-gradient(115deg, var(--orange) 0 8px, #f08a45 8px 12px); }
+.pview .phud .ammo { font-size: 22px; font-weight: 800; text-align: right; }
+.pview .phud .wpn { font-size: 12px; color: var(--lime); text-transform: uppercase; }
+.pview .pdown { position: absolute; left: 50%; top: 60%; transform: translateX(-50%); background: rgba(90,20,30,.6); padding: 6px 14px; border-radius: 10px; font-weight: 800; }
+#shared { left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 3; text-align: center; background: rgba(20,22,30,.8); padding: 4px 14px; border-radius: 12px;
+  border: 2px dashed rgba(243,236,221,.35); font-size: 13px; }
+#shared #wave { font-weight: 900; color: var(--gold); letter-spacing: 1px; background: none; border: 0; padding: 0; font-size: 16px; }
+#shared #phase b { color: var(--gold); }
+#join { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 6; background: var(--panel); border: 3px dashed rgba(243,236,221,.4);
+  border-radius: 20px; padding: 22px 26px; width: min(520px, 92vw); cursor: pointer; }
+#join h1 { margin: 0 0 8px; color: var(--gold); letter-spacing: 3px; }
+#join .keys { font-size: 13px; color: var(--muted); }
+#join .go { font-size: 20px; font-weight: 800; color: var(--lime); }
+#join .hint a { color: var(--muted); }
