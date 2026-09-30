@@ -58,11 +58,11 @@ The checklist tracks what is in the game (✅) and what is still ahead (⬜).
 - ✅ Single-player with bot teammates who fight, build, upgrade and re-stitch
 - ✅ Online co-op up to 4 (server-authoritative, lag-compensated)
 - ✅ LAN hosting from the desktop app
-- ✅ Local split-screen for 2 players, keyboard + mouse and gamepads
-- ✅ PvP: Free-for-All (up to 8) and Team Deathmatch
+- ✅ Local split-screen for 2–4 players (halves or quadrants), keyboard + mouse and gamepads
+- ✅ PvP: Free-for-All (up to 8), Team Deathmatch and King of the Spool (hold the hopping Golden Spool)
 - ✅ Missions: 10 waves with a boss, a 5-wave skirmish and Endless, at four difficulties
 - ✅ Survivability: 150 stitches, Stitch-up regeneration, spawn protection, thimble armour, down and re-stitch, pickups and drops
-- ✅ Weapons: Pom-Pom Popper, Button Buster, Needle Lance (pierces), Crochet Hook, Yarn-Ball Launcher (lobbed splash, tangle)
+- ✅ Weapons: Pom-Pom Popper, Button Buster, Needle Lance (pierces), Crochet Hook, Yarn-Ball Launcher (lobbed splash, tangle), Glue Gun (sticky globs), Static Sock (chain zap)
 - ✅ Traps: Turret, Pin Wall, Brick Barricade, Tangle Mat, Battery Zapper, Mousetrap and Spring Pad, all upgradable to tier 3
 - ✅ Dynamic mazing: flow fields re-bake whenever a blockade changes
 - ✅ Mass-Knit Army:
@@ -72,12 +72,14 @@ The checklist tracks what is in the game (✅) and what is still ahead (⬜).
   - flyers: moths, RC drones that drop teeth
   - saboteurs: scissor snips
   - tanks: brutes
+  - support: Tin Drummers (speed up everyone nearby)
+  - ambushers: Jack-in-the-Boxes (spring out at toys)
   - boss: The Unraveller
-- ✅ Maps at toy scale: The Bedroom, The Back Garden, The Garage
-- ✅ Verticality: climbable fabric and bark, jump pads, book and crate steps, shelves and roofs
+- ✅ Maps at toy scale: The Bedroom, The Back Garden, The Garage, The Bathroom, The Toy Store Aisle
+- ✅ Verticality: climbable fabric and bark, jump pads, book and crate steps, shelves and roofs, ledge mantle, the yarn-swing grapple
 - ✅ Collectibles: 8 secrets per map (golden thimbles, weapon parts, credit stashes)
 - ✅ Customisation with zero pay-to-win:
-  - 9 cosmetic slots, 6 packaging styles
+  - 11 cosmetic slots, 6 packaging styles, weapon charms and grip wraps unlocked by the weapon parts you find
   - levels, credits and 10 medals
   - Customise and Progress screens, and an end-of-match packaging card
 - ✅ Saturday-morning framing: Sgt. Tuft Buttonsworth's briefings and tips, Baron von Ravel's taunts
@@ -85,22 +87,24 @@ The checklist tracks what is in the game (✅) and what is still ahead (⬜).
 - ✅ Toy physics: knitted pieces pop off and bounce, stuffing puffs; damage-direction arcs; camera shake
 - ✅ AAA-style cinematic main menu with gamepad navigation
 - ✅ Electron desktop app: Windows `.exe`, unpacked build ready for SteamPipe, portable exe
+- ✅ Steamworks scaffold: medals unlock achievements and rich presence shows mode, map and wave (optional steamworks.js; no-op without it)
+- ✅ Key rebinding; accessibility: colour-blind palettes, subtitles and sound captions, reduced camera shake
+- ✅ Performance: distance LOD for invaders (proxies and no posing when far)
 
 **Still ahead**
-- ⬜ Steam integration (needs your App ID): steamworks.js achievements mapped to medals, lobbies and invites, relay networking, cloud saves
-- ⬜ More maps: bathroom, kitchen counter, toy store aisle, sewing room, attic, a seasonal Christmas living room
+- ⬜ Steam, the rest (needs your App ID): lobbies and invites, relay networking, cloud saves
+- ⬜ More maps: kitchen counter, sewing room, attic, a seasonal Christmas living room
 - ⬜ A boss per map (only The Unraveller exists)
 - ⬜ Mission variety: escort, salvage and daily challenges
-- ⬜ PvP variety: Capture the Yarn, King of the Spool
-- ⬜ Traversal extras: ledge mantle and the yarn-swing grapple
-- ⬜ Weapon parts as real attachments (found parts currently pay out credits)
-- ⬜ Split-screen for 3–4 players; gamepad aim assist; key rebinding
-- ⬜ More weapons: Static Sock, Glue Gun, Stuffing Blaster, Safety-Pin Crossbow; gadgets
-- ⬜ More invaders: Tin Drummer, Yo-Yo Slinger, Paper-Plane squadron, Jack-in-the-Box, Moth Queen
+- ⬜ PvP variety: Capture the Yarn
+- ⬜ Weapon parts with stat-free variants per weapon (charms and wraps exist; per-weapon skins do not yet)
+- ⬜ Gamepad aim assist; gamepad button remapping
+- ⬜ More weapons: Stuffing Blaster, Safety-Pin Crossbow; gadgets
+- ⬜ More invaders: Yo-Yo Slinger, Paper-Plane squadron, Moth Queen
 - ⬜ More traps: Fan, Marble Chute, Sewing-Machine Turret, Hot-Water-Bottle Mortar, Healing Sewing Kit
-- ⬜ Performance: figure LODs, per-room occlusion culling, baked lighting, meshing in a Web Worker
+- ⬜ Performance: LOD for player figures, per-room occlusion culling, baked lighting, meshing in a Web Worker
 - ⬜ Presentation: a commissioned rock soundtrack and voice acting, a trailer, store capsules, code signing
-- ⬜ Accessibility: colour-blind palettes, subtitles for the briefings, toggle vs hold options
+- ⬜ Accessibility: toggle vs hold options, UI scale, a one-handed control preset
 - ⬜ Dedicated servers, matchmaking and reconnect
 
 Priorities: **P1** makes the game fun enough to sell, **P2** makes it rich, **P3** is polish and long tail.

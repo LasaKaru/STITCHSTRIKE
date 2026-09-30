@@ -55,13 +55,17 @@ Friends join with the same room code, mode, map and mission settings. The deskto
 | WASD · mouse | left stick · right stick | move · look |
 | hold mouse button | RT | fire |
 | Space (twice) · Shift · C | A · L3 · B | jump (double) · sprint · crouch |
-| 1–5 · mouse wheel | LB / RB | weapons |
+| 1–7 · mouse wheel | RB | weapons |
+| hold right mouse · X | hold LB | yarn-swing: hook anything above you, jump to let go |
+| jump at a ledge, hold W | jump, push the stick | mantle up onto it |
 | R | X | reload |
 | B, then 1–7 · Q | D-pad up, left/right, then LT | build deck: build or upgrade on your pad · build again |
 | G · Enter / F | D-pad down · Start | recycle (50%) · ready up |
 | hold E | hold Y | re-stitch a downed teammate |
 | walk into fabric or bark | push the stick into it | climb |
 | V · Tab · Esc | R3 · View | camera · scores · pause |
+
+Every keyboard action can be rebound in Settings → Key bindings.
 
 ### The game
 
@@ -71,6 +75,8 @@ Friends join with the same room code, mode, map and mission settings. The deskto
   - **Needle Lance:** sniper that pierces 3 toys
   - **Crochet Hook:** SMG
   - **Yarn-Ball Launcher:** a lobbed yarn ball that bursts, knocks back and tangles crowds
+  - **Glue Gun:** fast hot-glue globs that glue invaders in place
+  - **Static Sock:** a chain zap that arcs to up to three more targets
 
   Every weapon is available from the start.
 - **Toys** have 150 stitches, plus up to 100 thimble armour.
@@ -97,30 +103,38 @@ Friends join with the same room code, mode, map and mission settings. The deskto
   - **Tin Soldiers**, which shoot from range
   - **RC Drones**, which drop teeth
   - **Scissor Snips**, which cut traps apart
+  - **Tin Drummers**, whose drumming speeds up every invader nearby
+  - **Jack-in-the-Boxes**, which spring their clowns at toys who get close
   - **The Unraveller**, the boss: a giant felted bear in a top hat that stomps
 - **Missions:** 10 waves with the boss, a 5-wave skirmish, or endless (every loop tougher, a boss every 10th wave).
   - Four difficulties scale invader health, numbers, damage and starting buttons.
   - Sgt. Tuft Buttonsworth briefs you and Baron von Ravel taunts you, Saturday-morning-cartoon style.
   - Solo practice can start at any wave: `&wave=8`.
-- **Traversal and secrets:** climb bedsheets, curtains, tree bark, hedges, the pegboard and the ladder. Spring toys launch you onto shelves, desks and roofs. Every map hides 8 golden thimbles, weapon parts and credit stashes.
-- **Progression, with zero pay-to-win:** XP, levels, credits and ten medals unlock heads, hat and hair yarns, beards, glasses, knit patterns, jacket and trouser yarns, and six 90s packaging styles. Your figure appears on the end-of-match results card in its blister-pack packaging. Nothing affects combat, and nothing is for sale.
+- **Traversal and secrets:** climb bedsheets, curtains, tree bark, hedges, towels, SALE banners, the pegboard and the ladder. Mantle up ledges, swing on a strand of yarn from anything overhead, and let spring toys launch you onto shelves, desks and roofs. Every map hides 8 golden thimbles, weapon parts and credit stashes.
+- **Progression, with zero pay-to-win:** XP, levels, credits and ten medals unlock heads, hat and hair yarns, beards, glasses, knit patterns, jacket and trouser yarns, six 90s packaging styles, and weapon charms and grip wraps that you unlock by finding weapon parts. Your figure appears on the end-of-match results card in its blister-pack packaging. Nothing affects combat, and nothing is for sale.
 - **Maps:**
   - **The Bedroom:** bed, desk, bookshelf, climbable curtain.
   - **The Back Garden:** house, shed, treehouse, pond, yarn grass.
   - **The Garage:** a car you crawl under and climb onto, steel shelving, a workbench and pegboard, and a roll-up door stuck half open.
+  - **The Bathroom:** a bubble-bath tub, a climbable shower curtain, the toilet tank as a sniper perch, a toilet-roll staircase.
+  - **The Toy Store Aisle:** towering shelves of boxed 90s toys, SALE banners to climb, a ball pit, a trolley and the checkout.
+- **Modes:** co-op defence (solo with bots, online up to 4, split-screen for 2–4), Free-for-All, Team Deathmatch and **King of the Spool** (two teams fight to stand on a Golden Spool that hops around the map; first to 100).
+- **Accessibility:** colour-blind palettes, subtitles and sound captions, reduced camera shake, full key rebinding.
+- **Steam:** medals unlock Steam achievements and rich presence shows what you're playing (desktop build with steamworks.js; see [docs/DESKTOP_AND_STEAM.md](docs/DESKTOP_AND_STEAM.md)).
 - **Sound:** every sound is synthesized, with no audio files. There's a music-box menu theme, a garage-rock combat score that follows the match, and weapon and invader effects.
 
 Balance check (full simulated matches, bots only, 2-second build phases): 4 bots hold out to around wave 5 of 10 on Scratchy on every map. A human team has to build and maze well to reach the boss.
 
 ### URL options
 
-`?mode=coop|pvp|tdm` · `?map=bedroom|garden|garage` · `?waves=5|10|0` · `?difficulty=0..3` · `?wave=N` (solo practice start) · `?room=ABCD` · `?solo=1` · `?bots=0..7` · `?lag=150` · `?name=Pip` · `?quality=low|medium|high` · `?server=ws://host:8787` · `?cam=overview|core|…` (fixed spectator camera) · `?autopilot=1` (headless smoke tests).
+`?mode=coop|pvp|tdm|koth` · `?map=bedroom|garden|garage|bathroom|toystore` · `?waves=5|10|0` · `?difficulty=0..3` · `?wave=N` (solo practice start) · `?room=ABCD` · `?solo=1` · `?bots=0..7` · `?lag=150` · `?name=Pip` · `?quality=low|medium|high` · `?server=ws://host:8787` · `?cam=overview|core|…` (fixed spectator camera) · `?autopilot=1` (headless smoke tests) · `?lod=0` (full-detail invaders at any distance). Split-screen: `split.html?players=2|3|4`.
 
 Server env: `PORT` (8787), `FILL_BOTS` (4), `FAKE_LAG_MS` (one-way per direction), `STATIC_DIR` (also serve the built client).
 
 ```bash
-pnpm test         # 76 tests: movement, weapons, pickups, down/re-stitch, invaders, traps, mazing, missions,
-                  # protocol, lag comp, prediction, co-op on every map, traversal, progression, SDF mesher, rig
+pnpm test         # 107 tests: movement, mantle and yarn-swing, weapons, pickups, down/re-stitch, invaders, traps,
+                  # mazing, missions, King of the Spool, protocol, lag comp, prediction, co-op on every map,
+                  # progression and weapon parts, settings, SDF mesher, rig
 pnpm typecheck    # tsc -b across all packages
 pnpm build        # production client -> packages/client/dist
 pnpm loadtest -- --url ws://localhost:8787 --clients 4 --seconds 30 --mode coop
