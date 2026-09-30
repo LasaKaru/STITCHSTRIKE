@@ -22,10 +22,9 @@
 #feed div span { color: var(--muted); }
 #feed div.mine { border: 1px solid var(--gold); }
 
-.top-center { left: 50%; top: 14px; transform: translateX(-50%); font-size: 18px; text-align: center; pointer-events: auto; }
-.top-center a { color: var(--gold); }
-.net { left: 12px; top: 52px; font: 12px ui-monospace, monospace; color: var(--muted); }
-.netpanel { left: 12px; top: 72px; font: 12px/1.5 ui-monospace, monospace; color: var(--muted); background: rgba(0,0,0,.35); padding: 6px 8px; border-radius: 6px; }
+.top-center { left: 50%; top: 14px; transform: translateX(-50%); font-size: 18px; text-align: center; }
+.net { left: 12px; bottom: 96px; font: 12px ui-monospace, monospace; color: var(--muted); }
+.netpanel { left: 12px; bottom: 116px; font: 12px/1.5 ui-monospace, monospace; color: var(--muted); background: rgba(0,0,0,.35); padding: 6px 8px; border-radius: 6px; }
 
 #crosshair, #hitmarker { position: fixed; left: 50%; top: 50%; pointer-events: none; z-index: 2; }
 #crosshair { width: 18px; height: 18px; margin: -9px 0 0 -9px;
@@ -61,3 +60,63 @@
 #overlay .keys td { padding: 3px 4px; }
 #overlay .keys td:nth-child(odd) { color: var(--gold); font-weight: 700; white-space: nowrap; }
 #overlay .hint a { color: var(--muted); }
+
+/* ---------------------------------------------------------------- co-op HUD */
+body.pvp .coop-only { display: none !important; }
+
+.top-left { left: 16px; top: 14px; }
+#cores .core { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+#cores .letter { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-weight: 800;
+  color: #20242e; border: 2px dashed rgba(255,255,255,.7); }
+#cores .bars { width: min(180px, 30vw); }
+#cores .hp, #cores .sh { height: 9px; border-radius: 99px; background: rgba(0,0,0,.45); overflow: hidden; }
+#cores .sh { height: 5px; margin-top: 2px; }
+#cores .hp i, #cores .sh i { display: block; height: 100%; transition: width .2s; }
+#cores .hp i { background: repeating-linear-gradient(115deg, var(--gold) 0 7px, #ffd978 7px 11px); }
+#cores .sh i { background: var(--shield); }
+#cores .core.hurt .letter { animation: pulse .4s ease-out; }
+#cores .core.down { opacity: .35; }
+@keyframes pulse { 0% { transform: scale(1.5); box-shadow: 0 0 18px var(--red); } 100% { transform: scale(1); } }
+
+#wavebar { top: 12px; }
+#wave { display: inline-block; font-weight: 800; font-size: 20px; letter-spacing: 1px; background: var(--gold); color: #20242e;
+  padding: 4px 16px; border-radius: 10px; border: 3px dashed rgba(32,36,46,.35); text-shadow: none; }
+#phase { margin-top: 6px; font-size: 15px; }
+#phase b { color: var(--gold); }
+
+.bottom-center { left: 50%; bottom: 18px; transform: translateX(-50%); text-align: center; }
+#padhint { font-size: 14px; margin-bottom: 6px; min-height: 18px; }
+#deck { display: flex; gap: 8px; justify-content: center; }
+#deck .card { width: 92px; padding: 6px 6px 5px; border-radius: 12px; background: rgba(44,50,64,.85);
+  border: 2px dashed rgba(243,236,221,.35); font-size: 12px; line-height: 1.25; }
+#deck .card .key { font-weight: 800; color: var(--gold); }
+#deck .card .cost { color: var(--muted); }
+#deck .card.poor { opacity: .45; }
+#deck .card.flash { border-color: var(--lime); }
+
+#buttons { font-size: 22px; font-weight: 800; margin-bottom: 8px; color: var(--gold); }
+#buttons small { font-size: 12px; color: var(--muted); font-weight: 600; letter-spacing: 1px; }
+
+#slots { display: flex; gap: 6px; justify-content: flex-end; margin-bottom: 4px; }
+#slots span { font-size: 12px; padding: 2px 8px; border-radius: 8px; background: rgba(0,0,0,.35); color: var(--muted); }
+#slots span.on { background: var(--lime); color: #20242e; font-weight: 800; }
+
+.status { left: 50%; top: 38%; transform: translateX(-50%); font-size: 20px; text-align: center; pointer-events: auto; }
+.status a { color: var(--gold); }
+
+#banner { left: 50%; top: 24%; transform: translate(-50%, -50%) rotate(-2deg); font-size: clamp(22px, 4.5vw, 46px); font-weight: 900;
+  letter-spacing: 1px; background: var(--gold); color: #20242e; padding: 6px 28px; border-radius: 8px; text-shadow: none;
+  border: 4px dashed rgba(32,36,46,.35); box-shadow: 0 6px 0 rgba(0,0,0,.35); opacity: 0; transition: opacity .25s; white-space: nowrap; }
+#banner.show { opacity: 1; animation: bannerIn .45s cubic-bezier(.2,1.6,.4,1); }
+#banner.bad { background: var(--red); color: var(--ink); }
+#banner.good { background: var(--lime); }
+@keyframes bannerIn { from { transform: translate(-50%, -50%) rotate(-2deg) scale(.4); } }
+
+#popups { inset: 0; }
+#popups div { position: absolute; font-weight: 800; font-size: 16px; color: var(--gold); animation: floatUp .9s ease-out forwards; }
+@keyframes floatUp { to { transform: translateY(-40px); opacity: 0; } }
+
+@media (max-width: 700px) {
+  #deck .card { width: 74px; font-size: 11px; }
+  .net { display: none; }
+}

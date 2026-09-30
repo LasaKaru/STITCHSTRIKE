@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Stitchstrike Arena</title>
+    <title>Stitchstrike</title>
     <link rel="stylesheet" href="/src/style.css" />
     <link rel="stylesheet" href="/src/arena.css" />
   </head>
@@ -13,16 +13,30 @@
     <div id="hitmarker"></div>
     <div id="damage"></div>
 
+    <!-- Co-op HUD -->
+    <div class="hud top-left coop-only" id="cores"></div>
+    <div class="hud top-center" id="wavebar">
+      <div id="wave"></div>
+      <div id="phase"></div>
+    </div>
+    <div class="hud bottom-center coop-only">
+      <div id="padhint"></div>
+      <div id="deck"></div>
+    </div>
+    <div id="banner" class="hud"></div>
+    <div id="popups" class="hud"></div>
+
     <div class="hud bottom-left">
+      <div id="buttons" class="coop-only"></div>
       <div class="yarnbar"><div id="health-fill"></div></div>
       <div id="health-text"></div>
     </div>
     <div class="hud bottom-right">
-      <div class="weapon">Pom-Pom Popper</div>
+      <div id="slots"></div>
       <div id="ammo"></div>
     </div>
     <div class="hud top-right"><div id="score"></div><div id="feed"></div></div>
-    <div class="hud top-center" id="status"></div>
+    <div class="hud status" id="status"></div>
     <div class="hud net" id="net"></div>
     <div class="hud netpanel hidden" id="netpanel"></div>
     <div id="scoreboard" class="hidden"></div>
@@ -30,16 +44,17 @@
     <div id="overlay">
       <div class="card">
         <h1>STITCHSTRIKE</h1>
-        <p class="sub">Phase 0 · networked grey-box arena</p>
+        <p class="sub" id="modeline">Co-op defence · protect the Heartspools</p>
         <p class="go">Click to play</p>
         <table class="keys">
           <tr><td>WASD</td><td>move</td><td>Mouse</td><td>look / fire</td></tr>
           <tr><td>Space</td><td>jump (×2)</td><td>Shift</td><td>sprint</td></tr>
-          <tr><td>C</td><td>crouch</td><td>R</td><td>reload</td></tr>
+          <tr><td>1 / 2</td><td>Popper / Buster</td><td>R</td><td>reload</td></tr>
+          <tr class="coop-only"><td>3 4 5</td><td>build on pad</td><td>G</td><td>recycle</td></tr>
+          <tr class="coop-only"><td>Enter</td><td>ready up</td><td>C</td><td>crouch</td></tr>
           <tr><td>V</td><td>1st / 3rd person</td><td>Tab</td><td>scores</td></tr>
-          <tr><td>F3</td><td>net stats</td><td>Esc</td><td>release mouse</td></tr>
         </table>
-        <p class="hint"><a href="/">← back</a></p>
+        <p class="hint"><a href="/">← menu</a></p>
       </div>
     </div>
     <script type="module" src="/src/arena-main.ts"></script>

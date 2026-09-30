@@ -17,6 +17,12 @@
       a.card:hover { transform: translateY(-3px) rotate(-.4deg); border-color: var(--gold); }
       a.card h2 { margin: 0 0 6px; font-size: 22px; }
       a.card p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.4; }
+      a.card p a { color: var(--gold); }
+      a.card.hero { grid-column: 1 / -1; border-color: var(--gold); }
+      #join { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      #join input, #join select, #join button { font: inherit; padding: 10px 12px; border-radius: 10px; border: 2px dashed rgba(243,236,221,.35);
+        background: var(--panel); color: var(--ink); min-width: 0; flex: 1 1 140px; }
+      #join button { background: var(--gold); color: #20242e; font-weight: 800; flex: 0 0 auto; cursor: pointer; }
       .tag { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 99px; margin-bottom: 10px; background: var(--denim); }
       footer { margin-top: 36px; color: var(--muted); font-size: 14px; line-height: 1.5; }
       code { background: rgba(0,0,0,.3); padding: 1px 5px; border-radius: 4px; }
@@ -25,27 +31,38 @@
   <body>
     <main>
       <h1>STITCHSTRIKE</h1>
-      <p class="hook">Soft toys. Hard fights. — Phase 0 prototypes</p>
+      <p class="hook">Soft toys. Hard fights. Everything here is wool.</p>
       <div class="cards">
-        <a class="card" href="/wool.html">
-          <span class="tag">Phase 0 (a)</span>
-          <h2>Wool lookdev</h2>
-          <p>Pip, a crocheted seal, in a bedroom corner under a sunbeam. Toggle every layer of the wool shader live.</p>
+        <a class="card hero" href="/arena.html?mode=coop">
+          <span class="tag">Co-op · 1–4 players</span>
+          <h2>Defend the Heartspools</h2>
+          <p>Build turrets, pin walls and tangle mats on stitched pads, then hold off 5 waves of knitted Grunts, Scuttlers, Moths and Felted Brutes. Online room <code>LOBBY</code>; bots fill empty slots.</p>
         </a>
-        <a class="card" href="/arena.html">
-          <span class="tag">Phase 0 (b)</span>
-          <h2>Networked arena</h2>
-          <p>Grey-box Sunbeam Bedroom. Authoritative server, prediction, interpolation, lag-compensated shooting, bots.</p>
-        </a>
-        <a class="card" href="/arena.html?solo=1">
+        <a class="card" href="/arena.html?mode=coop&solo=1">
           <span class="tag">Solo</span>
-          <h2>Arena vs bots (no server)</h2>
-          <p>The same server code running in a Web Worker in your browser (plan §17.6).</p>
+          <h2>Co-op with bots</h2>
+          <p>No server needed: the real game server runs inside your browser, with 3 bot teammates who fight and build.</p>
+        </a>
+        <a class="card" href="/arena.html?mode=pvp">
+          <span class="tag">PvP · up to 8</span>
+          <h2>Free-for-All</h2>
+          <p>Pom-Pom Popper and Button Buster in the knitted bedroom. Lag-compensated hits; bots fill the lobby.</p>
+        </a>
+        <a class="card" href="/wool.html">
+          <span class="tag">Lookdev</span>
+          <h2>Wool shader</h2>
+          <p>Pip the crocheted seal under a sunbeam. Toggle every layer of the wool material live.</p>
         </a>
       </div>
+      <form id="join" onsubmit="event.preventDefault(); const r = this.room.value.trim().toUpperCase() || 'LOBBY'; location.href = `/arena.html?mode=${this.mode.value}&room=${encodeURIComponent(r)}&name=${encodeURIComponent(this.nick.value)}`;">
+        <input name="nick" placeholder="Your toy's name" maxlength="16" />
+        <input name="room" placeholder="Room code (share it)" maxlength="8" />
+        <select name="mode"><option value="coop">Co-op</option><option value="pvp">PvP</option></select>
+        <button>Join room</button>
+      </form>
       <footer>
-        Arena options: <code>?room=ABCD</code> private room · <code>?lag=150</code> fake round-trip lag ·
-        <code>?bots=0..7</code> bot fill · <code>?name=Pip</code>.<br />
+        Game options: <code>?mode=coop|pvp</code> · <code>?room=ABCD</code> · <code>?solo=1</code> · <code>?bots=0..7</code> ·
+        <code>?lag=150</code> fake round-trip lag · <code>?quality=low|medium|high</code> · PvP vs bots offline: <a href="/arena.html?mode=pvp&solo=1" style="color:var(--gold)">here</a>.<br />
         Full design: <code>docs/BUILD_PLAN.md</code>
       </footer>
     </main>

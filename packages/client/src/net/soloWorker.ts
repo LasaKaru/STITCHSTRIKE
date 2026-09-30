@@ -6,10 +6,10 @@ declare const self: DedicatedWorkerGlobalScope;
 
 let handlers: ReturnType<RoomHost['connect']> | null = null;
 
-self.onmessage = (e: MessageEvent<string | Uint8Array | { init: true; fillTo: number }>) => {
+self.onmessage = (e: MessageEvent<string | Uint8Array | { init: true; fillTo: number; mode: 'coop' | 'pvp' }>) => {
   const d = e.data;
   if (typeof d === 'object' && !(d instanceof Uint8Array) && 'init' in d) {
-    const host = new RoomHost({ code: 'SOLO', fillTo: d.fillTo });
+    const host = new RoomHost({ code: 'SOLO', fillTo: d.fillTo, mode: d.mode });
     handlers = host.connect({
       send: (frame) => self.postMessage(frame),
       close: () => self.close(),

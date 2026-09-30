@@ -1,4 +1,5 @@
-import { INPUT_DT, JUMP_VELOCITY, PLAYER, POPPER } from './constants.ts';
+import { INPUT_DT, JUMP_VELOCITY, PLAYER } from './constants.ts';
+import { SWITCH_SECONDS, WEAPONS } from './weapons.ts';
 import type { Box, Vec3, World } from './world.ts';
 
 export const Buttons = {
@@ -11,6 +12,16 @@ export const Buttons = {
   Crouch: 1 << 6,
   Fire: 1 << 7,
   Reload: 1 << 8,
+  Weapon1: 1 << 9,
+  Weapon2: 1 << 10,
+  /** Co-op: build card 1/2/3 on the nearest empty build pad. */
+  Build1: 1 << 11,
+  Build2: 1 << 12,
+  Build3: 1 << 13,
+  /** Co-op: recycle the buildable on the nearest pad for half its cost. */
+  Sell: 1 << 14,
+  /** Co-op: vote to skip the rest of the build phase. */
+  Ready: 1 << 15,
 } as const;
 
 export interface InputCmd {
@@ -38,7 +49,12 @@ export interface PlayerState {
   /** Buttons from the previous command, for edge-triggered actions. */
   buttons: number;
   cooldown: number;
+  /** Equipped weapon index into WEAPONS. */
+  weapon: number;
+  /** Magazine of the Pom-Pom Popper. */
   ammo: number;
+  /** Magazine of the Button Buster. */
+  ammoB: number;
   reload: number;
 }
 
@@ -51,7 +67,9 @@ export function createPlayerState(spawn: Vec3, yaw = 0): PlayerState {
     airJumps: 1,
     buttons: 0,
     cooldown: 0,
-    ammo: POPPER.magazine,
+    weapon: 0,
+    ammo: WEAPONS[0].magazine,
+    ammoB: WEAPONS[1].magazine,
     reload: 0,
   };
 }
@@ -123,6 +141,8 @@ function moveHorizontal(s: PlayerState, dx: number, dz: number, boxes: Box[], ca
 
 export interface StepResult {
   fired: boolean;
+  /** Weapon index that fired (valid when fired). */
+  weapon: number;
 }
 
 /**
@@ -192,29 +212,47 @@ export function stepPlayer(s: PlayerState, cmd: InputCmd, world: World): StepRes
     s.y = 0; s.vy = 0;
   }
 
+  const weapon = s.weapon;
   const fired = stepWeapon(s, b, pressed, dt);
   s.buttons = b;
-  return { fired };
+  return { fired, weapon };
+}
+
+function magazine(s: PlayerState): number {
+  return s.weapon === 0 ? s.ammo : s.ammoB;
+}
+
+function setMagazine(s: PlayerState, v: number): void {
+  if (s.weapon === 0) s.ammo = v;
+  else s.ammoB = v;
 }
 
 function stepWeapon(s: PlayerState, b: number, pressed: number, dt: number): boolean {
   s.cooldown = Math.max(0, s.cooldown - dt);
+  const want = pressed & Buttons.Weapon1 ? 0 : pressed & Buttons.Weapon2 ? 1 : s.weapon;
+  if (want !== s.weapon) {
+    s.weapon = want;
+    s.reload = 0;
+    s.cooldown = Math.max(s.cooldown, SWITCH_SECONDS);
+    return false;
+  }
+  const w = WEAPONS[s.weapon];
   if (s.reload > 0) {
     s.reload -= dt;
     if (s.reload <= 0) {
       s.reload = 0;
-      s.ammo = POPPER.magazine;
+      setMagazine(s, w.magazine);
     }
     return false;
   }
-  if ((pressed & Buttons.Reload) && s.ammo < POPPER.magazine) {
-    s.reload = POPPER.reloadSeconds;
+  if ((pressed & Buttons.Reload) && magazine(s) < w.magazine) {
+    s.reload = w.reloadSeconds;
     return false;
   }
-  if ((b & Buttons.Fire) && s.cooldown <= 1e-9 && s.ammo > 0) {
-    s.ammo -= 1;
-    s.cooldown = Math.max(0, s.cooldown) + 1 / POPPER.fireRate;
-    if (s.ammo === 0) s.reload = POPPER.reloadSeconds;
+  if ((b & Buttons.Fire) && s.cooldown <= 1e-9 && magazine(s) > 0) {
+    setMagazine(s, magazine(s) - 1);
+    s.cooldown = Math.max(0, s.cooldown) + 1 / w.fireRate;
+    if (magazine(s) === 0) s.reload = w.reloadSeconds;
     return true;
   }
   return false;

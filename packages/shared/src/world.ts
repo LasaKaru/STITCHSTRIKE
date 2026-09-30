@@ -6,6 +6,8 @@ export interface Box {
   /** Render hint only; collision treats every box the same. */
   kind: 'floor' | 'wall' | 'furniture' | 'prop' | 'shelf';
   color?: number;
+  /** Render hint only: draw as something softer than a box. */
+  shape?: 'beanbag' | 'books' | 'bed';
 }
 
 export interface World {
@@ -14,6 +16,50 @@ export interface World {
   spawns: Vec3[];
   /** Bot navigation waypoints at floor level or on reachable tops. */
   waypoints: Vec3[];
+  coop: CoopLayout;
+}
+
+export interface BuildPad {
+  pos: Vec3;
+  /** Index of the Heartspool this pad protects (colour-coded in the client). */
+  core: number;
+}
+
+/** Co-op defence layout (plan §9, §11): Heartspools, stitched build pads, enemy burrows. */
+export interface CoopLayout {
+  cores: Vec3[];
+  pads: BuildPad[];
+  enemySpawns: Vec3[];
+  playerSpawns: Vec3[];
+}
+
+/** Circle (in XZ) vs every floor-level box. */
+export function circleClear(boxes: Box[], x: number, z: number, r: number, maxY = 1.2): boolean {
+  for (const b of boxes) {
+    if (b.kind === 'floor' || b.min[1] > maxY || b.max[1] < 0.05) continue;
+    const cx = Math.max(b.min[0], Math.min(x, b.max[0]));
+    const cz = Math.max(b.min[2], Math.min(z, b.max[2]));
+    if ((x - cx) ** 2 + (z - cz) ** 2 < r * r) return false;
+  }
+  return true;
+}
+
+function ringPads(boxes: Box[], cores: Vec3[], perCore: number, radius: number): BuildPad[] {
+  const pads: BuildPad[] = [];
+  cores.forEach((c, ci) => {
+    let placed = 0;
+    for (let k = 0; k < 16 && placed < perCore; k++) {
+      const a = (k / 16) * Math.PI * 2 * 3 + ci; // stride around the ring to spread pads out
+      const x = c[0] + Math.cos(a) * radius;
+      const z = c[2] + Math.sin(a) * radius;
+      if (!circleClear(boxes, x, z, 1.3)) continue;
+      if (cores.some((o) => Math.hypot(o[0] - x, o[2] - z) < 2.2)) continue;
+      if (pads.some((p) => Math.hypot(p.pos[0] - x, p.pos[2] - z) < 2.6)) continue;
+      pads.push({ pos: [x, 0, z], core: ci });
+      placed++;
+    }
+  });
+  return pads;
 }
 
 function box(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, kind: Box['kind'], color?: number): Box {
@@ -25,7 +71,7 @@ function steps(x: number, z0: number, z1: number, count: number, rise: number, r
   const out: Box[] = [];
   for (let i = 0; i < count; i++) {
     const xa = x + dir * i * run;
-    out.push(box(xa, 0, z0, xa + dir * run, rise * (count - i), z1, 'prop', color));
+    out.push({ ...box(xa, 0, z0, xa + dir * run, rise * (count - i), z1, 'prop', color), shape: 'books' });
   }
   return out;
 }
@@ -47,7 +93,7 @@ export function createBedroom(): World {
     box(W, 0, -D, W + T, H, D, 'wall', 0x66728c),
 
     // Bed along the back wall: mattress top at 5 u.
-    box(-W, 0, -D, -W + 11, 5, -D + 18, 'furniture', 0x7d8fbf),
+    { ...box(-W, 0, -D, -W + 11, 5, -D + 18, 'furniture', 0x3a5da8), shape: 'bed' },
     box(-W, 5, -D, -W + 11, 9, -D + 1.2, 'furniture', 0x6a5a4a),
 
     // Desk (top at 7.5) with legs, and a chair seat at 4.5.
@@ -68,7 +114,7 @@ export function createBedroom(): World {
     box(W - 4, 0, 12, W, 16, 12.6, 'shelf', 0x9a7a55),
 
     // Bean bag (soft high ground) and toy clutter used as cover.
-    box(-6, 0, 6, 0, 3, 12, 'prop', 0x8bcb3a),
+    { ...box(-6, 0, 6, 0, 3, 12, 'prop', 0x8bcb3a), shape: 'beanbag' },
     box(-2, 0, -4, 1, 2, -1, 'prop', 0xe8742a),
     box(4, 0, 2, 6, 2.6, 4, 'prop', 0x2f7fe0),
     box(-12, 0, 6, -9, 1.2, 9, 'prop', 0xd8262e),
@@ -99,5 +145,14 @@ export function createBedroom(): World {
     [-14, 0, 13], [-15, 5, -10], [16, 0, 0], [3, 0, -12], [-8, 0, -3], [17, 0, 8],
   ];
 
-  return { name: 'Sunbeam Bedroom (grey-box)', boxes, spawns, waypoints };
+  const cores: Vec3[] = [[-6, 0, -7], [2, 0, 3.5], [8, 0, -5]];
+  const coop: CoopLayout = {
+    cores,
+    pads: ringPads(boxes, cores, 5, 3.4),
+    // Burrows: under the desk, the doorway, the dark corner behind the toy box.
+    enemySpawns: [[14, 0, -14], [13, 0, 16], [-17, 0, 14]],
+    playerSpawns: [[-1, 0, 0.5], [-3.5, 0, 1.5], [5, 0, 0], [4, 0, 8], [-8, 0, 2], [10, 0, 2]],
+  };
+
+  return { name: 'Sunbeam Bedroom', boxes, spawns, waypoints, coop };
 }

@@ -17,6 +17,8 @@ export const INPUTS_PER_PACKET = 2;
 
 /** Remote entities are drawn this far in the past, interpolating between snapshots. */
 export const INTERP_DELAY_MS = 100;
+/** Enemies arrive at 10 Hz, so they are drawn a little further back. */
+export const ENEMY_INTERP_DELAY_MS = 160;
 /** Server keeps this much position history for lag compensation. */
 export const HISTORY_MS = 1000;
 /** Hitscan rewind is capped at this age. */
@@ -44,7 +46,7 @@ export const PLAYER = {
 
 export const JUMP_VELOCITY = Math.sqrt(2 * PLAYER.gravity * PLAYER.jumpHeight);
 
-/** Phase 0 has one weapon: the Pom-Pom Popper, simplified to hitscan. */
+/** @deprecated use WEAPONS[0]; kept for the PvP HUD and older tests. */
 export const POPPER = {
   damage: 9,
   headshotMultiplier: 1.5,

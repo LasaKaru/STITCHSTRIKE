@@ -1,6 +1,6 @@
 import { Bot } from './bots.ts';
 import { isSnapshotTick, MAX_PLAYERS, TICK_RATE } from './constants.ts';
-import { decodeInputs, encodeSnapshot, type ClientText, type ServerText } from './protocol.ts';
+import { decodeInputs, encodeSnapshot, type ClientText, type GameMode, type ServerText } from './protocol.ts';
 import { Room } from './room.ts';
 import { createBedroom } from './world.ts';
 
@@ -15,6 +15,7 @@ export interface HostOptions {
   code: string;
   /** Bots are added until humans + bots reach this count. */
   fillTo: number;
+  mode?: GameMode;
 }
 
 /**
@@ -23,14 +24,16 @@ export interface HostOptions {
  * Node server and by the solo Web Worker.
  */
 export class RoomHost {
-  readonly room = new Room(createBedroom());
+  readonly room: Room;
   private conns = new Map<number, Connection>();
   private bots = new Map<number, Bot>();
   private timer: ReturnType<typeof setInterval> | null = null;
   private lastTime = 0;
   private acc = 0;
+  private snapshots = 0;
 
   constructor(readonly options: HostOptions) {
+    this.room = new Room(createBedroom(), options.mode ?? 'coop');
     this.balanceBots();
   }
 
@@ -57,7 +60,7 @@ export class RoomHost {
             if (!p) { this.sendText(conn, { t: 'full' }); conn.close(); return; }
             id = p.id;
             this.conns.set(id, conn);
-            this.sendText(conn, { t: 'welcome', id, tick: this.room.tick, room: this.options.code });
+            this.sendText(conn, { t: 'welcome', id, tick: this.room.tick, room: this.options.code, mode: this.room.mode });
             this.broadcastRoster();
           } else if (msg.t === 'ping') {
             this.sendText(conn, { t: 'pong', c: msg.c, tick: this.room.tick });
@@ -104,8 +107,11 @@ export class RoomHost {
   private broadcastState(): void {
     const players = this.room.netPlayers();
     const shots = this.room.drainShots();
+    // Enemy positions go out at half the snapshot rate (10 Hz); clients interpolate them further in the past.
+    this.snapshots += 1;
+    const coop = this.room.coopState(this.snapshots % 2 === 0);
     for (const [id, conn] of this.conns) {
-      conn.send(encodeSnapshot(this.room.snapshotFor(id, players, shots)));
+      conn.send(encodeSnapshot(this.room.snapshotFor(id, players, shots, coop)));
     }
     const list = this.room.drainEvents();
     if (list.length > 0) this.broadcastText({ t: 'events', tick: this.room.tick, list });

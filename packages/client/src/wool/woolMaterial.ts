@@ -58,6 +58,11 @@ export interface WoolOptions {
   pattern: StitchPattern;
   /** Approximate surface size in world units along the U and V directions of the mesh UVs. */
   uvSize: [number, number];
+  /**
+   * World-space planar mapping picked by the dominant normal axis, for big
+   * static geometry without meaningful UVs (walls, furniture). uvSize is ignored.
+   */
+  triplanar?: boolean;
   /** Multiplier on the global stitch density (e.g. 1.4 for finer yarn). */
   gauge?: number;
   /** Multiplier on fuzz length (felt and mohair are fuzzier). */
@@ -137,6 +142,19 @@ function patchShader(shader: THREE.WebGLProgramParametersWithUniforms, data: Woo
 	transformed.y -= woolLen * 0.35 * vWoolShellT * vWoolShellT;`);
   } else {
     vs = vs.replace('#include <begin_vertex>', '#include <begin_vertex>\n\tvWoolShellT = 0.0;');
+  }
+  if (options.triplanar) {
+    vs = vs.replace('#include <begin_vertex>', /* glsl */ `#include <begin_vertex>
+	{
+		vec3 woolWp = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;
+		vec3 woolWn = abs( normalize( mat3( modelMatrix ) * objectNormal ) );
+		vec2 woolPlane = woolWn.x > woolWn.y && woolWn.x > woolWn.z ? woolWp.zy : ( woolWn.y > woolWn.z ? woolWp.xz : woolWp.xy );
+		vWoolUv = woolPlane * uWoolRepeat;
+		#ifdef USE_NORMALMAP
+			// Derivative-based tangent frames follow this UV, so stitches stay upright on every face.
+			vNormalMapUv = vWoolUv;
+		#endif
+	}`);
   }
   vs = vs.replace('#include <project_vertex>', '#include <project_vertex>\n\tvWoolWorldPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;');
   shader.vertexShader = vs;
@@ -223,10 +241,13 @@ let currentLayers: WoolLayers = { ...QUALITY_LAYERS.high };
 export function createWoolMaterial(options: WoolOptions, shell = false): THREE.MeshPhysicalMaterial {
   const maps = getStitchMaps(options.pattern);
   const gauge = (options.gauge ?? 1) * woolParams.density;
-  const repeat = new THREE.Vector2(
-    Math.max(1, Math.round((options.uvSize[0] * gauge) / maps.cols)),
-    Math.max(1, Math.round((options.uvSize[1] * gauge) / maps.rows)),
-  );
+  // Triplanar: repeat is tiles per world unit. UV-mapped: whole tiles across the part so seams wrap.
+  const repeat = options.triplanar
+    ? new THREE.Vector2(gauge / maps.cols, gauge / maps.rows)
+    : new THREE.Vector2(
+      Math.max(1, Math.round((options.uvSize[0] * gauge) / maps.cols)),
+      Math.max(1, Math.round((options.uvSize[1] * gauge) / maps.rows)),
+    );
   const normalMap = maps.normal.clone();
   normalMap.repeat.copy(repeat);
   const color = new THREE.Color(options.color);
@@ -246,7 +267,7 @@ export function createWoolMaterial(options: WoolOptions, shell = false): THREE.M
     patchShader(shader, data, mat);
     syncLayerUniforms(mat);
   };
-  mat.customProgramCacheKey = () => (shell ? 'wool-shell' : 'wool');
+  mat.customProgramCacheKey = () => `wool${shell ? '-shell' : ''}${options.triplanar ? '-tri' : ''}`;
   all.add(mat);
   applyLayers(mat, currentLayers);
   return mat;

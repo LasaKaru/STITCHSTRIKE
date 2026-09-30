@@ -1,7 +1,8 @@
 import {
-  clonePlayerState, decodeSnapshot, encodeInputs, INPUT_DT, INPUTS_PER_PACKET, INTERP_DELAY_MS, MSG_SNAPSHOT,
+  clonePlayerState, decodeSnapshot, encodeInputs, ENEMY_INTERP_DELAY_MS, INPUT_DT, INPUTS_PER_PACKET, INTERP_DELAY_MS, MSG_SNAPSHOT,
   stepPlayer, TICK_RATE,
-  type GameEvent, type InputCmd, type NetPlayer, type PlayerState, type RosterEntry, type ServerText, type Shot, type Snapshot, type World,
+  type CoopState, type GameEvent, type GameMode, type InputCmd, type NetEnemy, type NetPlayer, type PlayerState, type RosterEntry,
+  type ServerText, type Shot, type Snapshot, type World,
 } from '@stitchstrike/shared';
 import type { Frame, Transport } from './transport.ts';
 
@@ -14,6 +15,13 @@ import type { Frame, Transport } from './transport.ts';
  */
 
 interface Buffered { snap: Snapshot; players: Map<number, NetPlayer> }
+interface EnemyFrame { tick: number; enemies: Map<number, NetEnemy> }
+
+export interface EnemySample extends NetEnemy {
+  /** Heading from recent motion. */
+  vx: number;
+  vz: number;
+}
 
 export interface RemoteView {
   id: number;
@@ -37,6 +45,9 @@ const TICK_MS = 1000 / TICK_RATE;
 export class NetClient {
   id = 0;
   room = '';
+  mode: GameMode = 'coop';
+  /** Latest co-op state (phase, wave, cores, pads). Enemies come from enemySamples(). */
+  coop: CoopState | null = null;
   roster = new Map<number, RosterEntry>();
   /** Predicted local state; null while unravelled (dead). */
   predicted: PlayerState | null = null;
@@ -53,11 +64,14 @@ export class NetClient {
   onEvent: (e: GameEvent) => void = () => {};
   onRoster: () => void = () => {};
   onSpawn: (s: PlayerState) => void = () => {};
+  /** An enemy dropped out of the snapshot stream (unravelled or cleared). */
+  onEnemyGone: (e: NetEnemy) => void = () => {};
 
   private seq = 0;
   private pending: InputCmd[] = [];
   private outbox: InputCmd[] = [];
   private buffer: Buffered[] = [];
+  private enemyFrames: EnemyFrame[] = [];
   /** serverTick ~= localMs * TICK_RATE / 1000 + tickOffset */
   private tickOffset: number | null = null;
   private stats: NetStats;
@@ -91,9 +105,57 @@ export class NetClient {
     return (now * TICK_RATE) / 1000 + (this.tickOffset ?? 0);
   }
 
-  /** The (fractional) server tick remote players are drawn at. Sent with inputs for lag compensation. */
+  /** The (fractional) server tick remote players are drawn at. */
   renderTick(now = performance.now()): number {
     return this.serverTickNow(now) - (INTERP_DELAY_MS * TICK_RATE) / 1000;
+  }
+
+  /** The tick enemies are drawn at (further back: they arrive at 10 Hz). */
+  enemyRenderTick(now = performance.now()): number {
+    return this.serverTickNow(now) - (ENEMY_INTERP_DELAY_MS * TICK_RATE) / 1000;
+  }
+
+  /** Stamp sent with inputs for lag compensation: whatever this mode's targets are drawn at. */
+  private aimTick(now: number): number {
+    return this.mode === 'coop' ? this.enemyRenderTick(now) : this.renderTick(now);
+  }
+
+  private pushEnemies(tick: number, list: NetEnemy[]): void {
+    const map = new Map(list.map((e) => [e.id, e]));
+    const prev = this.enemyFrames[this.enemyFrames.length - 1];
+    if (prev) for (const [id, e] of prev.enemies) if (!map.has(id)) this.onEnemyGone(e);
+    this.enemyFrames.push({ tick, enemies: map });
+    while (this.enemyFrames.length > 12) this.enemyFrames.shift();
+  }
+
+  /** Enemies interpolated at enemyRenderTick. */
+  enemySamples(now = performance.now()): EnemySample[] {
+    const f = this.enemyFrames;
+    if (f.length === 0) return [];
+    const rt = this.enemyRenderTick(now);
+    let a = f[0];
+    let b = f[f.length - 1];
+    for (let i = f.length - 1; i >= 0; i--) {
+      if (f[i].tick <= rt) { a = f[i]; b = f[Math.min(f.length - 1, i + 1)]; break; }
+    }
+    const span = b.tick - a.tick;
+    const k = span > 0 ? Math.max(0, Math.min(1, (rt - a.tick) / span)) : 0;
+    const out: EnemySample[] = [];
+    // Draw what the newer frame says exists; enemies new in it pop in at their first position.
+    for (const [id, eb] of b.enemies) {
+      const ea = a.enemies.get(id) ?? eb;
+      if (!a.enemies.has(id) && k < 0.5) continue;
+      const g = a.enemies.has(id) ? k : 1;
+      out.push({
+        id, type: eb.type,
+        x: ea.x + (eb.x - ea.x) * g, y: ea.y + (eb.y - ea.y) * g, z: ea.z + (eb.z - ea.z) * g,
+        health: g < 0.5 ? ea.health : eb.health,
+        vx: eb.x - ea.x, vz: eb.z - ea.z,
+      });
+    }
+    // Enemies gone in the newer frame linger until the render time reaches it.
+    if (k < 1) for (const [id, ea] of a.enemies) if (!b.enemies.has(id)) out.push({ ...ea, vx: 0, vz: 0 });
+    return out;
   }
 
   private observeTick(tick: number, now: number): void {
@@ -119,6 +181,7 @@ export class NetClient {
         case 'welcome':
           this.id = msg.id;
           this.room = msg.room;
+          this.mode = msg.mode;
           this.status = 'joined';
           break;
         case 'roster':
@@ -147,6 +210,10 @@ export class NetClient {
     this.buffer.push({ snap, players: new Map(snap.players.map((p) => [p.id, p])) });
     while (this.buffer.length > 30) this.buffer.shift();
     for (const s of snap.shots) this.onShot(s);
+    if (snap.coop) {
+      this.coop = snap.coop;
+      if (snap.coop.enemies) this.pushEnemies(snap.tick, snap.coop.enemies);
+    }
     this.reconcile(snap);
   }
 
@@ -191,26 +258,29 @@ export class NetClient {
 
   /**
    * Produces one fixed-step input, predicts it locally, and queues it for the server.
-   * Returns true if the local weapon fired this step.
+   * Reports whether the local weapon fired this step, which weapon, and the input seq (pellet seed).
    */
-  input(buttons: number, yaw: number, pitch: number, now: number): boolean {
+  input(buttons: number, yaw: number, pitch: number, now: number): { fired: boolean; weapon: number; seq: number } {
     const cmd: InputCmd = {
       seq: ++this.seq,
       buttons,
       yaw: Math.fround(yaw),
       pitch: Math.fround(pitch),
-      renderTick: this.renderTick(now),
+      renderTick: this.aimTick(now),
     };
     let fired = false;
+    let weapon = this.predicted?.weapon ?? 0;
     if (this.predicted) {
       this.previous = clonePlayerState(this.predicted);
-      fired = stepPlayer(this.predicted, cmd, this.world).fired;
+      const r = stepPlayer(this.predicted, cmd, this.world);
+      fired = r.fired;
+      weapon = r.weapon;
     }
     this.pending.push(cmd);
     if (this.pending.length > MAX_PENDING) this.pending.shift();
     this.outbox.push(cmd);
     if (this.outbox.length >= INPUTS_PER_PACKET) this.flush();
-    return fired;
+    return { fired, weapon, seq: cmd.seq };
   }
 
   flush(): void {

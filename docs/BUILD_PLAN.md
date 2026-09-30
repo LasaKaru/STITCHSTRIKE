@@ -3,7 +3,9 @@
 **A browser-based multiplayer toy shooter where hand-knitted wool toys defend a child's room.**
 Built with Three.js, same web-first approach as the Foldline watercolour project.
 
-Version 1.0 · 30 Sep 2026
+Version 1.1 · 30 Sep 2026
+
+> **Direction update (v1.1):** after studying the reference trailer frame by frame, the art direction is now **all wool**. Heroes, enemies and the environment are all knitted, crocheted or felted. The "wool vs plastic" contrast in §1, §10 and §13 becomes **handmade wool vs cheap mass-knit acrylic**: enemies are scratchy, harsh-coloured acrylic knits with glowing button eyes, plus the wool-eating Moths. Hard accessories (buttons, pins, wooden spools) stay as small accents. See the README for what is implemented.
 
 ---
 

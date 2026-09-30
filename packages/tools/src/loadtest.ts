@@ -2,7 +2,7 @@
  * Headless load tester: connects N fake clients that run around and fire,
  * then reports downstream bandwidth per client and snapshot rate.
  *
- *   pnpm loadtest -- --url ws://localhost:8787 --clients 4 --seconds 10
+ *   pnpm loadtest -- --url ws://localhost:8787 --clients 4 --seconds 10 [--mode coop|pvp] [--bots N]
  */
 import WebSocket from 'ws';
 import { Buttons, encodeInputs, INPUT_RATE, INPUTS_PER_PACKET, MSG_SNAPSHOT, type InputCmd } from '@stitchstrike/shared';
@@ -16,13 +16,15 @@ const url = arg('url', 'ws://localhost:8787');
 const clients = Number(arg('clients', '4'));
 const seconds = Number(arg('seconds', '10'));
 const room = arg('room', `LOAD${Math.floor(Math.random() * 1000)}`);
+const mode = arg('mode', 'coop');
+const bots = arg('bots', '0');
 
 interface Stats { bytes: number; snapshots: number; welcomed: boolean; first: number; last: number }
 
 function runClient(i: number): Promise<Stats> {
   return new Promise((resolve) => {
     const stats: Stats = { bytes: 0, snapshots: 0, welcomed: false, first: 0, last: 0 };
-    const ws = new WebSocket(`${url}/?room=${room}&bots=0`);
+    const ws = new WebSocket(`${url}/?room=${room}&bots=${bots}&mode=${mode}`);
     ws.binaryType = 'nodebuffer';
     let seq = 0;
     let yaw = Math.random() * Math.PI * 2;
@@ -32,7 +34,7 @@ function runClient(i: number): Promise<Stats> {
       const batch: InputCmd[] = [];
       timer = setInterval(() => {
         yaw += (Math.random() - 0.5) * 0.2;
-        const buttons = Buttons.Forward | Buttons.Fire | (Math.random() < 0.02 ? Buttons.Jump : 0);
+        const buttons = Buttons.Forward | Buttons.Fire | (Math.random() < 0.02 ? Buttons.Jump : 0) | (seq % 60 < 30 ? Buttons.Ready : 0);
         batch.push({ seq: ++seq, buttons, yaw: Math.fround(yaw), pitch: 0, renderTick: 0 });
         if (batch.length >= INPUTS_PER_PACKET) ws.send(encodeInputs(batch.splice(0)));
       }, 1000 / INPUT_RATE);
@@ -56,7 +58,7 @@ const welcomed = results.filter((r) => r.welcomed).length;
 const span = (r: Stats) => Math.max(0.001, (r.last - r.first) / 1000);
 const avgKbps = results.reduce((a, r) => a + (r.bytes * 8) / 1000 / span(r), 0) / Math.max(1, results.length);
 const avgRate = results.reduce((a, r) => a + (r.snapshots - 1) / span(r), 0) / Math.max(1, results.length);
-console.log(`room ${room}: ${welcomed}/${clients} clients joined`);
-console.log(`downstream per client: ${avgKbps.toFixed(1)} kbps (budget < 96 kbps PvP)`);
+console.log(`${mode} room ${room}: ${welcomed}/${clients} clients joined`);
+console.log(`downstream per client: ${avgKbps.toFixed(1)} kbps (budget: co-op < 64 kbps, PvP < 96 kbps)`);
 console.log(`snapshot rate: ${avgRate.toFixed(1)} Hz`);
 process.exit(welcomed === clients ? 0 : 1);

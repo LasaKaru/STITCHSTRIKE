@@ -113,8 +113,9 @@ describe('protocol', () => {
     self.vx = 0.123456789;
     const snap = {
       tick: 999, ack: 42, respawn: 0, self,
-      players: [{ id: 3, x: 1.2345, y: 2.5, z: -3.75, yaw: 1, pitch: -0.3, health: 73, alive: true, crouch: false, kos: 4, deaths: 2 }],
-      shots: [{ id: 3, hit: 5, head: true, to: [4, 1.3, -2] as [number, number, number] }],
+      players: [{ id: 3, x: 1.2345, y: 2.5, z: -3.75, yaw: 1, pitch: -0.3, health: 73, alive: true, crouch: false, weapon: 1, kos: 4, deaths: 2 }],
+      shots: [{ id: 3, hit: 5, head: true, enemy: false, to: [4, 1.3, -2] as [number, number, number] }],
+      coop: null,
     };
     const out = decodeSnapshot(encodeSnapshot(snap))!;
     expect(out.tick).toBe(999);
@@ -207,7 +208,7 @@ describe('room', () => {
 
 describe('host + client prediction', () => {
   it('a predicting client matches the server exactly with no loss', () => {
-    const host = new RoomHost({ code: 'TEST', fillTo: 0 });
+    const host = new RoomHost({ code: 'TEST', fillTo: 0, mode: 'pvp' });
     const received: (string | Uint8Array)[] = [];
     const conn: Connection = { send: (d) => received.push(d), close: () => {} };
     const h = host.connect(conn);
@@ -249,7 +250,7 @@ describe('host + client prediction', () => {
   });
 
   it('fills empty slots with bots and makes room for humans', () => {
-    const host = new RoomHost({ code: 'BOTS', fillTo: 4 });
+    const host = new RoomHost({ code: 'BOTS', fillTo: 4, mode: 'pvp' });
     expect(host.room.players.size).toBe(4);
     const h = host.connect({ send: () => {}, close: () => {} });
     h.onMessage(JSON.stringify({ t: 'hello', name: 'Human' }));

@@ -1,99 +1,122 @@
 # STITCHSTRIKE
 
-**Soft toys. Hard fights.** A browser multiplayer toy shooter where hand-knitted wool toys defend a child's room from mass-made plastic invaders. Built with Three.js and TypeScript.
+**Soft toys. Hard fights.** A browser multiplayer toy shooter where everything is wool: the heroes, the enemies and the whole room. Knitted toys defend glowing **Heartspools** from waves of mass-knit invaders in a giant crocheted bedroom. Built with Three.js and TypeScript, with a server-authoritative netcode.
 
-The full design lives in [`docs/BUILD_PLAN.md`](docs/BUILD_PLAN.md). This repository currently contains **Phase 0** from that plan (§20): the two riskiest prototypes, built side by side so they can be merged in week 4.
+![Knitted Grunts and Scuttlers rushing Heartspool B](docs/screenshots/coop-grunts.jpg)
 
-| Prototype | Page | What it proves |
+| The knitted bedroom | Sunlight through the knitted curtains | Pip, the crocheted hero (lookdev) |
 |---|---|---|
-| **0(a) Wool lookdev** | `/wool.html` | Pip, a crocheted seal, in a grey-box bedroom corner under a sunbeam through blinds. Every layer of the §13.3 wool shader can be toggled and tuned live. |
-| **0(b) Networked arena** | `/arena.html` | Grey-box Sunbeam Bedroom. Authoritative server, client prediction, reconciliation, interpolation and lag-compensated hitscan, with bots filling empty slots. |
-| **Solo** | `/arena.html?solo=1` | The same server code running in a Web Worker, so no server is needed (§17.6). |
+| ![](docs/screenshots/coop-overview.jpg) | ![](docs/screenshots/coop-window.jpg) | ![](docs/screenshots/lookdev-hero.jpg) |
+| **First person with the Pom-Pom Popper** | **PvP free-for-all** | **Close-up: shell fuzz + stray fibres** |
+| ![](docs/screenshots/coop-firstperson.jpg) | ![](docs/screenshots/pvp-bedroom.jpg) | ![](docs/screenshots/lookdev-closeup.jpg) |
 
-![Pip under the sunbeam (lookdev, High preset)](docs/screenshots/lookdev-hero.jpg)
+_Screenshots are headless renders with SwiftShader, so real GPUs look sharper._
 
-| Close-up (Ultra: shells + stray fibres) | Bedroom corner (wide) | Arena vs bots (solo worker) |
-|---|---|---|
-| ![](docs/screenshots/lookdev-closeup.jpg) | ![](docs/screenshots/lookdev-wide.jpg) | ![](docs/screenshots/arena-solo.jpg) |
-
-_Rendered headless with SwiftShader; stills from `?still=1`._
-
-## Quick start
+## Play
 
 ```bash
 pnpm install
 pnpm dev          # game server on :8787 + Vite on :5173 (the /ws path is proxied to the server)
 ```
 
-Open http://localhost:5173. Other scripts:
+Open http://localhost:5173 and pick a mode:
+
+| Mode | Link | What happens |
+|---|---|---|
+| **Co-op defence** (1–4 players) | `/arena.html?mode=coop` | Build phase, then waves. Protect Heartspools A, B and C through 5 waves. Bots fill empty slots; they fight and build too. |
+| **Co-op solo** | `/arena.html?mode=coop&solo=1` | The same server code runs in a Web Worker in your browser, so no server is needed. |
+| **PvP free-for-all** (up to 8) | `/arena.html?mode=pvp` | Lag-compensated shooting in the same knitted bedroom. |
+| **Wool lookdev** | `/wool.html` | Pip the crocheted seal under a sunbeam, with every wool-shader layer adjustable live. |
+
+Friends join the same match with the same room code: `/arena.html?mode=coop&room=ABCD` (the landing page has a join form).
+
+### Controls
+
+WASD move · mouse look/fire · Space jump (double jump) · Shift sprint · C crouch · R reload · **1/2** Pom-Pom Popper / Button Buster · **3/4/5** build Turret / Pin Wall / Tangle Mat on the pad you stand on · **G** recycle (50% refund) · **Enter** ready up (skip build time) · V first/third person · Tab scores · F3 net stats.
+
+### Co-op rules
+
+- **Heartspools** (A, B, C) have a blue thread shield that absorbs damage first and regrows during build phases. Lose all three and the match is lost.
+- **Build pads** are the embroidered patches around each Heartspool. Costs are paid in **buttons**, a team pool you earn by unravelling enemies and clearing waves:
+  - **Pom-Pom Turret** (150): auto-fires at the nearest enemy in sight.
+  - **Pin Wall** (80): a felt pin-cushion that blocks the lane until chewed through.
+  - **Tangle Mat** (100): slows walking enemies by 60%.
+- **Enemies**, all knitted:
+  - **Knit Grunt**: acrylic soldier.
+  - **Scuttler**: fast crocheted spider-crab.
+  - **Moth**: felted flyer that goes straight for the wool.
+  - **Felted Brute**: a tank that flattens buildables.
+- **Pathing:** ground enemies follow flow fields over a nav grid to their target Heartspool. They turn on nearby toys and push through walls.
+- **Scaling:** 5 waves, with enemy count and HP growing with the number of players. Victory or defeat restarts the match after 12 s.
+
+Balance check (full simulated matches, bots only): 1–4 bots lose around waves 4–5, so a human team has to build well to win. Server cost is about 60–80 µs per tick for a full wave.
+
+### URL options
+
+`?mode=coop|pvp` · `?room=ABCD` · `?solo=1` · `?bots=0..7` (fill-to count) · `?lag=150` (fake round-trip ms) · `?name=Pip` · `?quality=low|medium|high` · `?server=ws://host:8787` · `?cam=overview|window|core` (fixed spectator camera) · `?autopilot=1` (headless smoke tests).
+
+Server env: `PORT` (8787), `FILL_BOTS` (4), `FAKE_LAG_MS` (one-way per direction).
 
 ```bash
-pnpm test         # shared simulation tests (movement, protocol, lag compensation, prediction)
+pnpm test         # 30 simulation tests: movement, protocol, lag comp, prediction, co-op waves/building/pathing
 pnpm typecheck    # tsc -b across all packages
-pnpm build        # production client build -> packages/client/dist
-pnpm loadtest -- --clients 8 --seconds 10    # headless bot clients against a running server
+pnpm build        # production client -> packages/client/dist
+pnpm loadtest -- --clients 4 --seconds 30 --mode coop   # headless clients against a running server
 ```
 
-### Arena URL options
-
-| Param | Meaning |
-|---|---|
-| `?room=ABCD` | Private room code (share the link) |
-| `?bots=0..7` | Bots fill the room up to this many players (server default 4) |
-| `?lag=150` | Fake round-trip latency added client-side, for testing netcode feel |
-| `?solo=1` | Run the server in a Web Worker instead of connecting |
-| `?name=Pip` | Display name |
-| `?server=ws://host:8787` | Connect to a server on another origin |
-
-Server environment variables: `PORT` (8787), `FILL_BOTS` (4), `FAKE_LAG_MS` (one-way delay per direction).
-
-Controls: WASD move · mouse look/fire · Space jump (double jump) · Shift sprint · C crouch · R reload · V first/third person · Tab scores · F3 net stats.
-
-### Lookdev URL options
-
-`?quality=low|medium|high|ultra` · `?cam=hero|backlit|closeup|wide` · `?gui=0` · `?dof=0` · `?still=1` (render a few frames and stop; used for screenshots).
-
-## Layout
+## How it's built
 
 ```
 packages/
-  shared/   simulation that must match on client and server (plan §18.2 "golden rule")
-            constants, world (grey-box bedroom), movement + weapon step, raycasts,
-            binary protocol, Room (authoritative sim + lag compensation), bots, RoomHost
-  server/   Node WebSocket server: rooms by code, 30 Hz tick, 20 Hz snapshots
+  shared/   everything that must agree on client and server
+            movement + weapons (deterministic step), world + co-op layout, enemies + nav flow fields,
+            CoopDirector (waves, Heartspools, pads, buttons), Room (authoritative sim, lag compensation),
+            bots, binary protocol, RoomHost (transport-agnostic loop)
+  server/   Node WebSocket server: rooms by mode + code, 30 Hz tick, 20 Hz snapshots
   client/   Vite + Three.js
-            src/wool/    procedural stitch maps + layered wool material
-            src/scene/   Pip, props, bedroom corner, post chain, arena world, avatars
+            src/wool/    procedural stitch maps + the layered wool material (UV or world-space/triplanar)
+            src/scene/   woolRoom (the all-wool bedroom), enemyRenderer (instanced knitted enemies),
+                         coopProps (Heartspools, pads, buildables), fx, viewModel, avatars, Pip, post chain
             src/net/     transports (WebSocket / Worker / fake lag) and the predicting NetClient
+            src/audio/   synthesized sound effects (Web Audio, no files)
   tools/    headless load tester
-docs/BUILD_PLAN.md
+docs/BUILD_PLAN.md       the full design
 ```
 
-## How the netcode works (plan §17)
+### Everything is wool
 
-- **Inputs** are fixed 1/60 s commands (buttons, float32 yaw and pitch, and render tick), sent in pairs (30 packets/s).
-- **Server** (30 Hz) applies each player's queued commands with the shared `stepPlayer`, limited by a real-time budget so input flooding can't speed-hack. Snapshots go out at 20 Hz.
-- **Snapshots** are binary: the recipient's own state at full precision (so replays are exact), other players quantised to 16 bits per axis, and this interval's shots at 9 bytes each. Rare events (KOs, roster) are JSON.
-- **Prediction and reconciliation:** the client runs the same step function, and on each snapshot it rewinds to the server state and replays the unacknowledged inputs. Any error is eased out over ~100 ms.
-- **Interpolation:** other players are drawn 100 ms in the past between the two snapshots around that time.
-- **Lag compensation:** every input carries the tick the client was rendering. The server rewinds targets to that time (capped at 200 ms) before testing the ray.
+`createWoolMaterial()` extends `MeshPhysicalMaterial` with the layers from plan §13.3:
 
-Measured locally: 20 Hz snapshots; ~29 kbps per client with 4 players and ~44 kbps with 8 players all firing (budgets: 64 / 96 kbps). The test suite checks that a predicting client matches the server exactly. In a headless browser run at 150 ms RTT, every reconciliation sample was 0.
+1. procedural stitch normals and cavity AO: stocking, rib, garter, crochet, felt, wound yarn
+2. per-stitch hand-dyed tint
+3. sheen
+4. a backlit fuzz rim
+5. instanced shell fuzz
+6. stray fibres
+7. diffuse-only wrap lighting
 
-## The wool shader (plan §13.3)
+The room uses a **triplanar** variant: stitches are mapped in world space by the dominant normal axis, so every wall, bed, desk and toy block is knitted at the same gauge without UV work. Furniture uses puffy "pillow box" geometry so it reads as stuffed fabric. Decoration is all yarn: a crochet rag rug, knitted curtains, a shelf of knitted books, a felt poster with a crocheted sun, and a yarn-ball mobile. The only direct light is the sun through the window, with a light shaft and dust motes. The post chain adds GTAO, bloom, AgX tonemapping, vignette and grain.
 
-`createWoolMaterial()` extends `MeshPhysicalMaterial`:
+Enemies are drawn with one `InstancedMesh` per body part per type, animated per instance (walk swing, wing flaps, hit squash). A full wave costs a few dozen draw calls. When an enemy unravels, it bursts into curls of yarn fluff in its own colour.
 
-1. **Stitch normals and cavity AO** from procedural, tileable height fields: stocking, rib, garter, crochet, felt and wound yarn (`src/wool/stitches.ts`). No texture files are needed.
-2. **Hand-dyed tint**: a per-stitch random value plus low-frequency world-space noise.
-3. **Sheen** (`sheen = 1`, tunable roughness).
-4. **Fuzz rim**: a fresnel term, strongest when backlit by the sun.
-5. **Shell fuzz**: up to 16 alpha-tested shells in one instanced draw. Shells only render within a set distance of the camera.
-6. **Stray fibres**: a few hundred curved line strands (Ultra only).
-7. **Wrap lighting** on the diffuse term only. Wrapping the specular term too makes its visibility term blow up at silhouettes.
+### Netcode (plan §17)
 
-Quality presets toggle layers as the plan describes. Every material shares one set of uniforms, so the debug panel tunes all of them live.
+- **Inputs:** fixed 1/60 s commands sent in pairs. The server runs the shared step under a real-time budget, which stops speed hacks.
+- **Snapshots** at 20 Hz:
+  - your own state at full precision, for exact replays
+  - quantised players
+  - 9-byte shots
+  - a co-op block: phase, wave, timer, buttons, cores and pads
+  - enemies at 9 bytes each, sent at **10 Hz** (every other snapshot) to fit the budget
+- **Client:** prediction and reconciliation for your own toy. Other players are interpolated 100 ms in the past, enemies 160 ms.
+- **Lag compensation** rewinds players (PvP) or enemies (co-op) to the time stamped on your input, capped at 200 ms.
+- **Measured:**
+  - 4-player co-op through waves: ~44 kbps per client (budget 64)
+  - 8-player PvP: ~46 kbps (budget 96)
+  - two real browser clients at 120 ms RTT: 0.000 u reconciliation error over 40 s
 
-## What's next (Phase 1)
+## Roadmap from here
 
-A grey-box co-op loop: Heartspools and Spools, 3 weapons with their physical effects, 4 buildables on build pads, 3 enemy types with navmesh AI on the server, and 5 waves. Merge the wool figure into the arena as the player avatar and view model, and add path-event enemy sync (§17.3 item 8) before the enemy count grows.
+- **More maps:** kitchen counter, sewing room and attic from the plan, built with the same triplanar wool kit.
+- **Plan features still missing:** Spools (carry-able shield batteries), the yarn-swing move, more weapons with physical effects, the full buildable deck, medals and unlocks, customisation.
+- **Art and netcode:** skinned, animated character rigs to replace primitive toys; WebRTC/WebTransport datagrams for PvP.

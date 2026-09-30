@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { WebSocketServer, type RawData, type WebSocket } from 'ws';
-import { DEFAULT_PORT, RoomHost, type Connection } from '@stitchstrike/shared';
+import { DEFAULT_PORT, RoomHost, type Connection, type GameMode } from '@stitchstrike/shared';
 
 const PORT = Number(process.env.PORT ?? DEFAULT_PORT);
 /** Artificial one-way delay per direction, for testing netcode (total RTT = 2x). */
@@ -15,13 +15,15 @@ function roomCode(raw: string | null): string {
   return code || 'LOBBY';
 }
 
-function getRoom(code: string, fillTo: number): RoomHost {
-  let host = rooms.get(code);
+function getRoom(code: string, fillTo: number, mode: GameMode): RoomHost {
+  // Rooms are keyed by mode too, so ?room=ABCD&mode=pvp and co-op ABCD are different matches.
+  const key = `${mode}:${code}`;
+  let host = rooms.get(key);
   if (!host) {
-    host = new RoomHost({ code, fillTo });
+    host = new RoomHost({ code, fillTo, mode });
     host.start();
-    rooms.set(code, host);
-    console.log(`[room ${code}] opened (bots fill to ${fillTo})`);
+    rooms.set(key, host);
+    console.log(`[room ${key}] opened (bots fill to ${fillTo})`);
   }
   return host;
 }
@@ -36,7 +38,10 @@ const http = createServer((req, res) => {
   if (req.url === '/health' || req.url === '/') {
     const body = JSON.stringify({
       ok: true,
-      rooms: [...rooms.values()].map((r) => ({ code: r.options.code, humans: r.humans, players: r.room.players.size, tick: r.room.tick })),
+      rooms: [...rooms.values()].map((r) => ({
+        code: r.options.code, mode: r.room.mode, humans: r.humans, players: r.room.players.size, tick: r.room.tick,
+        wave: r.room.coop?.wave, enemies: r.room.coop?.enemies.length,
+      })),
     });
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*' });
     res.end(body);
@@ -52,7 +57,9 @@ wss.on('connection', (ws: WebSocket, req) => {
   const code = roomCode(url.searchParams.get('room'));
   const botParam = url.searchParams.get('bots');
   const fill = botParam === null ? FILL_BOTS : Math.max(0, Math.min(8, Number(botParam) || 0));
-  const host = getRoom(code, fill);
+  const mode: GameMode = url.searchParams.get('mode') === 'pvp' ? 'pvp' : 'coop';
+  const host = getRoom(code, fill, mode);
+  const key = `${mode}:${code}`;
 
   const delay = (fn: () => void) => (FAKE_LAG_MS > 0 ? setTimeout(fn, FAKE_LAG_MS) : fn());
   const conn: Connection = {
@@ -69,8 +76,8 @@ wss.on('connection', (ws: WebSocket, req) => {
     handlers.onClose();
     if (host.humans === 0) {
       host.stop();
-      rooms.delete(code);
-      console.log(`[room ${code}] closed`);
+      rooms.delete(key);
+      console.log(`[room ${key}] closed`);
     }
   });
   ws.on('error', () => ws.close());

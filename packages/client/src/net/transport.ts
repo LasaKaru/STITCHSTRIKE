@@ -44,7 +44,7 @@ export function wsTransport(url: string): Transport {
 }
 
 /** Solo play: the exact server code (RoomHost) running in a Web Worker. No network, no server. */
-export function workerTransport(fillTo: number): Transport {
+export function workerTransport(fillTo: number, mode: 'coop' | 'pvp' = 'coop'): Transport {
   const t = base('solo worker');
   const worker = new Worker(new URL('./soloWorker.ts', import.meta.url), { type: 'module' });
   worker.onmessage = (e: MessageEvent<Frame>) => {
@@ -53,7 +53,7 @@ export function workerTransport(fillTo: number): Transport {
     t.onMessage(d);
   };
   worker.onerror = (e) => t.onClose(`worker error: ${e.message}`);
-  worker.postMessage({ init: true, fillTo });
+  worker.postMessage({ init: true, fillTo, mode });
   t.send = (d) => worker.postMessage(d);
   t.close = () => worker.terminate();
   queueMicrotask(() => t.onOpen());
