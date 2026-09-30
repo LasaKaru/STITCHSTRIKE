@@ -1,4 +1,5 @@
 import { Bot } from './bots.ts';
+import { randomLook } from './cosmetics.ts';
 import { isSnapshotTick, MAX_PLAYERS, TICK_RATE } from './constants.ts';
 import { decodeInputs, encodeSnapshot, sanitizeLook, type ClientText, type GameMode, type ServerText } from './protocol.ts';
 import { Room } from './room.ts';
@@ -97,7 +98,7 @@ export class RoomHost {
 
   private balanceBots(): void {
     while (this.room.players.size < this.options.fillTo && !this.room.isFull) {
-      const p = this.room.addPlayer(Bot.pickName(this.room), true);
+      const p = this.room.addPlayer(Bot.pickName(this.room), true, randomLook());
       if (!p) break;
       this.bots.set(p.id, new Bot(this.room, p));
     }

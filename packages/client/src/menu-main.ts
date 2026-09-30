@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { MenuMusic } from './audio/music.ts';
 import { buildCinematic, type Cinematic } from './scene/cinematic.ts';
 import { desktop, loadSettings, saveSettings, type QualitySetting } from './settings.ts';
+import { CustomiseScreen, renderProgress } from './menu-customise.ts';
+import { levelOf, loadProfile } from './profile.ts';
 
 /**
  * Main menu: "press any key" title over a live in-engine cinematic, then a
@@ -21,7 +23,11 @@ if (bridge) {
   $('#version').textContent = `v${bridge.version}`;
 }
 for (const el of $$('.logo')) el.appendChild(($('#logo-tpl') as unknown as HTMLTemplateElement).content.cloneNode(true));
-$('#who-name').textContent = settings.name;
+function refreshWho(): void {
+  const p = loadProfile();
+  $('#who-name').textContent = `${settings.name} · Lv ${levelOf(p.xp).level} · ${p.credits} credits`;
+}
+refreshWho();
 
 // ---------------------------------------------------------------- the cinematic
 
@@ -70,7 +76,7 @@ addEventListener('resize', () => {
 
 // ---------------------------------------------------------------- screens
 
-type ScreenId = 'title' | 'main' | 'play' | 'settings' | 'howto' | 'credits';
+type ScreenId = 'title' | 'main' | 'play' | 'settings' | 'howto' | 'credits' | 'customise' | 'progress';
 let current: ScreenId = 'title';
 const stack: ScreenId[] = [];
 
@@ -88,8 +94,11 @@ function go(s: ScreenId, push = true): void {
   if (s === current) return;
   if (push) stack.push(current);
   $(`#${current}`).classList.remove('active');
+  if (current === 'customise') { customise.close(); refreshWho(); }
   $(`#${s}`).classList.add('active');
   current = s;
+  if (s === 'customise') customise.open();
+  if (s === 'progress') renderProgress();
   document.body.classList.toggle('in-menu', s !== 'title');
   document.body.classList.toggle('in-panel', s !== 'title' && s !== 'main');
   cin?.setOffset(offsetFor(s));
@@ -134,6 +143,7 @@ document.addEventListener('click', (e) => {
   else if (el.classList.contains('choice')) choose(el);
 });
 
+const customise = new CustomiseScreen(() => settings.name, (k) => music.blip(k, settings.sfxVolume));
 const play = { mode: 'coop', map: 'garden', where: 'solo' };
 function choose(el: HTMLElement): void {
   const group = el.parentElement!.dataset.group as keyof typeof play;
@@ -300,6 +310,7 @@ function frame(): void {
     shotName.textContent = cin.shotName;
   }
   pollPads(dt);
+  customise.frame(t);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

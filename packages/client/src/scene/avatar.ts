@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { PLAYER } from '@stitchstrike/shared';
+import { PLAYER, type Look } from '@stitchstrike/shared';
+import { lookOptions } from '../figures/looks.ts';
 import { heldBlaster, heroOptions, spawnFigure } from '../figures/cast.ts';
 import { poseHumanoid } from '../figures/humanoid.ts';
 import type { FigureInstance } from '../figures/rig.ts';
@@ -15,11 +16,11 @@ export interface Avatar {
   update(dt: number, t: number, speed: number, pitch: number, crouch: boolean, airborne: boolean, downed: boolean): void;
 }
 
-export function createAvatar(color: number, variant = 0): Avatar {
+export function createAvatar(color: number, variant = 0, look?: Look): Avatar {
   const root = new THREE.Group();
   const tip = new THREE.Group();
   root.add(tip);
-  const figure: FigureInstance = spawnFigure(heroOptions(color, variant));
+  const figure: FigureInstance = spawnFigure(look ? lookOptions(look, color) : heroOptions(color, variant));
   tip.add(figure.root);
   const gun = heldBlaster(variant % 2 ? 0xe8742a : 0x8bcb3a);
   figure.root.add(gun);

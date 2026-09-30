@@ -10,3 +10,4 @@ export * from './room.ts';
 export * from './bots.ts';
 export * from './host.ts';
 export * from './pickups.ts';
+export * from './cosmetics.ts';

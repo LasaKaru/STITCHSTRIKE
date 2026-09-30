@@ -61,6 +61,8 @@
         <nav class="menu-list">
           <button class="item primary" data-go="play"><span class="t">Play</span><span class="s">Co-op defence or free-for-all, online or with bots</span></button>
           <button class="item" data-action="quick"><span class="t">Quick match</span><span class="s">Solo co-op in the Back Garden with 3 bot teammates</span></button>
+          <button class="item" data-go="customise"><span class="t">Customise</span><span class="s">Heads, yarns, knit patterns and packaging you've earned</span></button>
+          <button class="item" data-go="progress"><span class="t">Progress</span><span class="s">Level, medals, secrets found</span></button>
           <button class="item" data-href="/figures.html"><span class="t">Toy Box</span><span class="s">Meet the knitted heroes and invaders</span></button>
           <button class="item" data-go="settings"><span class="t">Settings</span><span class="s">Controls, graphics, audio</span></button>
           <button class="item" data-go="howto"><span class="t">How to play</span><span class="s">Controls and co-op rules</span></button>
@@ -110,6 +112,31 @@
           </div>
           <button class="start" id="start"><span>Start match</span></button>
         </div>
+      </section>
+
+      <!-- Customise -->
+      <section id="customise" class="screen panel-screen">
+        <header><button class="back-btn" data-back>‹ Back</button><h2>Customise</h2><span class="credits-chip" id="c-credits"></span></header>
+        <div class="custom-grid">
+          <div class="package" id="package">
+            <div class="hang"></div>
+            <div class="brand">STITCHSTRIKE</div>
+            <div class="bubble"><canvas id="preview"></canvas><div class="knitting" id="knitting">Knitting…</div><div class="sticker">NEW!</div></div>
+            <div class="pname" id="pname"></div>
+            <div class="ptag">Knitted action figure · ages 5 and up</div>
+          </div>
+          <div class="panel slots-panel">
+            <div class="tabs" id="slot-tabs"></div>
+            <div class="items" id="slot-items"></div>
+            <p class="hint">Everything here is earned by playing: levels, medals, and credits from matches and secrets. Nothing changes how you fight.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Progress -->
+      <section id="progress" class="screen panel-screen">
+        <header><button class="back-btn" data-back>‹ Back</button><h2>Progress</h2></header>
+        <div class="panel" id="progress-body"></div>
       </section>
 
       <!-- Settings -->

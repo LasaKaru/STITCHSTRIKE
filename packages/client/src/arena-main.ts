@@ -22,7 +22,9 @@ import { buildWoolGarden } from './scene/woolGarden.ts';
 import { buildWoolRoom } from './scene/woolRoom.ts';
 import { buildWoolGarage } from './scene/woolGarage.ts';
 import { TraversalView } from './scene/traversalView.ts';
-import { loadProfile, saveProfile } from './profile.ts';
+import { levelOf, loadProfile } from './profile.ts';
+import { award, wearable, XP, type Award } from './progression.ts';
+import { jacketColor } from './figures/looks.ts';
 import { QUALITY_LAYERS, setWoolLayers, updateShellLod } from './wool/woolMaterial.ts';
 
 /**
@@ -45,6 +47,8 @@ const solo = params.get('solo') === '1';
 const lag = Math.max(0, Number(params.get('lag') ?? 0) || 0);
 const bots = params.get('bots');
 const settings = loadSettings();
+const profile = loadProfile();
+profile.look = wearable(profile, profile.look);
 const quality = (params.get('quality') ?? settings.quality) as 'low' | 'medium' | 'high';
 const autopilot = params.get('autopilot') === '1';
 /** Fixed cinematic camera for screenshots and spectating: ?cam=overview|core|window. */
@@ -71,7 +75,7 @@ function connect(): Transport {
   return withFakeLag(wsTransport(`${base}/?${q}`), lag);
 }
 
-const net = new NetClient(connect(), world, name);
+const net = new NetClient(connect(), world, name, profile.look);
 net.mode = mode;
 
 // ---------------------------------------------------------------- renderer + scene
@@ -127,15 +131,15 @@ function syncAvatars(): void {
   for (const [id, r] of net.roster) {
     if (id === net.id) {
       if (!ownAvatar) {
-        ownAvatar = createAvatar(r.color, id);
+        ownAvatar = createAvatar(r.color, id, r.look);
         ownAvatar.root.visible = false;
         scene.add(ownAvatar.root);
-        viewModel.setJacket(r.color);
+        viewModel.setJacket(jacketColor(r.look, r.color));
       }
       continue;
     }
     if (!avatars.has(id)) {
-      const a = createAvatar(r.color, id);
+      const a = createAvatar(r.color, id, r.look);
       scene.add(a.root);
       avatars.set(id, a);
     }
@@ -242,6 +246,20 @@ function attenuation(p: THREE.Vector3): number {
 
 // ---------------------------------------------------------------- events
 
+/** This match, for the results card. */
+const session = { kills: 0, revives: 0, waves: 0, xp: 0, credits: 0 };
+
+function progress(xp: number, credits: number, stats: Parameters<typeof award>[3] = {}, ctx: Parameters<typeof award>[4] = {}): void {
+  if (autopilot) return;
+  const a: Award = award(profile, xp, credits, stats, ctx);
+  session.xp += a.xp;
+  session.credits += a.credits;
+  if (xp >= 40) popup(`+${xp} XP${credits ? ` · +${credits} credits` : ''}`);
+  if (a.levelUp) setTimeout(() => { banner(`LEVEL UP! LEVEL ${a.levelUp}`, 'good', 3000); sfx.play('win', 0.6); }, 600);
+  a.medals.forEach((m, i) => setTimeout(() => { banner(`MEDAL: ${m.name.toUpperCase()}`, 'good', 3000); sfx.play('collect'); }, 1400 + i * 1600));
+  if (a.unlocks.length) setTimeout(() => feed(`<span>Unlocked:</span> ${a.unlocks.map(escapeHtml).join(', ')}`, true), 900);
+}
+
 let bannerTimer: ReturnType<typeof setTimeout> | undefined;
 function banner(text: string, kind: '' | 'good' | 'bad' = '', ms = 2600): void {
   const el = document.getElementById('banner')!;
@@ -258,18 +276,29 @@ net.onEvent = (e) => {
       const a = e.attacker ? net.roster.get(e.attacker)?.name ?? '?' : `a ${ENEMIES[e.enemyType ?? 0]?.name ?? 'toy'}`;
       feed(`${escapeHtml(a)} <span>unravelled</span> ${escapeHtml(v)}`, e.attacker === net.id || e.victim === net.id);
       if (e.victim === net.id) sfx.play('hurt');
+      if (e.attacker === net.id && mode !== 'coop') { session.kills++; progress(XP.pvpKo, 5, { kills: 1 }, { medals: session.kills >= 25 ? ['duelist'] : [] }); }
       renderScoreboard();
       break;
     }
     case 'kill':
-      if (e.by === net.id) { sfx.play('kill'); popup(`+${e.reward} buttons`); }
+      if (e.by === net.id) { sfx.play('kill'); popup(`+${e.reward} buttons`); session.kills++; progress(XP.kill, e.enemyType === EnemyType.Boss ? 100 : 1, { kills: 1 }); }
       break;
     case 'phase':
-      if (e.phase === Phase.Wave) { banner(`WAVE ${e.wave} INCOMING!`); sfx.play('wave'); }
-      else if (e.phase === Phase.Build && e.wave > 0) { banner(`WAVE ${e.wave} CLEARED!`, 'good'); }
-      else if (e.phase === Phase.Build) { banner('NEW MATCH · BUILD YOUR DEFENCE'); }
-      else if (e.phase === Phase.Won) { banner('THE HEARTSPOOLS ARE SAFE!', 'good', 6000); sfx.play('win'); }
-      else if (e.phase === Phase.Lost) { banner('THE HEARTSPOOLS UNRAVELLED', 'bad', 6000); sfx.play('lose'); }
+      if (e.phase === Phase.Wave) { banner(`WAVE ${e.wave} INCOMING!`); sfx.play('wave'); resultsCard(null); }
+      else if (e.phase === Phase.Build && e.wave > 0) {
+        banner(`WAVE ${e.wave} CLEARED!`, 'good');
+        session.waves++;
+        progress(XP.wave, 25, { waves: 1, ...(net.waves === 0 ? { bestEndless: e.wave } : {}) });
+      } else if (e.phase === Phase.Build) { banner('NEW MATCH · BUILD YOUR DEFENCE'); resultsCard(null); Object.assign(session, { kills: 0, revives: 0, waves: 0, xp: 0, credits: 0 }); }
+      else if (e.phase === Phase.Won) {
+        banner('THE HEARTSPOOLS ARE SAFE!', 'good', 6000); sfx.play('win');
+        progress(Math.round(XP.win * (1 + 0.25 * net.difficulty)), 300, { wins: 1, matches: 1 }, { medals: net.difficulty >= 2 ? ['survivor'] : [] });
+        setTimeout(() => resultsCard(true), 2500);
+      } else if (e.phase === Phase.Lost) {
+        banner('THE HEARTSPOOLS UNRAVELLED', 'bad', 6000); sfx.play('lose');
+        progress(XP.match, 50, { matches: 1 });
+        setTimeout(() => resultsCard(false), 2500);
+      }
       break;
     case 'coreDown':
       banner(`HEARTSPOOL ${CORE_LETTERS[e.core]} UNRAVELLED!`, 'bad');
@@ -288,7 +317,7 @@ net.onEvent = (e) => {
     }
     case 'revived': {
       if (e.id === net.id) { banner('RE-STITCHED!', 'good'); sfx.play('revived'); }
-      else if (e.by === net.id) { popup('Teammate re-stitched!'); sfx.play('revived'); }
+      else if (e.by === net.id) { popup('Teammate re-stitched!'); sfx.play('revived'); session.revives++; progress(XP.revive, 10, { revives: 1 }); }
       if (e.by) feed(`${escapeHtml(net.roster.get(e.by)?.name ?? '?')} <span>re-stitched</span> ${escapeHtml(net.roster.get(e.id)?.name ?? '?')}`, e.by === net.id || e.id === net.id);
       break;
     }
@@ -300,7 +329,7 @@ net.onEvent = (e) => {
       break;
     case 'boss':
       if (e.state === 'arrive') { banner('THE UNRAVELLER APPROACHES!', 'bad', 4000); sfx.play('boss'); }
-      else { banner('THE UNRAVELLER IS UNPICKED!', 'good', 4000); sfx.play('win'); }
+      else { banner('THE UNRAVELLER IS UNPICKED!', 'good', 4000); sfx.play('win'); progress(XP.boss, 200, { bossKills: 1 }); }
       break;
     case 'stomp': {
       const at = new THREE.Vector3(e.x, 0, e.z);
@@ -615,6 +644,26 @@ function resize(): void {
 }
 window.addEventListener('resize', resize);
 
+/** End-of-match "action figure on a blister card" with this match's haul. */
+function resultsCard(won: boolean | null): void {
+  const el = $('results');
+  if (won === null) { el.classList.add('hidden'); return; }
+  const lv = levelOf(profile.xp);
+  el.className = `pk-${profile.look.packaging}`;
+  el.innerHTML = `<div class="hang"></div>
+    <div class="brand">STITCHSTRIKE · ${escapeHtml(world.name.toUpperCase())} · ${net.waves === 0 ? 'ENDLESS' : `${net.waves} WAVES`}</div>
+    <h2>${won ? 'VICTORY!' : 'UNRAVELLED'}</h2>
+    <div class="bubble">
+      <div class="sticker">NEW!<br>Collect<br>them all!</div>
+      <div class="name">${escapeHtml(name)}</div>
+      <div class="tag">Knitted action figure with ${WEAPONS.length} blasters and real re-stitch action!</div>
+      <div class="stats"><div><b>${session.kills}</b><span>unravelled</span></div><div><b>${session.revives}</b><span>re-stitched</span></div><div><b>${session.waves}</b><span>waves held</span></div></div>
+    </div>
+    <div class="reward"><span>+${session.xp} XP</span><span>+${session.credits} credits</span><span>Level ${lv.level}</span></div>
+    <div class="lvl"><i style="width:${(lv.into / lv.need) * 100}%"></i></div>
+    <div class="fine">Rewards are cosmetic. Unlock heads, yarns and packaging in the Customise menu. Ages 5 and up.</div>`;
+}
+
 function teamScoreText(): string {
   const score = [0, 0];
   for (const p of net.latest?.players ?? []) score[net.roster.get(p.id)?.team ?? 0] += p.kos;
@@ -622,7 +671,6 @@ function teamScoreText(): string {
 }
 
 const pickupsView = new PickupsView(scene, world);
-const profile = loadProfile();
 const traversal = new TraversalView(scene, world, new Set(profile.collected));
 const music = new CombatMusic();
 
@@ -814,8 +862,7 @@ function frame(): void {
     profile.collected.push(c.id);
     const found = world.collectibles.filter((k) => profile.collected.includes(k.id)).length;
     const reward = c.kind === 2 ? 150 : 60;
-    profile.credits += reward;
-    saveProfile(profile);
+    progress(50, reward, {}, { mapComplete: found === world.collectibles.length });
     sfx.play('collect');
     banner(`${['GOLDEN THIMBLE', 'WEAPON PART', 'CREDIT STASH'][c.kind]} FOUND! ${found}/${world.collectibles.length}`, 'good', 2200);
     popup(`+${reward} credits`);
