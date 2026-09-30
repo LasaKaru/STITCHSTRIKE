@@ -164,6 +164,7 @@ function arenaUrl(p: { mode: string; map: string; where: string; waves?: string;
   const q = new URLSearchParams({ mode: p.mode, map: p.map });
   if (p.mode === 'coop') { q.set('waves', p.waves ?? '10'); q.set('difficulty', p.difficulty ?? '1'); }
   if (p.where === 'split') return `/split.html?${q}`;
+  if (p.where === 'split4') return `/split.html?${q}&players=4`;
   if (p.where === 'solo') q.set('solo', '1');
   else q.set('room', ($<HTMLInputElement>('#room').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '') || 'LOBBY'));
   if (current === 'play') q.set('bots', bots.value);

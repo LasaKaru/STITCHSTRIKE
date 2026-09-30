@@ -1,8 +1,11 @@
 body.split .divider { position: fixed; left: 0; right: 0; top: 50%; height: 4px; margin-top: -2px; z-index: 2;
   background: repeating-linear-gradient(90deg, var(--gold) 0 14px, transparent 14px 22px); }
-.pview { position: fixed; left: 0; right: 0; height: 50%; pointer-events: none; z-index: 2; }
-#p0 { top: 0; }
-#p1 { top: 50%; }
+.pview { position: fixed; pointer-events: none; z-index: 2; }
+body.split .divider.v { display: none; }
+body.players-3 .divider.v, body.players-4 .divider.v { display: block; left: 50%; right: auto; top: 0; bottom: 0; width: 4px; height: auto; margin: 0 0 0 -2px;
+  background: repeating-linear-gradient(180deg, var(--gold) 0 14px, transparent 14px 22px); }
+body.players-3 .pview .phud, body.players-4 .pview .phud { font-size: 12px; }
+body.players-3 .pview .phud .bar, body.players-4 .pview .phud .bar { width: 120px; }
 .pview .xh { position: absolute; left: 50%; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px; opacity: .85;
   background: linear-gradient(var(--ink), var(--ink)) center / 2px 100% no-repeat, linear-gradient(var(--ink), var(--ink)) center / 100% 2px no-repeat; }
 .pview .phud { position: absolute; left: 14px; bottom: 10px; right: 14px; display: flex; justify-content: space-between; align-items: flex-end;

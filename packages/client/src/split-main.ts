@@ -43,6 +43,9 @@ const waves = [0, 5, 10].includes(Number(params.get('waves'))) ? Number(params.g
 const difficulty = Math.max(0, Math.min(3, Number(params.get('difficulty') ?? 1) || 0));
 const settings = loadSettings();
 const profile = loadProfile();
+/** Couch size: 2 players (top/bottom) or 3–4 (quadrants). */
+const PLAYERS = Math.max(2, Math.min(4, Number(params.get('players') ?? 2) || 2));
+document.body.classList.add(`players-${PLAYERS}`);
 
 const host = new RoomHost({ code: 'COUCH', fillTo: 4, mode, map, waves, difficulty });
 host.start();
@@ -94,18 +97,24 @@ interface Local {
 
 function makeLocal(index: number): Local {
   const look = index === 0 ? profile.look : randomLook();
-  const name = index === 0 ? settings.name : 'Player 2';
+  const name = index === 0 ? settings.name : `Player ${index + 1}`;
   const net = new NetClient(loopbackTransport(host), world, name, look);
   net.mode = mode;
   const camera = new THREE.PerspectiveCamera(settings.fov, innerWidth / (innerHeight / 2), 0.03, world.outdoor ? 900 : 200);
   camera.rotation.order = 'YXZ';
-  // Layers: 1-2 view models, 3-4 own avatars (a camera never sees its own body or the other player's gun).
+  // Layers: 1-4 view models, 5-8 own avatars (a camera never sees its own body or anyone else's gun).
   camera.layers.enable(1 + index);
-  camera.layers.enable(3 + (1 - index));
+  for (let j = 0; j < PLAYERS; j++) if (j !== index) camera.layers.enable(5 + j);
   scene.add(camera);
   const viewModel = new ViewModel(camera);
   viewModel.group.traverse((o) => o.layers.set(1 + index));
-  const el = document.getElementById(`p${index}`)!;
+  const el = document.createElement('div');
+  el.className = 'pview';
+  el.id = `p${index}`;
+  el.innerHTML = '<div class="xh"></div><div class="phud"></div><div class="pdown hidden"></div>';
+  const r = viewRect(index);
+  Object.assign(el.style, { left: `${r[0] * 100}%`, top: `${(1 - r[1] - r[3]) * 100}%`, width: `${r[2] * 100}%`, height: `${r[3] * 100}%` });
+  document.body.appendChild(el);
   const l: Local = {
     index, net, camera, viewModel, yaw: 0, pitch: 0, weapon: 0, action: 0, lastBuild: DECK[0], deck: false, pad: null, acc: 0,
     hud: el.querySelector('.phud')!, down: el.querySelector('.pdown')!, lastWeapon: 0,
@@ -114,7 +123,15 @@ function makeLocal(index: number): Local {
   return l;
 }
 
-const locals = [makeLocal(0), makeLocal(1)];
+/** Viewport of local player i as fractions [x, y, w, h] from the bottom-left (slot 3 is the spectator when three play). */
+function viewRect(i: number): [number, number, number, number] {
+  if (PLAYERS === 2) return i === 0 ? [0, 0.5, 1, 0.5] : [0, 0, 1, 0.5];
+  return [[0, 0.5], [0.5, 0.5], [0, 0], [0.5, 0]][i].concat([0.5, 0.5]) as [number, number, number, number];
+}
+
+const locals = Array.from({ length: PLAYERS }, (_, i) => makeLocal(i));
+/** Three players: the spare quadrant slowly orbits the battle. */
+const spectator = PLAYERS === 3 ? new THREE.PerspectiveCamera(50, 1, 0.1, world.outdoor ? 900 : 200) : null;
 const main = locals[0].net;
 
 // ---------------------------------------------------------------- avatars (from player 1's view of the room)
@@ -130,7 +147,7 @@ function syncAvatars(): void {
     const a = createAvatar(r.color, id, r.look);
     const localIndex = locals.findIndex((l) => l.net.id === id);
     if (localIndex >= 0) {
-      a.root.traverse((o) => o.layers.set(3 + localIndex));
+      a.root.traverse((o) => o.layers.set(5 + localIndex));
       locals[localIndex].viewModel.setJacket(jacketColor(r.look, r.color));
       locals[localIndex].viewModel.setLook(r.look);
     }
@@ -138,8 +155,7 @@ function syncAvatars(): void {
     avatars.set(id, a);
   }
 }
-main.onRoster = syncAvatars;
-locals[1].net.onRoster = syncAvatars;
+for (const l of locals) l.net.onRoster = syncAvatars;
 
 // ---------------------------------------------------------------- shots and events (shared)
 
@@ -247,11 +263,14 @@ const KEYMAP: [string[], number][] = [
   [['KeyX'], Buttons.Grapple],
 ];
 
-/** Pads: with two, one each; with one, it belongs to player 2 (player 1 has the keyboard). */
+/**
+ * Pads: with one per player, everyone gets a pad; otherwise player 1 has the
+ * keyboard and mouse and the pads go to players 2, 3, 4 in the order connected.
+ */
 function assignPads(): void {
   const pads = [...(navigator.getGamepads?.() ?? [])].filter((p): p is Gamepad => !!p);
-  if (pads.length >= 2) { locals[0].pad ??= new PadReader(pads[0].index); locals[1].pad ??= new PadReader(pads[1].index); }
-  else if (pads.length === 1) { locals[1].pad ??= new PadReader(pads[0].index); }
+  const first = pads.length >= PLAYERS ? 0 : 1;
+  pads.slice(0, PLAYERS - first).forEach((p, k) => { locals[first + k].pad ??= new PadReader(p.index); });
 }
 addEventListener('gamepadconnected', assignPads);
 
@@ -413,17 +432,28 @@ function frame(): void {
   hudTimer -= dt;
   if (hudTimer <= 0) { hudTimer = 0.1; updateHud(); }
 
-  // Two viewports: player 1 on top, player 2 below.
+  // One viewport per player: halves for two, quadrants for three or four.
   const w = innerWidth, h = innerHeight;
   renderer.setScissorTest(true);
-  locals.forEach((l, i) => {
-    const y = i === 0 ? Math.floor(h / 2) : 0;
-    renderer.setViewport(0, y, w, Math.ceil(h / 2));
-    renderer.setScissor(0, y, w, Math.ceil(h / 2));
-    l.camera.aspect = w / (h / 2);
-    l.camera.updateProjectionMatrix();
-    renderer.render(scene, l.camera);
-  });
+  const draw = (cam: THREE.PerspectiveCamera, i: number) => {
+    const r = viewRect(i);
+    const x = Math.floor(r[0] * w), y = Math.floor(r[1] * h), vw = Math.ceil(r[2] * w), vh = Math.ceil(r[3] * h);
+    renderer.setViewport(x, y, vw, vh);
+    renderer.setScissor(x, y, vw, vh);
+    cam.aspect = vw / vh;
+    cam.updateProjectionMatrix();
+    renderer.render(scene, cam);
+  };
+  locals.forEach((l, i) => draw(l.camera, i));
+  if (spectator) {
+    // Orbit inside the map's walls, looking at the middle of the room.
+    const { min, max } = world.bounds;
+    const cx = (min[0] + max[0]) / 2, cz = (min[1] + max[1]) / 2;
+    const rx = (max[0] - min[0]) * 0.4, rz = (max[1] - min[1]) * 0.4;
+    spectator.position.set(cx + Math.sin(t * 0.08) * rx, Math.min(22, Math.max(rx, rz) * 0.6), cz + Math.cos(t * 0.08) * rz);
+    spectator.lookAt(cx, 0, cz);
+    draw(spectator, 3);
+  }
   renderer.setScissorTest(false);
   requestAnimationFrame(frame);
 }
