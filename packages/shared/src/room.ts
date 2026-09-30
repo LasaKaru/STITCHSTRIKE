@@ -560,6 +560,7 @@ export class Room {
       id: p.id, x: p.state.x, y: p.state.y, z: p.state.z, yaw: p.state.yaw, pitch: p.state.pitch,
       health: p.health, armor: p.armor, alive: p.alive, crouch: (p.state.buttons & Buttons.Crouch) !== 0,
       downed: p.bleed > 0, powered: p.power > 0, revive: p.revive,
+      hook: p.state.hooked ? [p.state.hx, p.state.hy, p.state.hz] : null,
       weapon: p.state.weapon, kos: p.kos, deaths: p.deaths,
     }));
   }

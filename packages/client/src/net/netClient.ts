@@ -30,6 +30,8 @@ export interface RemoteView {
   yaw: number; pitch: number;
   alive: boolean; crouch: boolean;
   downed: boolean; powered: boolean; revive: number;
+  /** Yarn-swing anchor while swinging. */
+  hook: [number, number, number] | null;
 }
 
 export interface NetStats {
@@ -286,7 +288,7 @@ export class NetClient {
    * Produces one fixed-step input, predicts it locally, and queues it for the server.
    * Reports whether the local weapon fired this step, which weapon, and the input seq (pellet seed).
    */
-  input(buttons: number, yaw: number, pitch: number, now: number, wantWeapon = this.predicted?.weapon ?? 0, action = 0): { fired: boolean; weapon: number; seq: number } {
+  input(buttons: number, yaw: number, pitch: number, now: number, wantWeapon = this.predicted?.weapon ?? 0, action = 0): { fired: boolean; weapon: number; seq: number; mantled: boolean; hook: number } {
     const cmd: InputCmd = {
       seq: ++this.seq,
       buttons,
@@ -296,19 +298,21 @@ export class NetClient {
       weapon: wantWeapon,
       action,
     };
-    let fired = false;
+    let fired = false, mantled = false, hook = 0;
     let weapon = this.predicted?.weapon ?? 0;
     if (this.predicted) {
       this.previous = clonePlayerState(this.predicted);
       const r = stepPlayer(this.predicted, cmd, this.world);
       fired = r.fired;
       weapon = r.weapon;
+      mantled = r.mantled;
+      hook = r.hook;
     }
     this.pending.push(cmd);
     if (this.pending.length > MAX_PENDING) this.pending.shift();
     this.outbox.push(cmd);
     if (this.outbox.length >= INPUTS_PER_PACKET) this.flush();
-    return { fired, weapon, seq: cmd.seq };
+    return { fired, weapon, seq: cmd.seq, mantled, hook };
   }
 
   flush(): void {
@@ -361,6 +365,7 @@ export class NetClient {
         downed: pc.downed,
         powered: pc.powered,
         revive: pc.revive,
+        hook: g < 0.5 ? pa.hook : pc.hook,
       });
     }
     return out;

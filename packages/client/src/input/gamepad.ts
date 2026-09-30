@@ -3,7 +3,7 @@ import { Action, Buttons, DECK, WEAPON_COUNT } from '@stitchstrike/shared';
 /**
  * Gamepad play (standard mapping; Xbox names):
  *   left stick move · right stick look · RT fire · A jump · B crouch · X reload
- *   Y hold to re-stitch · LB/RB weapons · L3 sprint · R3 camera
+ *   Y hold to re-stitch · LB hold yarn-swing · RB next weapon · L3 sprint · R3 camera
  *   D-pad up build deck · D-pad left/right pick a card · LT build/upgrade
  *   D-pad down recycle · Start ready up · View scoreboard
  */
@@ -58,7 +58,7 @@ export class PadReader {
     const speed = 3.4 * lookScale;
     f.dYaw = -rx * speed * dt;
     f.dPitch = -ry * speed * 0.75 * dt * (invertY ? -1 : 1);
-    if (edge(4)) f.weaponDelta = -1;
+    if (down(4)) f.buttons |= Buttons.Grapple;
     if (edge(5)) f.weaponDelta = 1;
     if (edge(12)) f.toggleDeck = true;
     if (edge(14)) f.cardDelta = -1;

@@ -59,6 +59,26 @@ export const PLAYER = {
   reviveHealth: 60,
   /** Climbing speed up fabric and bark. */
   climbSpeed: 5.5,
+  /** Ledge mantle: grab a ledge up to this far above your feet while airborne and pull yourself up. */
+  mantleReach: 1.35,
+} as const;
+
+/** The yarn-swing: fire a strand of yarn at anything above you and swing from it. */
+export const GRAPPLE = {
+  range: 26,
+  /** The anchor must be at least this far above your eyes (it's a swing, not a zip-line). */
+  minRise: 0.6,
+  minRope: 2.5,
+  /** The rope reels in at this many units per second while held. */
+  reel: 7,
+  /** On attach the rope is this fraction of the distance to the anchor. */
+  snatch: 0.8,
+  maxSpeed: 24,
+  /** Seconds before you can fire another strand after letting go (or missing). */
+  cooldown: 0.5,
+  missCooldown: 0.25,
+  /** Vertical kick when you let go with a jump. */
+  jumpBoost: 5,
 } as const;
 
 export const JUMP_VELOCITY = Math.sqrt(2 * PLAYER.gravity * PLAYER.jumpHeight);

@@ -169,6 +169,8 @@ export interface NetPlayer {
   powered: boolean;
   /** 0..1 re-stitch progress while downed. */
   revive: number;
+  /** Yarn-swing anchor while swinging. */
+  hook: Vec3 | null;
   weapon: number;
   kos: number;
   deaths: number;
@@ -301,7 +303,7 @@ export function encodeSnapshot(s: Snapshot): Uint8Array {
   if (s.self) {
     const p = s.self;
     for (const n of [p.x, p.y, p.z, p.vx, p.vy, p.vz]) w.f64(n);
-    w.u8((p.onGround ? 1 : 0) | (p.downed ? 2 : 0));
+    w.u8((p.onGround ? 1 : 0) | (p.downed ? 2 : 0) | (p.hooked ? 4 : 0));
     w.u8(p.airJumps);
     w.u16(p.buttons);
     w.f64(p.cooldown);
@@ -311,6 +313,8 @@ export function encodeSnapshot(s: Snapshot): Uint8Array {
     w.f64(p.reload);
     w.f32(p.yaw);
     w.f32(p.pitch);
+    w.f64(p.hookCd);
+    if (p.hooked) for (const n of [p.hx, p.hy, p.hz, p.rope]) w.f64(n);
   }
   w.u8(s.players.length);
   for (const p of s.players) {
@@ -320,7 +324,8 @@ export function encodeSnapshot(s: Snapshot): Uint8Array {
     w.i16(Math.round((p.pitch / (Math.PI / 2)) * 32767));
     w.u8(Math.max(0, Math.min(255, Math.ceil(p.health))));
     w.u8(Math.max(0, Math.min(255, Math.ceil(p.armor))));
-    w.u8((p.alive ? 1 : 0) | (p.crouch ? 2 : 0) | (p.downed ? 4 : 0) | (p.powered ? 8 : 0));
+    w.u8((p.alive ? 1 : 0) | (p.crouch ? 2 : 0) | (p.downed ? 4 : 0) | (p.powered ? 8 : 0) | (p.hook ? 16 : 0));
+    if (p.hook) { w.u16(quantPos(p.hook[0], 0)); w.u16(quantPos(p.hook[1], 1)); w.u16(quantPos(p.hook[2], 2)); }
     w.u8(pct(p.revive));
     w.u8(p.weapon);
     w.u16(p.kos);
@@ -399,9 +404,13 @@ export function decodeSnapshot(buf: Uint8Array): Snapshot | null {
       const reload = r.f64();
       const yaw = r.f32();
       const pitch = r.f32();
+      const hookCd = r.f64();
+      const hooked = (flags & 4) !== 0;
+      const h = hooked ? [r.f64(), r.f64(), r.f64(), r.f64()] : [0, 0, 0, 0];
       self = {
         x: f[0], y: f[1], z: f[2], vx: f[3], vy: f[4], vz: f[5], onGround: (flags & 1) !== 0, downed: (flags & 2) !== 0,
         airJumps, buttons, cooldown, weapon, mags, reload, yaw, pitch,
+        hooked, hx: h[0], hy: h[1], hz: h[2], rope: h[3], hookCd,
       };
     }
     const players: NetPlayer[] = [];
@@ -413,11 +422,12 @@ export function decodeSnapshot(buf: Uint8Array): Snapshot | null {
       const health = r.u8();
       const armor = r.u8();
       const flags = r.u8();
+      const hook: Vec3 | null = flags & 16 ? [dequantPos(r.u16(), 0), dequantPos(r.u16(), 1), dequantPos(r.u16(), 2)] : null;
       const revive = r.u8() / 255;
       const weapon = r.u8();
       players.push({
         id, x, y, z, yaw, pitch, health, armor, alive: (flags & 1) !== 0, crouch: (flags & 2) !== 0, downed: (flags & 4) !== 0,
-        powered: (flags & 8) !== 0, revive, weapon, kos: r.u16(), deaths: r.u16(),
+        powered: (flags & 8) !== 0, hook, revive, weapon, kos: r.u16(), deaths: r.u16(),
       });
     }
     const shots: Shot[] = [];

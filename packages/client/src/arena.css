@@ -59,6 +59,8 @@ body.is-downed canvas { filter: saturate(.35); }
     linear-gradient(var(--ink), var(--ink)) center / 100% 2px no-repeat;
   opacity: .85; filter: drop-shadow(0 0 1px #000);
 }
+/* A yarn strand would catch here: a knitted ring around the crosshair. */
+#crosshair.can-swing::after { content: ''; position: absolute; inset: -7px; border: 2px dashed #e8742a; border-radius: 50%; opacity: .9; }
 #hitmarker { width: 26px; height: 26px; margin: -13px 0 0 -13px; opacity: 0; transition: opacity .05s;
   background:
     linear-gradient(45deg, transparent 45%, #fff 45% 55%, transparent 55%),

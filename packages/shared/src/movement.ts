@@ -1,4 +1,5 @@
-import { INPUT_DT, JUMP_VELOCITY, PLAYER } from './constants.ts';
+import { GRAPPLE, INPUT_DT, JUMP_VELOCITY, PLAYER } from './constants.ts';
+import { rayWorld } from './raycast.ts';
 import { SWITCH_SECONDS, WEAPON_COUNT, WEAPONS } from './weapons.ts';
 import type { Box, Vec3, World } from './world.ts';
 
@@ -14,6 +15,8 @@ export const Buttons = {
   Reload: 1 << 8,
   /** Hold to interact: re-stitch (revive) a downed teammate. */
   Use: 1 << 9,
+  /** Hold to fire a yarn strand at a surface above you and swing from it. */
+  Grapple: 1 << 10,
 } as const;
 
 /**
@@ -65,6 +68,14 @@ export interface PlayerState {
   reload: number;
   /** Co-op: knocked down, waiting for a teammate to re-stitch you (crawl only). */
   downed: boolean;
+  /** Yarn-swing: attached to an anchor (hx, hy, hz) with this much rope; 0 rope = not attached. */
+  hooked: boolean;
+  hx: number;
+  hy: number;
+  hz: number;
+  rope: number;
+  /** Seconds until another strand can be fired. */
+  hookCd: number;
 }
 
 export function createPlayerState(spawn: Vec3, yaw = 0): PlayerState {
@@ -80,6 +91,7 @@ export function createPlayerState(spawn: Vec3, yaw = 0): PlayerState {
     mags: WEAPONS.map((w) => w.magazine),
     reload: 0,
     downed: false,
+    hooked: false, hx: 0, hy: 0, hz: 0, rope: 0, hookCd: 0,
   };
 }
 
@@ -156,6 +168,65 @@ export interface StepResult {
   fired: boolean;
   /** Weapon index that fired (valid when fired). */
   weapon: number;
+  /** Pulled up onto a ledge this step (for sounds and camera). */
+  mantled: boolean;
+  /** 1 = a yarn strand attached this step, -1 = one was fired and missed, 0 = neither. */
+  hook: number;
+}
+
+/** Chest height, where the yarn strand is tied on. */
+const CHEST = 0.9;
+
+function releaseHook(s: PlayerState, cooldown: number): void {
+  s.hooked = false;
+  s.rope = 0;
+  s.hookCd = cooldown;
+}
+
+/** Fire, hold or release the yarn strand. Returns the StepResult hook code. */
+function stepHook(s: PlayerState, b: number, pressed: number, world: World, dt: number): number {
+  s.hookCd = Math.max(0, s.hookCd - dt);
+  if (s.hooked && (!(b & Buttons.Grapple) || s.downed)) releaseHook(s, GRAPPLE.cooldown);
+  if (s.hooked && (pressed & Buttons.Jump)) {
+    releaseHook(s, GRAPPLE.cooldown);
+    s.vy = Math.max(s.vy, 0) + GRAPPLE.jumpBoost;
+  }
+  if (s.hooked || !(pressed & Buttons.Grapple) || s.hookCd > 0 || s.downed) return 0;
+  const o: Vec3 = [s.x, s.y + PLAYER.eyeHeight, s.z];
+  const d = lookDirection(s.yaw, s.pitch);
+  const t = rayWorld(o, d, world.boxes, GRAPPLE.range);
+  const hy = o[1] + d[1] * t;
+  if (t >= GRAPPLE.range || hy < o[1] + GRAPPLE.minRise) {
+    s.hookCd = GRAPPLE.missCooldown;
+    return -1;
+  }
+  s.hooked = true;
+  s.hx = o[0] + d[0] * t;
+  s.hy = hy;
+  s.hz = o[2] + d[2] * t;
+  // Snatch in a little slack at once so the strand yanks you off your feet.
+  s.rope = Math.max(GRAPPLE.minRope, Math.hypot(s.x - s.hx, s.y + CHEST - s.hy, s.z - s.hz) * GRAPPLE.snatch);
+  return 1;
+}
+
+/** Rope constraint: no stretching past the rope's length, reel in slowly, cap swing speed. */
+function applyRope(s: PlayerState, dt: number): void {
+  s.rope = Math.max(GRAPPLE.minRope, s.rope - GRAPPLE.reel * dt);
+  const dx = s.x - s.hx, dy = s.y + CHEST - s.hy, dz = s.z - s.hz;
+  const dist = Math.hypot(dx, dy, dz);
+  if (dist < 1e-6) return;
+  const nx = dx / dist, ny = dy / dist, nz = dz / dist;
+  if (dist > s.rope) {
+    const out = s.vx * nx + s.vy * ny + s.vz * nz;
+    if (out > 0) { s.vx -= out * nx; s.vy -= out * ny; s.vz -= out * nz; }
+    const pull = Math.min(12, (dist - s.rope) * 6);
+    s.vx -= nx * pull; s.vy -= ny * pull; s.vz -= nz * pull;
+  }
+  const speed = Math.hypot(s.vx, s.vy, s.vz);
+  if (speed > GRAPPLE.maxSpeed) {
+    const k = GRAPPLE.maxSpeed / speed;
+    s.vx *= k; s.vy *= k; s.vz *= k;
+  }
 }
 
 /**
@@ -189,7 +260,10 @@ export function stepPlayer(s: PlayerState, cmd: InputCmd, world: World): StepRes
   s.vx += (wx * speed - s.vx) * k;
   s.vz += (wz * speed - s.vz) * k;
 
-  if ((pressed & Buttons.Jump) && !s.downed) {
+  const wasHooked = s.hooked;
+  const hook = stepHook(s, b, pressed, world, dt);
+  // Letting go with a jump spends the jump on the release boost.
+  if ((pressed & Buttons.Jump) && !s.downed && !(wasHooked && !s.hooked)) {
     if (s.onGround) {
       s.vy = JUMP_VELOCITY;
       s.onGround = false;
@@ -200,6 +274,7 @@ export function stepPlayer(s: PlayerState, cmd: InputCmd, world: World): StepRes
   }
 
   s.vy = Math.max(-TERMINAL_VELOCITY, s.vy - PLAYER.gravity * dt);
+  if (s.hooked) applyRope(s, dt);
 
   const boxes = world.boxes;
   lastBlock = null;
@@ -215,6 +290,19 @@ export function stepPlayer(s: PlayerState, cmd: InputCmd, world: World): StepRes
     // Keep pressing into the surface so we stay on it as we rise.
     if (hit.bx) s.vx = wantX * 0.2;
     if (hit.bz) s.vz = wantZ * 0.2;
+  }
+  // Mantle: airborne, pushing into a ledge within reach with room on top? Pull yourself up.
+  let mantled = false;
+  if (!climbing && (hit.bx || hit.bz) && lastBlock !== null && !s.onGround && !s.downed && (b & Buttons.Forward) !== 0 && len > 0) {
+    const top = (lastBlock as Box).max[1];
+    const rise = top - s.y;
+    const r = PLAYER.radius;
+    if (rise > PLAYER.stepHeight && rise <= PLAYER.mantleReach && overlapsAny(boxes, s.x + wx * r, top + 0.02, s.z + wz * r) === null) {
+      const need = Math.sqrt(2 * PLAYER.gravity * (rise + 0.2));
+      if (s.vy < need) { s.vy = need; mantled = true; }
+      if (hit.bx) s.vx = wx * PLAYER.runSpeed * 0.7;
+      if (hit.bz) s.vz = wz * PLAYER.runSpeed * 0.7;
+    }
   }
 
   const dy = s.vy * dt;
@@ -257,7 +345,7 @@ export function stepPlayer(s: PlayerState, cmd: InputCmd, world: World): StepRes
   const weapon = s.weapon;
   const fired = s.downed ? false : stepWeapon(s, b, pressed, cmd.weapon, dt);
   s.buttons = b;
-  return { fired, weapon };
+  return { fired, weapon, mantled, hook };
 }
 
 function magazine(s: PlayerState): number {

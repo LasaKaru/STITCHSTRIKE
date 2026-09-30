@@ -3,7 +3,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import {
   BUILD_RANGE, Buildable, BUILDABLES, Buttons, createWorld, ENEMIES, ENEMY_INTERP_DELAY_MS, eyePosition, lookDirection, MAX_PITCH,
   pelletDirections, Phase, PLAYER, rayBox, rayPlayer, rayWorld, TURRET, TURRET_SHOT_BASE, WEAPONS,
-  MAPS, type GameMode, type MapId, type PlayerState, type Vec3,
+  GRAPPLE, MAPS, type GameMode, type MapId, type PlayerState, type Vec3,
   Action, DECK, DIFFICULTIES, ENEMY_SHOT_ID, EnemyType, launchProjectile, LAUNCHER, MAX_TIER, PICKUPS, PickupKind, ShotKind, upgradeCost, WEAPON_COUNT,
 } from '@stitchstrike/shared';
 import { CombatMusic, type Intensity } from './audio/combatMusic.ts';
@@ -16,6 +16,7 @@ import { createAvatar, type Avatar } from './scene/avatar.ts';
 import { CORE_COLORS, CORE_LETTERS, CoopProps } from './scene/coopProps.ts';
 import { EnemyRenderer, type EnemyView } from './scene/enemyRenderer.ts';
 import { Fx } from './scene/fx.ts';
+import { YarnRopes, type RopeSpec } from './scene/yarnRopes.ts';
 import { createPost, type Post } from './scene/post.ts';
 import { ViewModel } from './scene/viewModel.ts';
 import { buildWoolGarden } from './scene/woolGarden.ts';
@@ -127,6 +128,11 @@ const avatars = new Map<number, Avatar>();
 let ownAvatar: Avatar | null = null;
 const lastPos = new Map<number, THREE.Vector3>();
 const remoteNow = new Map<number, THREE.Vector3>();
+const yarnRopes = new YarnRopes(scene);
+const ropeSpecs: RopeSpec[] = [];
+let grappleDown = false;
+const crosshairEl = document.getElementById('crosshair')!;
+let lastMantle = 0;
 
 function syncAvatars(): void {
   for (const [id, a] of avatars) {
@@ -390,8 +396,13 @@ document.addEventListener('mousemove', (e) => {
   yaw -= e.movementX * sensitivity;
   pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, pitch - e.movementY * sensitivity * invertY));
 });
-document.addEventListener('mousedown', (e) => { if (e.button === 0 && document.pointerLockElement) mouseDown = true; });
-document.addEventListener('mouseup', (e) => { if (e.button === 0) mouseDown = false; });
+document.addEventListener('mousedown', (e) => {
+  if (!document.pointerLockElement) return;
+  if (e.button === 0) mouseDown = true;
+  if (e.button === 2) grappleDown = true;
+});
+document.addEventListener('mouseup', (e) => { if (e.button === 0) mouseDown = false; if (e.button === 2) grappleDown = false; });
+document.addEventListener('contextmenu', (e) => { if (document.pointerLockElement) e.preventDefault(); });
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Tab') { e.preventDefault(); scoreboard.classList.remove('hidden'); }
   if (e.code === 'KeyV' && !e.repeat) thirdPerson = !thirdPerson;
@@ -402,13 +413,14 @@ document.addEventListener('keyup', (e) => {
   if (e.code === 'Tab') scoreboard.classList.add('hidden');
   keys.delete(e.code);
 });
-window.addEventListener('blur', () => { keys.clear(); mouseDown = false; });
+window.addEventListener('blur', () => { keys.clear(); mouseDown = false; grappleDown = false; });
 
 const KEYMAP: [string[], number][] = [
   [['KeyW', 'ArrowUp'], Buttons.Forward], [['KeyS', 'ArrowDown'], Buttons.Back],
   [['KeyA', 'ArrowLeft'], Buttons.Left], [['KeyD', 'ArrowRight'], Buttons.Right],
   [['Space'], Buttons.Jump], [['ShiftLeft', 'ShiftRight'], Buttons.Sprint],
   [['KeyC', 'ControlLeft'], Buttons.Crouch], [['KeyR'], Buttons.Reload], [['KeyE'], Buttons.Use],
+  [['KeyX'], Buttons.Grapple],
 ];
 
 /** Weapon we want equipped (sent with every input), and the next one-shot action. */
@@ -473,6 +485,7 @@ function sampleButtons(): number {
   let b = 0;
   for (const [codes, bit] of KEYMAP) if (codes.some((c) => keys.has(c))) b |= bit;
   if (mouseDown) b |= Buttons.Fire;
+  if (grappleDown) b |= Buttons.Grapple;
   return b;
 }
 
@@ -492,6 +505,11 @@ function autopilotButtons(now: number, p: PlayerState | null): number {
     yaw += 0.01;
     pitch = -0.05;
     b |= Buttons.Forward | (Math.sin(now / 700) > 0.95 ? Buttons.Jump : 0);
+  }
+  // Every so often, show off the yarn-swing: look up, throw a strand and ride it.
+  if (now % 10000 < 2600) {
+    pitch = 0.85;
+    b = Buttons.Grapple | Buttons.Forward;
   }
   return b;
 }
@@ -761,9 +779,11 @@ function frame(): void {
 
   // Remote players, interpolated in the past.
   remoteNow.clear();
+  ropeSpecs.length = 0;
   for (const r of net.remotes(now)) {
     const a = avatars.get(r.id);
     if (!a) continue;
+    if (r.hook && r.alive) ropeSpecs.push({ key: r.id, from: new THREE.Vector3(r.x, r.y + 0.9, r.z), to: new THREE.Vector3(...r.hook) });
     const prev = lastPos.get(r.id) ?? new THREE.Vector3(r.x, r.y, r.z);
     const speed = Math.hypot(r.x - prev.x, r.z - prev.z) / Math.max(dt, 1e-3);
     const airborne = Math.abs(r.y - prev.y) / Math.max(dt, 1e-3) > 1.5;
@@ -809,6 +829,9 @@ function frame(): void {
     const action = pendingAction;
     pendingAction = 0;
     const r = net.input(buttons, yaw, pitch, now, wantWeapon, action);
+    if (r.mantled && now - lastMantle > 400) { sfx.play('mantle', 0.8); lastMantle = now; }
+    if (r.hook === 1) sfx.play('yarnShot');
+    else if (r.hook === -1) sfx.play('yarnMiss', 0.7);
     if (r.fired && net.predicted) {
       const s = net.predicted;
       const weapon = WEAPONS[r.weapon];
@@ -905,6 +928,23 @@ function frame(): void {
       ownAvatar.update(dt, t, Math.min(1.3, Math.hypot(p.vx, p.vz) / PLAYER.runSpeed), pitch, crouching, !p.onGround, p.downed);
     }
   }
+  // Yarn-swing strands: ours from the hand (or chest in third person), everyone else's from the chest.
+  if (p?.hooked) {
+    const from = eye.clone();
+    if (thirdPerson || fixedCam) from.y -= PLAYER.eyeHeight - 0.9;
+    else from.add(tmp.set(0.3, -0.32, -1.4).applyQuaternion(camera.quaternion));
+    ropeSpecs.push({ key: -1, from, to: new THREE.Vector3(p.hx, p.hy, p.hz), width: thirdPerson || fixedCam ? 0.06 : 0.018 });
+  }
+  yarnRopes.update(ropeSpecs, dt);
+  // The crosshair rings when a yarn strand would catch.
+  let canSwing = false;
+  if (p && !p.hooked && !p.downed && p.hookCd <= 0) {
+    const o: Vec3 = [eye.x, eye.y, eye.z];
+    const d = lookDirection(yaw, pitch);
+    const t = rayWorld(o, d, world.boxes, GRAPPLE.range);
+    canSwing = t < GRAPPLE.range && o[1] + d[1] * t >= p.y + PLAYER.eyeHeight + GRAPPLE.minRise;
+  }
+  crosshairEl.classList.toggle('can-swing', canSwing);
   flash = Math.max(0, flash - dt);
   muzzleFlash.intensity = flash > 0 ? 3 : 0;
 

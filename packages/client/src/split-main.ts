@@ -13,6 +13,7 @@ import { NetClient } from './net/netClient.ts';
 import { loopbackTransport } from './net/transport.ts';
 import { loadProfile } from './profile.ts';
 import { createAvatar, type Avatar } from './scene/avatar.ts';
+import { YarnRopes, type RopeSpec } from './scene/yarnRopes.ts';
 import { CoopProps } from './scene/coopProps.ts';
 import { EnemyRenderer, type EnemyView } from './scene/enemyRenderer.ts';
 import { Fx } from './scene/fx.ts';
@@ -118,6 +119,8 @@ const main = locals[0].net;
 // ---------------------------------------------------------------- avatars (from player 1's view of the room)
 
 const avatars = new Map<number, Avatar>();
+const yarnRopes = new YarnRopes(scene);
+const ropeSpecs: RopeSpec[] = [];
 function syncAvatars(): void {
   for (const [id, a] of avatars) if (!main.roster.has(id)) { scene.remove(a.root); avatars.delete(id); }
   for (const [id, r] of main.roster) {
@@ -206,8 +209,14 @@ document.addEventListener('mousemove', (e) => {
   l.yaw -= e.movementX * settings.sensitivity;
   l.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, l.pitch - e.movementY * settings.sensitivity * (settings.invertY ? -1 : 1)));
 });
-document.addEventListener('mousedown', (e) => { if (e.button === 0 && document.pointerLockElement) mouseDown = true; });
-document.addEventListener('mouseup', (e) => { if (e.button === 0) mouseDown = false; });
+let grappleDown = false;
+document.addEventListener('mousedown', (e) => {
+  if (!document.pointerLockElement) return;
+  if (e.button === 0) mouseDown = true;
+  if (e.button === 2) grappleDown = true;
+});
+document.addEventListener('mouseup', (e) => { if (e.button === 0) mouseDown = false; if (e.button === 2) grappleDown = false; });
+document.addEventListener('contextmenu', (e) => { if (document.pointerLockElement) e.preventDefault(); });
 document.addEventListener('keydown', (e) => {
   keys.add(e.code);
   const l = locals[0];
@@ -225,6 +234,7 @@ document.addEventListener('keyup', (e) => keys.delete(e.code));
 const KEYMAP: [string[], number][] = [
   [['KeyW'], Buttons.Forward], [['KeyS'], Buttons.Back], [['KeyA'], Buttons.Left], [['KeyD'], Buttons.Right],
   [['Space'], Buttons.Jump], [['ShiftLeft'], Buttons.Sprint], [['KeyC'], Buttons.Crouch], [['KeyR'], Buttons.Reload], [['KeyE'], Buttons.Use],
+  [['KeyX'], Buttons.Grapple],
 ];
 
 /** Pads: with two, one each; with one, it belongs to player 2 (player 1 has the keyboard). */
@@ -240,6 +250,7 @@ function sample(l: Local, dt: number): number {
   if (l.index === 0 && document.pointerLockElement === renderer.domElement) {
     for (const [codes, bit] of KEYMAP) if (codes.some((c) => keys.has(c))) b |= bit;
     if (mouseDown) b |= Buttons.Fire;
+    if (grappleDown) b |= Buttons.Grapple;
   }
   if (l.pad) {
     const f = l.pad.poll(dt, settings.sensitivity / 0.0022, settings.invertY);
@@ -318,6 +329,9 @@ function frame(): void {
         sfx.play((['popper', 'buster', 'lance', 'hook', 'launch'] as const)[r.weapon], 0.8);
         l.viewModel.fire();
       }
+      if (r.hook === 1) sfx.play('yarnShot', 0.8);
+      else if (r.hook === -1) sfx.play('yarnMiss', 0.6);
+      if (r.mantled) sfx.play('mantle', 0.6);
     }
     l.net.decayCorrection(dt);
     const p = l.net.predicted;
@@ -337,6 +351,7 @@ function frame(): void {
   }
 
   // Everyone's avatars, from player 1's view (local toys use their exact predicted state).
+  ropeSpecs.length = 0;
   for (const [id, a] of avatars) {
     const l = locals.find((x) => x.net.id === id);
     if (l) {
@@ -346,6 +361,7 @@ function frame(): void {
         a.root.position.set(p.x, p.y, p.z);
         a.root.rotation.y = l.yaw;
         a.update(dt, t, Math.hypot(p.vx, p.vz) / PLAYER.runSpeed, l.pitch, false, !p.onGround, p.downed);
+        if (p.hooked) ropeSpecs.push({ key: id, from: new THREE.Vector3(p.x, p.y + 0.9, p.z), to: new THREE.Vector3(p.hx, p.hy, p.hz) });
       }
       continue;
     }
@@ -355,8 +371,10 @@ function frame(): void {
       a.root.position.set(r.x, r.y, r.z);
       a.root.rotation.y = r.yaw;
       a.update(dt, t, 0.6, r.pitch, r.crouch, false, !r.alive || r.downed);
+      if (r.hook && r.alive) ropeSpecs.push({ key: id, from: new THREE.Vector3(r.x, r.y + 0.9, r.z), to: new THREE.Vector3(...r.hook) });
     }
   }
+  yarnRopes.update(ropeSpecs, dt);
 
   if (enemyRenderer) {
     const views: EnemyView[] = main.enemySamples(now).map((e) => {
