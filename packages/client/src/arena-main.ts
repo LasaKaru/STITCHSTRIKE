@@ -21,6 +21,8 @@ import { ViewModel } from './scene/viewModel.ts';
 import { buildWoolGarden } from './scene/woolGarden.ts';
 import { buildWoolRoom } from './scene/woolRoom.ts';
 import { buildWoolGarage } from './scene/woolGarage.ts';
+import { buildWoolBathroom } from './scene/woolBathroom.ts';
+import { buildWoolToyStore } from './scene/woolToyStore.ts';
 import { TraversalView } from './scene/traversalView.ts';
 import { levelOf, loadProfile } from './profile.ts';
 import { award, wearable, XP, type Award } from './progression.ts';
@@ -96,7 +98,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(world.outdoor ? 0xcfdfea : 0x2a2f3a);
 scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environmentIntensity = world.outdoor ? 0.5 : 0.22;
-const room = world.outdoor ? buildWoolGarden(scene, world, quality) : world.id === 'garage' ? buildWoolGarage(scene, world) : buildWoolRoom(scene, world);
+const room = world.outdoor ? buildWoolGarden(scene, world, quality) : world.id === 'garage' ? buildWoolGarage(scene, world) : world.id === 'bathroom' ? buildWoolBathroom(scene, world) : world.id === 'toystore' ? buildWoolToyStore(scene, world) : buildWoolRoom(scene, world);
 (window as unknown as { __stitchstrike: unknown }).__stitchstrike = { net, scene, renderer };
 
 const camera = new THREE.PerspectiveCamera(settings.fov, window.innerWidth / window.innerHeight, 0.03, world.outdoor ? 900 : 200);
@@ -851,7 +853,18 @@ function frame(): void {
   if (p) camera.rotation.set(pitch, yaw, 0);
   else camera.lookAt(0, 1, 0);
   if (fixedCam) {
-    const shots: Record<string, [number, number, number, number, number, number]> = world.id === 'garage' ? {
+    const shots: Record<string, [number, number, number, number, number, number]> = world.id === 'bathroom' ? {
+      overview: [30, 26, 26, -6, 0, -8],
+      core: [-8, 4, 10, -16, 1, 2],
+      tub: [-6, 16, -2, -24, 2, -22],
+      toilet: [8, 12, 0, 25, 10, -26],
+    } : world.id === 'toystore' ? {
+      overview: [0, 26, 48, 0, 4, -20],
+      core: [6, 4, -4, 0, 1, -12],
+      aisle: [0, 12, 44, 0, 14, -10],
+      shelf: [-12, 32, -2, -25, 22, -30],
+      pit: [8, 10, 18, 0, 2, 27],
+    } : world.id === 'garage' ? {
       overview: [-4, 30, 31, 2, 0, -12],
       core: [4, 3, -2, 12, 1, -12],
       car: [10, 6, 30, -8, 6, 0],

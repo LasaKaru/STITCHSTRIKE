@@ -27,6 +27,16 @@ export const BRIEFINGS: Record<MapId, string[]> = {
     'You can crawl under the car and climb onto it. The pegboard makes a fine lookout.',
     'Lance them from the shelves. Snips go for your traps, so keep them covered!',
   ],
+  bathroom: [
+    "Bathroom duty, troops. They're coming under the door, up the drain and out of the laundry basket.",
+    'Climb the shower curtain or the towel on the vanity for height. The toilet tank is the best perch in the house.',
+    'Hop into the tub for cover, and do NOT fall in the loo!',
+  ],
+  toystore: [
+    'The toy store, soldiers. The Baron is opening his factory-made recruits straight off the shelves!',
+    'Climb the SALE banners to the top shelves and rain yarn down the aisle.',
+    'They are coming through the sliding doors and from behind the checkout. Hold the aisle!',
+  ],
 };
 
 const TAUNTS = [
