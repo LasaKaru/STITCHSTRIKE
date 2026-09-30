@@ -10,12 +10,15 @@ export interface Box {
   color?: number;
   /** Render hint only: what real object this collision box is drawn as. */
   shape?: string;
+  /** Fabric you can climb (bedsheets, curtains, pegboard, tree bark): push into it to climb. */
+  climb?: boolean;
 }
 
-export type MapId = 'bedroom' | 'garden';
+export type MapId = 'bedroom' | 'garden' | 'garage';
 export const MAPS: { id: MapId; name: string; blurb: string }[] = [
   { id: 'bedroom', name: 'Sunbeam Bedroom', blurb: 'A messy knitted bedroom lit by one sunbeam.' },
   { id: 'garden', name: 'Back Garden', blurb: 'Lawn, trees, a house, a shed and a treehouse, all wool.' },
+  { id: 'garage', name: 'The Garage', blurb: 'A family car, steel shelving, a workbench and a half-open door.' },
 ];
 
 export interface World {
@@ -35,7 +38,12 @@ export interface World {
   jumpPads: JumpPad[];
   /** Built spring pads (co-op), kept in sync by the room; also launch toys. Floor level. */
   springs?: { x: number; z: number; r: number; launch: number }[];
+  /** Hidden golden thimbles and weapon parts; collected per player profile (client-side). */
+  collectibles: Collectible[];
 }
+
+export const CollectibleKind = { Thimble: 0, Part: 1, Credits: 2 } as const;
+export interface Collectible { id: string; pos: Vec3; kind: number }
 
 export interface JumpPad { x: number; y: number; z: number; r: number; launch: number }
 
@@ -113,8 +121,10 @@ export function createBedroom(): World {
     box(W, 0, -D, W + T, H, D, 'wall', 0x66728c),
 
     // Bed along the back wall: mattress top at 5 u.
-    { ...box(-W, 0, -D, -W + 11, 5, -D + 18, 'furniture', 0x3a5da8), shape: 'bed' },
-    { ...box(-W, 5, -D, -W + 11, 9, -D + 1.2, 'furniture', 0x6a5a4a), shape: 'headboard' },
+    { ...box(-W, 0, -D, -W + 11, 5, -D + 18, 'furniture', 0x3a5da8), shape: 'bed', climb: true },
+    { ...box(-W, 5, -D, -W + 11, 9, -D + 1.2, 'furniture', 0x6a5a4a), shape: 'headboard', climb: true },
+    // A long knitted curtain by the window, hanging to the floor: climb it to the sill.
+    { ...box(-W, 0, 12.2, -W + 0.6, 17, 14, 'furniture', 0xd9a441), shape: 'curtain', climb: true },
 
     // Desk (top at 7.5) with legs, and a chair seat at 4.5.
     { ...box(8, 7, -D, W, 7.5, -D + 7, 'furniture', 0xc8a878), shape: 'deskTop' },
@@ -180,11 +190,28 @@ export function createBedroom(): World {
     // Rewards for climbing: armour on the bed, power on the top shelf, armour on the desk.
     { pos: [-15, 5, -8], kind: 1 }, { pos: [18, 16, 8], kind: 2 }, { pos: [16, 7.5, -13], kind: 1 },
   ];
-  return { id: 'bedroom', name: 'Sunbeam Bedroom', bounds: { min: [-19, -17], max: [19, 17] }, outdoor: false, boxes, spawns, waypoints, coop, pickups, jumpPads: [] };
+  // Spring toys: one by the bookshelf (to the top shelf), one by the desk.
+  const jumpPads = [
+    { x: 14, y: 0, z: 8, r: 1, launch: 30 },
+    { x: 5.5, y: 0, z: -12, r: 1, launch: 21 },
+  ];
+  const T0 = CollectibleKind.Thimble, PT = CollectibleKind.Part, CR = CollectibleKind.Credits;
+  const collectibles: Collectible[] = [
+    { id: 'bed-shelf-top', pos: [18, 16, 5], kind: T0 },
+    { id: 'bed-headboard', pos: [-15, 9, -16.8], kind: T0 },
+    { id: 'bed-desk', pos: [19, 7.5, -16], kind: T0 },
+    { id: 'bed-chair', pos: [13, 8.5, -6.3], kind: PT },
+    { id: 'bed-drum', pos: [13, 3, -1], kind: CR },
+    { id: 'bed-curtain', pos: [-19.3, 17, 13.1], kind: T0 },
+    { id: 'bed-corner', pos: [18.5, 0, 16], kind: PT },
+    { id: 'bed-beanbag', pos: [-3, 3, 9], kind: CR },
+  ];
+  return { id: 'bedroom', name: 'Sunbeam Bedroom', bounds: { min: [-19, -17], max: [19, 17] }, outdoor: false, boxes, spawns, waypoints, coop, pickups, jumpPads, collectibles };
 }
 
 export function createWorld(map: MapId = 'bedroom'): World {
-  return map === 'garden' ? createGarden() : createBedroom();
+  return map === 'garden' ? createGarden() : map === 'garage' ? createGarage() : createBedroom();
 }
 
+import { createGarage } from './garage.ts';
 import { createGarden } from './garden.ts';

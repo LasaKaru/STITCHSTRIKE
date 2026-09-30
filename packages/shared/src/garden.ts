@@ -1,4 +1,4 @@
-import { box, ringPads, type Box, type CoopLayout, type Vec3, type World } from './world.ts';
+import { box, CollectibleKind, ringPads, type Box, type CoopLayout, type Vec3, type World } from './world.ts';
 
 /**
  * "Back Garden": a big outdoor map at toy scale (1 u = 10 cm). A house with a
@@ -65,6 +65,8 @@ export function createGarden(): World {
     s(box(-41, 0, 36, -40.4, 14, 36.6, 'prop', 0xefe3c8), 'clothesPost'),
     s(box(-15, 0, 36, -14.4, 14, 36.6, 'prop', 0xefe3c8), 'clothesPost'),
   ];
+  // Bark and hedges are climbable.
+  for (const b of boxes) if (b.shape === 'treeTrunk' || b.shape === 'hedge') b.climb = true;
   // Crate climb up to the treehouse: 2 u rises so single jumps chain.
   for (let i = 0; i < 5; i++) {
     const x0 = -22 - i * 3;
@@ -92,6 +94,20 @@ export function createGarden(): World {
       // Climb rewards: armour on the deck and in the shed, power up in the treehouse.
       { pos: [-24, 3, -36], kind: 1 }, { pos: [36, 0, -34], kind: 1 }, { pos: [-36, 12.8, 6], kind: 2 },
     ],
-    jumpPads: [],
+    // Spring toys: up onto the shed roof and over the hedge top.
+    jumpPads: [
+      { x: 21.5, y: 0, z: -30, r: 1.1, launch: 33 },
+      { x: -20, y: 0, z: 36.5, r: 1.1, launch: 20 },
+    ],
+    collectibles: [
+      { id: 'gar-shed-roof', pos: [32, 19, -30], kind: CollectibleKind.Thimble },
+      { id: 'gar-treehouse', pos: [-39, 12.8, -1], kind: CollectibleKind.Thimble },
+      { id: 'gar-hedge', pos: [-30, 7, 41.5], kind: CollectibleKind.Thimble },
+      { id: 'gar-log', pos: [29, 3, 34.5], kind: CollectibleKind.Part },
+      { id: 'gar-birdbath', pos: [21, 6, 26], kind: CollectibleKind.Credits },
+      { id: 'gar-wheelbarrow', pos: [26, 4, 8], kind: CollectibleKind.Part },
+      { id: 'gar-pool', pos: [-19, 0, 26], kind: CollectibleKind.Credits },
+      { id: 'gar-pots', pos: [41, 5, -1], kind: CollectibleKind.Thimble },
+    ],
   };
 }

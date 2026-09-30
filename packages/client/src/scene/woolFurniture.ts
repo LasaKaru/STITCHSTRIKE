@@ -76,6 +76,25 @@ export function renderFurniture(group: THREE.Group, b: Box, wool: WoolFn): boole
   const add = (o: THREE.Object3D, x: number, y: number, z: number) => { o.position.set(x, y, z); group.add(o); return o; };
 
   switch (b.shape) {
+    case 'curtain': {
+      // A long knitted curtain in deep folds, pooling on the floor: climbable.
+      const geo = new THREE.PlaneGeometry(size[2], size[1], 24, 30);
+      const pos = geo.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const u = pos.getX(i), v = pos.getY(i);
+        pos.setZ(i, Math.sin(u * 5.5) * 0.28 + (v < -size[1] / 2 + 1 ? (1 - (v + size[1] / 2)) * 0.25 : 0));
+      }
+      geo.computeVertexNormals();
+      const mat = wool('rib', b.color ?? 0xd9a441, 1.1);
+      const cur = m(geo, mat);
+      (cur.material as THREE.Material).side = THREE.DoubleSide;
+      cur.rotation.y = Math.PI / 2;
+      add(cur, b.max[0] - 0.1, c.y, c.z);
+      const rod = m(new THREE.CylinderGeometry(0.12, 0.12, size[2] + 1.5, 10), wool('felt', 0x6a4a2e, 1));
+      rod.rotation.x = Math.PI / 2;
+      add(rod, b.max[0] - 0.05, b.max[1] + 0.1, c.z);
+      return true;
+    }
     case 'bed': {
       const frame = wool('felt', 0x8a5a3a, 1);
       // Frame rails and turned legs, a quilted mattress, a draped duvet, pillows.

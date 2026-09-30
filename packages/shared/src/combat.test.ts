@@ -369,3 +369,46 @@ describe('team deathmatch', () => {
     expect(a.health).toBe(PLAYER.maxHealth);
   });
 });
+
+describe('traversal', () => {
+  it('toys climb knitted fabric by walking into it', () => {
+    const world = createBedroom();
+    // Face the bed's side (it sits at x < -9) from the open floor and walk into it.
+    const s = createPlayerState([-8, 0, -6]);
+    const yaw = Math.PI / 2; // looking down -X
+    let top = 0;
+    for (let i = 1; i <= 240; i++) {
+      stepPlayer(s, cmd(i, Buttons.Forward, 0, 0, yaw), world);
+      top = Math.max(top, s.y);
+    }
+    expect(top).toBeGreaterThanOrEqual(4.9);
+    expect(s.x).toBeLessThan(-9);
+  });
+
+  it('plain walls cannot be climbed', () => {
+    const world = createBedroom();
+    const s = createPlayerState([18, 0, -3]);
+    for (let i = 1; i <= 120; i++) stepPlayer(s, cmd(i, Buttons.Forward, 0, 0, -Math.PI / 2), world);
+    expect(s.y).toBeLessThan(0.5);
+  });
+
+  it('map jump pads launch toys high', () => {
+    for (const map of ['bedroom', 'garden', 'garage'] as const) {
+      const world = createWorld(map);
+      for (const j of world.jumpPads) {
+        const s = createPlayerState([j.x, j.y + 0.5, j.z]);
+        let top = 0;
+        for (let i = 1; i <= 90; i++) { stepPlayer(s, cmd(i, 0), world); top = Math.max(top, s.y); }
+        expect(top - j.y).toBeGreaterThan(7.2);
+      }
+    }
+  });
+
+  it('every map hides collectibles', () => {
+    for (const map of ['bedroom', 'garden', 'garage'] as const) {
+      const world = createWorld(map);
+      expect(world.collectibles.length).toBeGreaterThanOrEqual(8);
+      expect(new Set(world.collectibles.map((c) => c.id)).size).toBe(world.collectibles.length);
+    }
+  });
+});

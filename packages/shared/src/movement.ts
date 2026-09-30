@@ -104,6 +104,9 @@ function overlapsAny(boxes: Box[], x: number, y: number, z: number): Box | null 
   return null;
 }
 
+/** The box that blocked the most recent horizontal move (for climbing). */
+let lastBlock: Box | null = null;
+
 /** Moves along one axis and pushes back out of any box hit. Returns true if blocked. */
 function moveAxis(s: PlayerState, axis: 0 | 1 | 2, delta: number, boxes: Box[]): boolean {
   if (delta === 0) return false;
@@ -118,6 +121,7 @@ function moveAxis(s: PlayerState, axis: 0 | 1 | 2, delta: number, boxes: Box[]):
     const b = overlapsAny(boxes, s.x, s.y, s.z);
     if (!b) break;
     blocked = true;
+    if (axis !== 1) lastBlock = b;
     if (axis === 0) s.x = delta > 0 ? b.min[0] - r : b.max[0] + r;
     else if (axis === 1) s.y = delta > 0 ? b.min[1] - h : b.max[1];
     else s.z = delta > 0 ? b.min[2] - r : b.max[2] + r;
@@ -198,9 +202,20 @@ export function stepPlayer(s: PlayerState, cmd: InputCmd, world: World): StepRes
   s.vy = Math.max(-TERMINAL_VELOCITY, s.vy - PLAYER.gravity * dt);
 
   const boxes = world.boxes;
+  lastBlock = null;
+  const wantX = s.vx, wantZ = s.vz;
   const hit = moveHorizontal(s, s.vx * dt, s.vz * dt, boxes, s.onGround);
   if (hit.bx) s.vx = 0;
   if (hit.bz) s.vz = 0;
+  // Climbing: walk into fabric or bark and you go up it (a toy's grippy knitted hands).
+  const climbing = (hit.bx || hit.bz) && lastBlock !== null && (lastBlock as Box).climb === true && (b & Buttons.Forward) !== 0 && !s.downed;
+  if (climbing) {
+    s.vy = Math.max(s.vy, PLAYER.climbSpeed);
+    s.airJumps = 1;
+    // Keep pressing into the surface so we stay on it as we rise.
+    if (hit.bx) s.vx = wantX * 0.2;
+    if (hit.bz) s.vz = wantZ * 0.2;
+  }
 
   const dy = s.vy * dt;
   const blockedY = moveAxis(s, 1, dy, boxes);

@@ -57,6 +57,8 @@ export const PLAYER = {
   reviveSeconds: 2.5,
   reviveRange: 2.1,
   reviveHealth: 60,
+  /** Climbing speed up fabric and bark. */
+  climbSpeed: 5.5,
 } as const;
 
 export const JUMP_VELOCITY = Math.sqrt(2 * PLAYER.gravity * PLAYER.jumpHeight);

@@ -20,6 +20,9 @@ import { createPost, type Post } from './scene/post.ts';
 import { ViewModel } from './scene/viewModel.ts';
 import { buildWoolGarden } from './scene/woolGarden.ts';
 import { buildWoolRoom } from './scene/woolRoom.ts';
+import { buildWoolGarage } from './scene/woolGarage.ts';
+import { TraversalView } from './scene/traversalView.ts';
+import { loadProfile, saveProfile } from './profile.ts';
 import { QUALITY_LAYERS, setWoolLayers, updateShellLod } from './wool/woolMaterial.ts';
 
 /**
@@ -87,7 +90,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(world.outdoor ? 0xcfdfea : 0x2a2f3a);
 scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environmentIntensity = world.outdoor ? 0.5 : 0.22;
-const room = world.outdoor ? buildWoolGarden(scene, world, quality) : buildWoolRoom(scene, world);
+const room = world.outdoor ? buildWoolGarden(scene, world, quality) : world.id === 'garage' ? buildWoolGarage(scene, world) : buildWoolRoom(scene, world);
 (window as unknown as { __stitchstrike: unknown }).__stitchstrike = { net, scene, renderer };
 
 const camera = new THREE.PerspectiveCamera(settings.fov, window.innerWidth / window.innerHeight, 0.03, world.outdoor ? 900 : 200);
@@ -619,9 +622,12 @@ function teamScoreText(): string {
 }
 
 const pickupsView = new PickupsView(scene, world);
+const profile = loadProfile();
+const traversal = new TraversalView(scene, world, new Set(profile.collected));
 const music = new CombatMusic();
 
 let acc = 0;
+let springSounded = false;
 let last = performance.now();
 let flash = 0;
 let hudTimer = 0;
@@ -748,7 +754,12 @@ function frame(): void {
   if (p) camera.rotation.set(pitch, yaw, 0);
   else camera.lookAt(0, 1, 0);
   if (fixedCam) {
-    const shots: Record<string, [number, number, number, number, number, number]> = world.outdoor ? {
+    const shots: Record<string, [number, number, number, number, number, number]> = world.id === 'garage' ? {
+      overview: [-4, 30, 31, 2, 0, -12],
+      core: [4, 3, -2, 12, 1, -12],
+      car: [10, 6, 30, -8, 6, 0],
+      shelf: [10, 20, 8, 36, 12, -15],
+    } : world.outdoor ? {
       overview: [48, 40, 50, -4, 0, -4],
       core: [12, 3.2, 12, 4, 1.2, 2],
       window: [-6, 20, 40, -20, 6, -20],
@@ -798,6 +809,19 @@ function frame(): void {
 
   fx.update(dt);
   if (net.latest) pickupsView.update(dt, t, net.latest.pickups, net.latest.drops, net.latest.projectiles, net.id);
+  for (const c of traversal.update(t, p && !autopilot ? p : null)) {
+    // Secrets: golden thimbles, weapon parts and credit buttons, kept in your profile.
+    profile.collected.push(c.id);
+    const found = world.collectibles.filter((k) => profile.collected.includes(k.id)).length;
+    const reward = c.kind === 2 ? 150 : 60;
+    profile.credits += reward;
+    saveProfile(profile);
+    sfx.play('collect');
+    banner(`${['GOLDEN THIMBLE', 'WEAPON PART', 'CREDIT STASH'][c.kind]} FOUND! ${found}/${world.collectibles.length}`, 'good', 2200);
+    popup(`+${reward} credits`);
+  }
+  if (p && p.onGround === false && p.vy > 15 && !springSounded) { sfx.play('spring'); springSounded = true; }
+  if (p?.onGround) springSounded = false;
   const cp = net.coop;
   music.setIntensity((!cp ? (net.latest ? 2 : 0) : cp.phase === Phase.Wave ? (cp.boss >= 0 ? 3 : 2) : cp.phase === Phase.Build ? 1 : 0) as Intensity);
   room.update(t, camera);
