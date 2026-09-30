@@ -63,6 +63,10 @@ export interface WoolOptions {
    * static geometry without meaningful UVs (walls, furniture). uvSize is ignored.
    */
   triplanar?: boolean;
+  /** UVs are already in stitch units (sculpted figures with knit-flow UVs); uvSize is ignored. */
+  stitchUv?: boolean;
+  /** Skinned shell layer (1..N): pushed out along the normal like instanced shells, but per draw. */
+  shellLayer?: number;
   /** Multiplier on the global stitch density (e.g. 1.4 for finer yarn). */
   gauge?: number;
   /** Multiplier on fuzz length (felt and mohair are fuzzier). */
@@ -135,8 +139,9 @@ function patchShader(shader: THREE.WebGLProgramParametersWithUniforms, data: Woo
   vs = vs.replace('#include <common>', `#include <common>\n${VERT_DECL}`);
   vs = vs.replace('#include <uv_vertex>', '#include <uv_vertex>\n\tvWoolUv = uv * uWoolRepeat;');
   if (data.shell) {
+    const layer = options.shellLayer !== undefined ? `${options.shellLayer.toFixed(1)}` : '( float( gl_InstanceID ) + 1.0 )';
     vs = vs.replace('#include <begin_vertex>', /* glsl */ `#include <begin_vertex>
-	vWoolShellT = ( float( gl_InstanceID ) + 1.0 ) / uWoolShellCount;
+	vWoolShellT = ${layer} / uWoolShellCount;
 	float woolLen = uWoolShellLength * uWoolFuzz;
 	transformed += objectNormal * woolLen * vWoolShellT;
 	transformed.y -= woolLen * 0.35 * vWoolShellT * vWoolShellT;`);
@@ -242,7 +247,9 @@ export function createWoolMaterial(options: WoolOptions, shell = false): THREE.M
   const maps = getStitchMaps(options.pattern);
   const gauge = (options.gauge ?? 1) * woolParams.density;
   // Triplanar: repeat is tiles per world unit. UV-mapped: whole tiles across the part so seams wrap.
-  const repeat = options.triplanar
+  const repeat = options.stitchUv
+    ? new THREE.Vector2(1 / maps.cols, 1 / maps.rows)
+    : options.triplanar
     ? new THREE.Vector2(gauge / maps.cols, gauge / maps.rows)
     : new THREE.Vector2(
       Math.max(1, Math.round((options.uvSize[0] * gauge) / maps.cols)),
@@ -267,7 +274,7 @@ export function createWoolMaterial(options: WoolOptions, shell = false): THREE.M
     patchShader(shader, data, mat);
     syncLayerUniforms(mat);
   };
-  mat.customProgramCacheKey = () => `wool${shell ? '-shell' : ''}${options.triplanar ? '-tri' : ''}`;
+  mat.customProgramCacheKey = () => `wool${shell ? '-shell' : ''}${options.triplanar ? '-tri' : ''}${options.shellLayer !== undefined ? `-L${options.shellLayer}` : ''}`;
   all.add(mat);
   applyLayers(mat, currentLayers);
   return mat;

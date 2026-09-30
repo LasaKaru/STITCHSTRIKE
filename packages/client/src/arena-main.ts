@@ -111,11 +111,16 @@ function syncAvatars(): void {
   }
   for (const [id, r] of net.roster) {
     if (id === net.id) {
-      if (!ownAvatar) { ownAvatar = createAvatar(r.color); ownAvatar.root.visible = false; scene.add(ownAvatar.root); }
+      if (!ownAvatar) {
+        ownAvatar = createAvatar(r.color, id);
+        ownAvatar.root.visible = false;
+        scene.add(ownAvatar.root);
+        viewModel.setJacket(r.color);
+      }
       continue;
     }
     if (!avatars.has(id)) {
-      const a = createAvatar(r.color);
+      const a = createAvatar(r.color, id);
       scene.add(a.root);
       avatars.set(id, a);
     }
@@ -129,7 +134,7 @@ function colorOf(id: number): number {
 
 // ---------------------------------------------------------------- enemies (client view)
 
-interface EnemyVisual { yaw: number; phase: number; hitAge: number; last: THREE.Vector3 }
+interface EnemyVisual { yaw: number; phase: number; speed: number; hitAge: number; last: THREE.Vector3 }
 const enemyVisuals = new Map<number, EnemyVisual>();
 let enemies: EnemySample[] = [];
 const ENEMY_COLORS = [0xb3262c, 0x6a3c9a, 0xb8a58a, 0x3e5a3a];
@@ -497,11 +502,11 @@ function frame(): void {
     if (!a) continue;
     const prev = lastPos.get(r.id) ?? new THREE.Vector3(r.x, r.y, r.z);
     const speed = Math.hypot(r.x - prev.x, r.z - prev.z) / Math.max(dt, 1e-3);
+    const airborne = Math.abs(r.y - prev.y) / Math.max(dt, 1e-3) > 1.5;
     lastPos.set(r.id, new THREE.Vector3(r.x, r.y, r.z));
     a.root.position.set(r.x, r.y, r.z);
     a.root.rotation.y = r.yaw;
-    a.setPose(r.pitch, Math.min(1, speed / PLAYER.runSpeed), t, r.crouch);
-    a.setDowned(!r.alive);
+    a.update(dt, t, Math.min(1.3, speed / PLAYER.runSpeed), r.pitch, r.crouch, airborne, !r.alive);
     if (r.alive) remoteNow.set(r.id, new THREE.Vector3(r.x, r.y, r.z));
   }
 
@@ -511,9 +516,9 @@ function frame(): void {
     const views: EnemyView[] = [];
     for (const e of enemies) {
       let v = enemyVisuals.get(e.id);
-      if (!v) { v = { yaw: 0, phase: Math.random() * 6, hitAge: 1, last: new THREE.Vector3(e.x, e.y, e.z) }; enemyVisuals.set(e.id, v); }
+      if (!v) { v = { yaw: 0, phase: Math.random() * 6, speed: 0, hitAge: 1, last: new THREE.Vector3(e.x, e.y, e.z) }; enemyVisuals.set(e.id, v); }
       const moved = Math.hypot(e.x - v.last.x, e.z - v.last.z);
-      v.phase += moved * (e.type === 3 ? 2.2 : 4.5);
+      v.phase += moved * (e.type === 3 ? 2.6 : e.type === 1 ? 6 : 5.5);
       if (Math.hypot(e.vx, e.vz) > 1e-3) {
         const target = Math.atan2(-e.vx, -e.vz);
         let d = target - v.yaw;
@@ -523,7 +528,9 @@ function frame(): void {
       }
       v.hitAge += dt;
       v.last.set(e.x, e.y, e.z);
-      views.push({ id: e.id, type: e.type, x: e.x, y: e.y, z: e.z, yaw: v.yaw, health: e.health, phase: v.phase, hitAge: v.hitAge });
+      const speed = moved / Math.max(dt, 1e-3) / ENEMIES[e.type].speed;
+      v.speed += (speed - v.speed) * Math.min(1, dt * 8);
+      views.push({ id: e.id, type: e.type, x: e.x, y: e.y, z: e.z, yaw: v.yaw, health: e.health, phase: v.phase, speed: v.speed, hitAge: v.hitAge });
     }
     enemyRenderer.update(views, t);
   }
@@ -596,7 +603,7 @@ function frame(): void {
     if (p) {
       ownAvatar.root.position.set(eye.x, eye.y - (crouching ? PLAYER.eyeHeight * 0.7 : PLAYER.eyeHeight), eye.z);
       ownAvatar.root.rotation.y = yaw;
-      ownAvatar.setPose(pitch, Math.min(1, Math.hypot(p.vx, p.vz) / PLAYER.runSpeed), t, crouching);
+      ownAvatar.update(dt, t, Math.min(1.3, Math.hypot(p.vx, p.vz) / PLAYER.runSpeed), pitch, crouching, !p.onGround, false);
     }
   }
   flash = Math.max(0, flash - dt);

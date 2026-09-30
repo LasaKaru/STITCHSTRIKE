@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { Box, World } from '@stitchstrike/shared';
 import type { StitchPattern } from '../wool/stitches.ts';
 import { addShellFuzz, createWoolMaterial } from '../wool/woolMaterial.ts';
+import { knittedFloor, renderFurniture, roomDetails } from './woolFurniture.ts';
 
 /**
  * The whole room is wool: knitted walls and ceiling, a knitted carpet with a
@@ -69,9 +70,10 @@ function renderBox(group: THREE.Group, b: Box, index: number): void {
   const centre = new THREE.Vector3((b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2);
 
   if (b.kind === 'floor') {
-    group.add(boxMesh(b.min, b.max, wool('rib', 0xa89a86, 0.8), false));
+    knittedFloor(group, b, wool);
     return;
   }
+  if (renderFurniture(group, b, wool)) return;
   if (b.kind === 'wall') {
     if (b.max[0] === ROOM_WINDOW.x) { windowWall(group, b); return; }
     group.add(boxMesh(b.min, b.max, wool('stocking', color, 0.7), true));
@@ -82,20 +84,6 @@ function renderBox(group: THREE.Group, b: Box, index: number): void {
     m.scale.set(size[0] / 2 * 1.05, size[1] * 0.62, size[2] / 2 * 1.05);
     m.position.set(centre.x, b.min[1] + size[1] * 0.42, centre.z);
     group.add(m);
-    return;
-  }
-  if (b.shape === 'bed') {
-    const quilt = mesh(pillowBox(size[0], size[1], size[2], 0.35), wool('stocking', color, 0.8));
-    quilt.position.copy(centre);
-    group.add(quilt);
-    // Granny-square throw and a fat knitted pillow on top.
-    const throwMat = wool('crochet', 0xe8742a, 0.9);
-    const throwBlanket = mesh(pillowBox(size[0] * 0.9, 0.35, size[2] * 0.45, 0.1), throwMat);
-    throwBlanket.position.set(centre.x, b.max[1] + 0.3, centre.z + size[2] * 0.2);
-    group.add(throwBlanket);
-    const pillow = mesh(pillowBox(size[0] * 0.7, 1.2, 3, 0.4), wool('rib', 0xefe3c8, 1));
-    pillow.position.set(centre.x, b.max[1] + 0.7, b.min[2] + 2.4);
-    group.add(pillow);
     return;
   }
   if (b.shape === 'books') {
@@ -217,6 +205,7 @@ export function buildWoolRoom(scene: THREE.Scene, world: World): WoolRoom {
   group.add(boxMesh([-21, CEILING, -18.5], [21, CEILING + 1, 18.5], wool('stocking', 0x7a8499, 0.6)));
   ragRug(group);
   shelfBooks(group);
+  roomDetails(group, wool);
 
   // A felt poster with a crocheted sun on the back wall, and a hanging yarn-ball mobile.
   const poster = boxMesh([-4, 9, -17.5], [4, 15, -17.35], wool('felt', 0x2f7fe0, 1));
@@ -286,7 +275,7 @@ function lightShaft(sunDir: THREE.Vector3): { mesh: THREE.Mesh; update(camera: T
   geo.setAttribute('along', new THREE.Float32BufferAttribute([0, 0, 0, 0, 1, 1, 1, 1], 1));
   geo.setIndex([0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7, 6, 3, 0, 4, 3, 4, 7]);
   const mat = new THREE.ShaderMaterial({
-    uniforms: { uColor: { value: new THREE.Color(0xffd9a0) }, uIntensity: { value: 0.014 } },
+    uniforms: { uColor: { value: new THREE.Color(0xffd9a0) }, uIntensity: { value: 0.009 } },
     vertexShader: /* glsl */ `
       attribute float along;
       varying float vAlong;

@@ -21,6 +21,7 @@ export default defineConfig({
         index: resolve(import.meta.dirname, 'index.html'),
         wool: resolve(import.meta.dirname, 'wool.html'),
         arena: resolve(import.meta.dirname, 'arena.html'),
+        figures: resolve(import.meta.dirname, 'figures.html'),
       },
     },
   },

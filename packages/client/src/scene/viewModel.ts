@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { addShellFuzz, createWoolMaterial } from '../wool/woolMaterial.ts';
 import { wood } from './materials.ts';
+import { createFpArms } from '../figures/fpArms.ts';
 import { createPopper } from './pip.ts';
 
 /** Button Buster: double knitted barrels on a wooden stock with a big sewing-button drum. */
@@ -39,6 +40,8 @@ export class ViewModel {
   private switchT = 1;
   private recoil = 0;
   private bob = 0;
+  private arms: THREE.Object3D;
+  private jacket = 0xe8742a;
 
   constructor(camera: THREE.Camera) {
     const popper = createPopper();
@@ -53,18 +56,22 @@ export class ViewModel {
       return holder;
     });
     this.guns[0].visible = true;
-    // A knitted sleeve so the hand holding the blaster is wool too.
-    const sleeve = new THREE.Mesh(
-      new THREE.CapsuleGeometry(0.075, 0.3, 8, 18),
-      createWoolMaterial({ color: 0xe8742a, pattern: 'rib', uvSize: [0.47, 0.54], gauge: 1.2 }),
-    );
-    sleeve.rotation.x = Math.PI / 2 - 0.25;
-    sleeve.position.set(0.02, -0.1, 0.2);
-    addShellFuzz(sleeve);
-    this.group.add(sleeve);
+    // Sculpted knitted sleeves and gloved hands gripping the blaster.
+    this.arms = createFpArms(0xe8742a);
+    this.group.add(this.arms);
     this.group.position.set(0.26, -0.26, -0.42);
     this.group.traverse((o) => { o.renderOrder = 5; });
     camera.add(this.group);
+  }
+
+  /** Re-knit the sleeves in the player's yarn colour. */
+  setJacket(color: number): void {
+    if (color === this.jacket) return;
+    this.jacket = color;
+    this.group.remove(this.arms);
+    this.arms = createFpArms(color);
+    this.arms.traverse((o) => { o.renderOrder = 5; });
+    this.group.add(this.arms);
   }
 
   setWeapon(i: number): void {

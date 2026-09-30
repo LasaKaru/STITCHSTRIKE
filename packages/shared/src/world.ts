@@ -7,7 +7,8 @@ export interface Box {
   kind: 'floor' | 'wall' | 'furniture' | 'prop' | 'shelf';
   color?: number;
   /** Render hint only: draw as something softer than a box. */
-  shape?: 'beanbag' | 'books' | 'bed';
+  shape?: 'beanbag' | 'books' | 'bed' | 'headboard' | 'deskTop' | 'deskLeg' | 'deskSide' | 'chairSeat' | 'chairBack' | 'chairPost'
+    | 'toyChest' | 'blocks' | 'car' | 'ruler' | 'book' | 'drum' | 'bookStack';
 }
 
 export interface World {
@@ -94,15 +95,16 @@ export function createBedroom(): World {
 
     // Bed along the back wall: mattress top at 5 u.
     { ...box(-W, 0, -D, -W + 11, 5, -D + 18, 'furniture', 0x3a5da8), shape: 'bed' },
-    box(-W, 5, -D, -W + 11, 9, -D + 1.2, 'furniture', 0x6a5a4a),
+    { ...box(-W, 5, -D, -W + 11, 9, -D + 1.2, 'furniture', 0x6a5a4a), shape: 'headboard' },
 
     // Desk (top at 7.5) with legs, and a chair seat at 4.5.
-    box(8, 7, -D, W, 7.5, -D + 7, 'furniture', 0xc8a878),
-    box(8, 0, -D, 8.8, 7, -D + 0.8, 'furniture', 0xa88858),
-    box(8, 0, -D + 6.2, 8.8, 7, -D + 7, 'furniture', 0xa88858),
-    box(W - 0.8, 0, -D, W, 7, -D + 7, 'furniture', 0xa88858),
-    box(11, 4, -D + 7.5, 15, 4.5, -D + 11.5, 'furniture', 0xd8262e),
-    box(12.6, 0, -D + 9.1, 13.4, 4, -D + 9.9, 'furniture', 0x333333),
+    { ...box(8, 7, -D, W, 7.5, -D + 7, 'furniture', 0xc8a878), shape: 'deskTop' },
+    { ...box(8, 0, -D, 8.8, 7, -D + 0.8, 'furniture', 0xa88858), shape: 'deskLeg' },
+    { ...box(8, 0, -D + 6.2, 8.8, 7, -D + 7, 'furniture', 0xa88858), shape: 'deskLeg' },
+    { ...box(W - 0.8, 0, -D, W, 7, -D + 7, 'furniture', 0xa88858), shape: 'deskSide' },
+    { ...box(11, 4, -D + 7.5, 15, 4.5, -D + 11.5, 'furniture', 0xd8262e), shape: 'chairSeat' },
+    { ...box(11.2, 4.5, -D + 11.1, 14.8, 8.5, -D + 11.6, 'furniture', 0xd8262e), shape: 'chairBack' },
+    { ...box(12.6, 0, -D + 9.1, 13.4, 4, -D + 9.9, 'furniture', 0x333333), shape: 'chairPost' },
 
     // Bookshelf tower on the right wall: shelves every 4 u, top at 16.
     box(W - 4, 0, 4, W, 0.6, 12, 'shelf', 0xb89870),
@@ -115,19 +117,19 @@ export function createBedroom(): World {
 
     // Bean bag (soft high ground) and toy clutter used as cover.
     { ...box(-6, 0, 6, 0, 3, 12, 'prop', 0x8bcb3a), shape: 'beanbag' },
-    box(-2, 0, -4, 1, 2, -1, 'prop', 0xe8742a),
-    box(4, 0, 2, 6, 2.6, 4, 'prop', 0x2f7fe0),
-    box(-12, 0, 6, -9, 1.2, 9, 'prop', 0xd8262e),
-    box(2, 0, 10, 8, 1, 11, 'prop', 0xefe3c8),
-    box(-4, 0, -12, -1, 4, -11, 'prop', 0x5e6b86),
-    box(12, 0, -2, 14, 3, 0, 'prop', 0xffc94a),
+    { ...box(-2, 0, -4, 1, 2, -1, 'prop', 0xe8742a), shape: 'toyChest' },
+    { ...box(4, 0, 2, 6, 2.6, 4, 'prop', 0x2f7fe0), shape: 'blocks' },
+    { ...box(-12, 0, 6, -9, 1.2, 9, 'prop', 0xd8262e), shape: 'car' },
+    { ...box(2, 0, 10, 8, 1, 11, 'prop', 0xefe3c8), shape: 'ruler' },
+    { ...box(-4, 0, -12, -1, 4, -11, 'prop', 0x5e6b86), shape: 'book' },
+    { ...box(12, 0, -2, 14, 3, 0, 'prop', 0xffc94a), shape: 'drum' },
   ];
 
   // Book-stack stairs up to the bed (mattress at 5) and the bookshelf's first shelf.
   boxes.push(...steps(-W + 11, -4, -1, 5, 1, 1.1, 1, 0x3a5da8));
   boxes.push(...steps(W - 4, 5, 7, 4, 1.1, 1, -1, 0xe8742a));
   // Chair -> desk: a book block to hop from the chair seat onto the desk.
-  boxes.push(box(10, 0, -D + 7, 12, 6, -D + 8, 'prop', 0xefe3c8));
+  boxes.push({ ...box(10, 0, -D + 7, 12, 6, -D + 8, 'prop', 0xefe3c8), shape: 'bookStack' });
 
   const spawns: Vec3[] = [
     [0, 0, 14],

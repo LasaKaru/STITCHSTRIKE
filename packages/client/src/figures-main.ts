@@ -1,0 +1,152 @@
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import GUI from 'three/addons/libs/lil-gui.module.min.js';
+import { bruteOptions, figureTemplate, grumbleOptions, gruntOptions, heldBlaster, heroOptions, spawnFigure } from './figures/cast.ts';
+import { createScuttler, createMoth, poseMoth, poseScuttler, type CreatureInstance } from './figures/creatures.ts';
+import { poseHumanoid } from './figures/humanoid.ts';
+import { addSkinnedShells, type FigureInstance } from './figures/rig.ts';
+import { createPost } from './scene/post.ts';
+import { createWoolMaterial, QUALITY_LAYERS, setWoolLayers } from './wool/woolMaterial.ts';
+
+/**
+ * Toy Box: every sculpted, rigged, knitted character on a turntable.
+ * URL params: ?pose=idle|walk|run|aim  ?focus=all|grumble|grunt|brute|creatures  ?still=1  ?gui=0  ?shells=0
+ */
+
+const params = new URLSearchParams(location.search);
+const still = params.get('still') === '1';
+const focus = params.get('focus') ?? 'all';
+setWoolLayers(QUALITY_LAYERS.high);
+
+const renderer = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: still });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.toneMapping = THREE.AgXToneMapping;
+renderer.toneMappingExposure = 1.1;
+document.getElementById('app')!.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x2b3140);
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.35;
+
+// A knitted display table under a warm key light.
+const floor = new THREE.Mesh(new THREE.CircleGeometry(12, 64), createWoolMaterial({ color: 0x6a5a4c, pattern: 'garter', uvSize: [1, 1], triplanar: true, gauge: 0.9 }));
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+const key = new THREE.DirectionalLight(0xffe0b8, 3.2);
+key.position.set(-3, 6, -4);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+key.shadow.camera.left = -6; key.shadow.camera.right = 6; key.shadow.camera.top = 6; key.shadow.camera.bottom = -6;
+key.shadow.normalBias = 0.02;
+const rim = new THREE.DirectionalLight(0xbcd4ff, 2.2);
+rim.position.set(4, 3, 5);
+scene.add(key, rim, new THREE.HemisphereLight(0xbfd0ff, 0x6a5040, 0.35));
+
+const camera = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.05, 100);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+interface Entry { kind: 'human' | 'scuttler' | 'moth'; inst: FigureInstance | CreatureInstance; gun?: THREE.Object3D; scale: number; x: number; hunch?: number }
+const cast: Entry[] = [];
+
+function addHuman(o: Parameters<typeof spawnFigure>[0], x: number, gunColor?: number, rifle = false, hunch = 0): FigureInstance {
+  const f = spawnFigure(o);
+  f.root.position.x = x;
+  scene.add(f.root);
+  let gun: THREE.Object3D | undefined;
+  if (gunColor !== undefined) {
+    gun = heldBlaster(gunColor, rifle, o.scale ?? 1);
+    f.root.add(gun);
+  }
+  cast.push({ kind: 'human', inst: f, gun, scale: o.scale ?? 1, x, hunch });
+  return f;
+}
+
+const t0 = performance.now();
+if (focus === 'grumble') {
+  const f = addHuman(grumbleOptions('hero'), 0, 0x8bcb3a);
+  if (params.get('shells') !== '0') addSkinnedShells(f, figureTemplate(grumbleOptions('hero')).def, 8);
+} else if (focus === 'grunt') {
+  addHuman(gruntOptions(), 0, 0x3a4a34, true);
+} else if (focus === 'brute') {
+  addHuman(bruteOptions(), 0, undefined, false, 0.35);
+} else if (focus === 'creatures') {
+  const s = createScuttler(); s.root.position.x = -0.8; scene.add(s.root); cast.push({ kind: 'scuttler', inst: s, scale: 1, x: -0.8 });
+  const m = createMoth(); m.root.position.set(0.8, 0.6, 0); scene.add(m.root); cast.push({ kind: 'moth', inst: m, scale: 1, x: 0.8 });
+} else {
+  addHuman(grumbleOptions('game'), -2.1, 0x8bcb3a);
+  addHuman(heroOptions(0x3a5da8, 1), -1.05, 0xe8742a);
+  addHuman(heroOptions(0x8bcb3a, 2), 0, 0xd8262e);
+  addHuman(gruntOptions(), 1.05, 0x3a4a34, true);
+  addHuman(bruteOptions(), 2.6, undefined, false, 0.35);
+  const s = createScuttler(); s.root.position.set(-3.3, 0, 0.3); scene.add(s.root); cast.push({ kind: 'scuttler', inst: s, scale: 1, x: -3.3 });
+  const m = createMoth(); m.root.position.set(4.2, 1.2, 0); scene.add(m.root); cast.push({ kind: 'moth', inst: m, scale: 1, x: 4.2 });
+}
+const buildMs = performance.now() - t0;
+
+const CAM: Record<string, [number, number, number, number, number, number]> = {
+  all: [0.4, 1.6, -9.2, 0.4, 0.9, 0],
+  grumble: [-0.45, 1.42, -1.25, 0, 1.28, 0],
+  grunt: [-1.1, 1.3, -2.8, 0, 0.9, 0],
+  brute: [-1.8, 2.2, -4.8, 0, 1.4, 0],
+  creatures: [-0.4, 1.0, -3.2, 0, 0.4, 0],
+};
+const c = CAM[focus] ?? CAM.all;
+camera.position.set(c[0], c[1], c[2]);
+controls.target.set(c[3], c[4], c[5]);
+controls.update();
+
+const post = createPost(renderer, scene, camera, { dof: focus === 'grumble', bloomStrength: 0.25, focus: 1.35, aperture: 0.0012, maxBlur: 0.004 });
+const state = { pose: params.get('pose') ?? 'aim', turntable: !still, pitch: 0 };
+if (params.get('gui') !== '0') {
+  const gui = new GUI({ title: 'Toy Box' });
+  gui.add(state, 'pose', ['idle', 'walk', 'run', 'aim', 'crouch', 'jump', 'downed']);
+  gui.add(state, 'turntable');
+  gui.add(state, 'pitch', -0.8, 0.8, 0.01).name('aim pitch');
+}
+const stats = document.getElementById('stats');
+let tris = 0;
+scene.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && m.geometry.index === null) tris += (m.geometry.attributes.position?.count ?? 0) / 3; });
+
+const timer = new THREE.Timer();
+function frame(): void {
+  timer.update();
+  const t = timer.getElapsed();
+  for (const e of cast) {
+    const speed = state.pose === 'run' ? 1 : state.pose === 'walk' ? 0.45 : 0;
+    const phase = t * (state.pose === 'run' ? 11 : 6.5);
+    if (e.kind === 'human') {
+      poseHumanoid(e.inst as FigureInstance, {
+        t, speed, phase, pitch: state.pitch, crouch: state.pose === 'crouch' ? 1 : 0, airborne: state.pose === 'jump',
+        aiming: !!e.gun && (state.pose === 'aim' || state.pose === 'walk' || state.pose === 'run' || state.pose === 'crouch'),
+        hunch: e.hunch, downed: state.pose === 'downed' ? 1 : 0,
+      }, e.scale, e.gun);
+      if (e.gun) e.gun.visible = state.pose !== 'idle' && state.pose !== 'downed';
+    } else if (e.kind === 'scuttler') {
+      poseScuttler(e.inst as CreatureInstance, t, speed > 0 ? phase * 1.4 : t * 2, speed > 0 ? 1 : 0.2);
+    } else {
+      poseMoth(e.inst as CreatureInstance, t);
+    }
+    if (state.turntable) e.inst.root.rotation.y = Math.sin(t * 0.4) * 0.9;
+  }
+  controls.update();
+  post.render(t);
+  if (stats) stats.textContent = `${cast.length} figures · ${(tris / 1000).toFixed(0)}k tris · built in ${buildMs.toFixed(0)} ms`;
+  if (!still) requestAnimationFrame(frame);
+}
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  post.setSize(innerWidth, innerHeight);
+});
+if (still) {
+  let n = 0;
+  const tick = () => { frame(); if (++n < 5) requestAnimationFrame(tick); else document.body.dataset.ready = '1'; };
+  tick();
+} else frame();
