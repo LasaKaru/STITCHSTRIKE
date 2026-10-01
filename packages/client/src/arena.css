@@ -207,3 +207,12 @@ body.pvp .coop-only { display: none !important; }
 #captions { position: fixed; left: 50%; bottom: 118px; transform: translateX(-50%); z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 4px; pointer-events: none; }
 #captions div { background: rgba(10,12,18,.72); color: var(--ink); font-size: 14px; font-style: italic; padding: 3px 12px; border-radius: 8px; animation: capfade 2.8s forwards; }
 @keyframes capfade { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
+
+/* Photo mode: nothing on screen but the shot and a quiet hint. */
+#photo-hint { display: none; }
+body.photo .hud, body.photo #crosshair, body.photo #hitmarker, body.photo #damage, body.photo #captions, body.photo #briefing { display: none !important; }
+body.photo #photo-hint {
+  display: block; position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+  padding: 6px 14px; border-radius: 999px; background: rgba(20, 16, 12, 0.55); color: #f6ead2;
+  font: 600 12px/1.4 system-ui, sans-serif; letter-spacing: 0.04em; pointer-events: none;
+}

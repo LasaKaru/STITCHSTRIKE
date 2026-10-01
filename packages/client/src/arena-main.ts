@@ -152,6 +152,8 @@ const avatars = new Map<number, Avatar>();
 let ownAvatar: Avatar | null = null;
 const lastPos = new Map<number, THREE.Vector3>();
 const remoteNow = new Map<number, THREE.Vector3>();
+/** Where every other toy is facing this frame (for spectating). */
+const remoteYaw = new Map<number, number>();
 const yarnRopes = new YarnRopes(scene);
 const ropeSpecs: RopeSpec[] = [];
 let grappleDown = false;
@@ -503,6 +505,54 @@ function toggleView(): void {
   settings.view = thirdPerson ? 'third' : 'first';
   saveSettings(settings);
 }
+// ---------------------------------------------------------------- spectating and photo mode
+
+/** While unravelled, follow a living teammate (anyone in free-for-all) over the shoulder. Click to switch. */
+const specCam = new ShoulderCam();
+specCam.snap(true);
+let spectateId = 0;
+let spectateNext = false;
+function spectateTarget(): { id: number; pos: THREE.Vector3; yaw: number } | null {
+  const myTeam = net.roster.get(net.id)?.team ?? 0;
+  const teamPlay = mode === 'coop' || mode === 'tdm' || mode === 'koth' || mode === 'cty';
+  let ids = [...remoteNow.keys()].filter((id) => !teamPlay || mode === 'coop' || net.roster.get(id)?.team === myTeam);
+  if (!ids.length) ids = [...remoteNow.keys()];
+  if (!ids.length) return null;
+  ids.sort((a, b) => a - b);
+  let i = ids.indexOf(spectateId);
+  if (i < 0) i = 0;
+  if (spectateNext) { i = (i + 1) % ids.length; spectateNext = false; }
+  spectateId = ids[i];
+  return { id: spectateId, pos: remoteNow.get(spectateId)!, yaw: remoteYaw.get(spectateId) ?? 0 };
+}
+
+/** Photo mode (P): the HUD hides, the toy holds still and the camera flies free. */
+const photo = { on: false, pos: new THREE.Vector3(), yaw: 0, pitch: 0, fov: 0 };
+function togglePhoto(): void {
+  photo.on = !photo.on;
+  document.body.classList.toggle('photo', photo.on);
+  if (photo.on) {
+    photo.pos.copy(camera.position);
+    photo.yaw = yaw; photo.pitch = pitch; photo.fov = camera.fov;
+  } else {
+    yaw = photo.yaw; pitch = photo.pitch;
+    camera.fov = photo.fov;
+    camera.updateProjectionMatrix();
+  }
+}
+function flyPhoto(dt: number): void {
+  const sp = (keys.has(K.sprint) ? 14 : 5) * dt;
+  const f = lookDirection(yaw, pitch);
+  const rx = Math.cos(yaw), rz = -Math.sin(yaw);
+  const mv = (k: string) => (keys.has(k) ? 1 : 0);
+  const fw = mv(K.forward) - mv(K.back), st = mv(K.right) - mv(K.left), up = mv(K.jump) - mv(K.crouch);
+  photo.pos.x += (f[0] * fw + rx * st) * sp;
+  photo.pos.y += (f[1] * fw + up) * sp;
+  photo.pos.z += (f[2] * fw + rz * st) * sp;
+  camera.position.copy(photo.pos);
+  camera.rotation.set(pitch, yaw, 0);
+}
+
 function swapShoulder(): void {
   shoulderCam.side = shoulderCam.side > 0 ? -1 : 1;
   settings.shoulder = shoulderCam.side as 1 | -1;
@@ -536,6 +586,7 @@ document.addEventListener('mousemove', (e) => {
 document.addEventListener('mousedown', (e) => {
   if (!document.pointerLockElement) return;
   if (e.button === 0) mouseDown = true;
+  if (e.button === 0 && !net.predicted) spectateNext = true;
   if (e.button === 2) grappleDown = true;
 });
 document.addEventListener('mouseup', (e) => { if (e.button === 0) mouseDown = false; if (e.button === 2) grappleDown = false; });
@@ -544,6 +595,7 @@ document.addEventListener('keydown', (e) => {
   if (e.code === 'Tab') { e.preventDefault(); scoreboard.classList.remove('hidden'); }
   if (e.code === settings.keys.camera && !e.repeat) toggleView();
   if (e.code === settings.keys.shoulder && !e.repeat) swapShoulder();
+  if (e.code === settings.keys.photo && !e.repeat && document.pointerLockElement === renderer.domElement) togglePhoto();
   if (e.code === 'F3') { e.preventDefault(); netPanel.classList.toggle('hidden'); }
   keys.add(e.code);
 });
@@ -599,6 +651,12 @@ document.addEventListener('keydown', (e) => {
 });
 document.addEventListener('wheel', (e) => {
   if (document.pointerLockElement !== renderer.domElement) return;
+  if (photo.on) {
+    // Photo mode: the wheel zooms.
+    camera.fov = Math.max(20, Math.min(110, camera.fov + Math.sign(e.deltaY) * 4));
+    camera.updateProjectionMatrix();
+    return;
+  }
   wantWeapon = (wantWeapon + (e.deltaY > 0 ? 1 : WEAPON_COUNT - 1)) % WEAPON_COUNT;
 }, { passive: true });
 
@@ -864,7 +922,10 @@ function updateHud(): void {
   else if (net.status === 'full') hud.status.textContent = 'Room is full (8 toys).';
   else if (net.status === 'closed') {
     hud.status.innerHTML = `Disconnected: ${escapeHtml(net.closeReason)}. <a href="?solo=1&mode=${mode}">Play solo with bots instead</a>`;
-  } else if (!net.predicted && net.latest) hud.status.textContent = `Unravelled! ${mode === 'coop' ? 'Back at the end of the wave, or' : 'Re-stitching'} in ${net.respawn.toFixed(1)} s`;
+  } else if (!net.predicted && net.latest) {
+    const watching = spectateId && remoteNow.has(spectateId) ? ` · watching ${escapeHtml(net.roster.get(spectateId)?.name ?? 'a teammate')} (click to switch)` : '';
+    hud.status.innerHTML = `Unravelled! ${mode === 'coop' ? 'Back at the end of the wave, or' : 'Re-stitching'} in ${net.respawn.toFixed(1)} s${watching}`;
+  }
   else hud.status.textContent = '';
 }
 
@@ -1007,6 +1068,7 @@ function frame(): void {
     a.setWeapon(r.weapon);
     a.update(dt, t, r.downed ? 0 : Math.min(1.3, speed / PLAYER.runSpeed), r.pitch, r.crouch, airborne, !r.alive || r.downed);
     if (r.alive) remoteNow.set(r.id, new THREE.Vector3(r.x, r.y, r.z));
+    remoteYaw.set(r.id, r.yaw);
   }
 
   // Enemies, interpolated further back (they arrive at 10 Hz).
@@ -1040,10 +1102,10 @@ function frame(): void {
   const locked = document.pointerLockElement === renderer.domElement || padActive;
   while (acc >= 1 / 60) {
     acc -= 1 / 60;
-    const buttons = autopilot ? autopilotButtons(now, net.predicted) : locked ? sampleButtons() | padButtons : 0;
+    const buttons = photo.on ? 0 : autopilot ? autopilotButtons(now, net.predicted) : locked ? sampleButtons() | padButtons : 0;
     const action = pendingAction;
     pendingAction = 0;
-    const r = net.input(buttons, yaw + aimFix.yaw, pitch + aimFix.pitch, now, wantWeapon, action);
+    const r = photo.on ? net.input(0, photo.yaw, photo.pitch, now, wantWeapon, 0) : net.input(buttons, yaw + aimFix.yaw, pitch + aimFix.pitch, now, wantWeapon, action);
     if (r.mantled && now - lastMantle > 400) { sfx.play('mantle', 0.8); lastMantle = now; }
     if (r.hook === 1) sfx.play('yarnShot');
     else if (r.hook === -1) sfx.play('yarnMiss', 0.7);
@@ -1086,11 +1148,15 @@ function frame(): void {
     eye.x += net.correction.x; eye.y += net.correction.y; eye.z += net.correction.z;
     if (p.weapon !== lastWeapon) { viewModel.setWeapon(p.weapon); sfx.play('switch'); lastWeapon = p.weapon; }
     viewModel.update(dt, Math.hypot(p.vx, p.vz), p.onGround);
-  } else if (net.latest) {
-    // Unravelled: a slow orbit over the Heartspools.
+  }
+  // Unravelled: follow a teammate over the shoulder, or orbit the Heartspools if nobody's about.
+  const spec = !p && net.latest && !fixedCam ? spectateTarget() : null;
+  if (!p && net.latest && !spec) {
     eye.set(Math.sin(t * 0.2) * (world.outdoor ? 30 : 14), world.outdoor ? 24 : 13, Math.cos(t * 0.2) * (world.outdoor ? 30 : 14));
   }
+  if (spec) eye.set(spec.pos.x, spec.pos.y + PLAYER.eyeHeight, spec.pos.z);
   if (p) camera.rotation.set(pitch, yaw, 0);
+  else if (spec) camera.rotation.set(-0.22, spec.yaw, 0);
   else camera.lookAt(0, 1, 0);
   if (fixedCam) {
     const shots: Record<string, [number, number, number, number, number, number]> = world.id === 'bathroom' ? {
@@ -1162,11 +1228,14 @@ function frame(): void {
     const a = shoulderCam.aim(eye, yaw, pitch, (o, d, range) => predictedHit(o, d, range).to.distanceTo(new THREE.Vector3(...o)));
     aimFix.yaw = wrapAngle(a.yaw - yaw);
     aimFix.pitch = a.pitch - pitch;
+  } else if (spec) {
+    camera.position.copy(specCam.update(dt, true, false, eye, spec.yaw, -0.22, world.boxes));
   } else if (!fixedCam) {
     camera.position.copy(eye);
   }
+  if (photo.on) flyPhoto(dt);
   if (!p || driving || fixedCam || !shoulderCam.third) { aimFix.yaw = 0; aimFix.pitch = 0; }
-  const seeSelf = shoulderCam.blend > 0.35;
+  const seeSelf = shoulderCam.blend > 0.35 || photo.on;
   viewModel.group.visible = !!p && !p.downed && !seeSelf && !fixedCam && !driving;
   // The muzzle light follows whichever gun is on screen.
   if (seeSelf && ownAvatar && muzzleFlash.parent !== scene) scene.add(muzzleFlash);
@@ -1207,6 +1276,7 @@ function frame(): void {
     canSwing = t < GRAPPLE.range && o[1] + d[1] * t >= p.y + PLAYER.eyeHeight + GRAPPLE.minRise;
   }
   crosshairEl.classList.toggle('can-swing', canSwing);
+  crosshairEl.style.visibility = p ? '' : 'hidden';
   flash = Math.max(0, flash - dt);
   muzzleFlash.intensity = flash > 0 ? 3 : 0;
 
