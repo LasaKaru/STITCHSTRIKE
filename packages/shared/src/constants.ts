@@ -40,23 +40,23 @@ export const PLAYER = {
   stepHeight: 0.45,
   groundResponse: 16,
   airResponse: 3,
-  maxHealth: 150,
+  maxHealth: 200,
   respawnSeconds: 3,
   /** Stitch-up: after this long without taking damage, health knits itself back... */
-  regenDelay: 4,
+  regenDelay: 3.5,
   /** ...at this many stitches per second. */
-  regenRate: 18,
+  regenRate: 24,
   /** Seconds of invulnerability after (re)spawning, so nobody is farmed at the spawn. */
   spawnProtection: 2,
   /** Enemy hits on toys are softened in co-op; the Heartspools are their real target. */
   coopDamageScale: 0.7,
-  maxArmor: 100,
+  maxArmor: 150,
   /** Downed (co-op): crawl speed, seconds before bleeding out, re-stitch time and range, health after. */
   crawlSpeed: 1.1,
   bleedSeconds: 20,
   reviveSeconds: 2.5,
   reviveRange: 2.1,
-  reviveHealth: 60,
+  reviveHealth: 90,
   /** Climbing speed up fabric and bark. */
   climbSpeed: 5.5,
   /** Ledge mantle: grab a ledge up to this far above your feet while airborne and pull yourself up. */
@@ -88,7 +88,7 @@ export const POPPER = {
   damage: 9,
   headshotMultiplier: 1.5,
   fireRate: 12,
-  magazine: 40,
+  magazine: 60,
   reloadSeconds: 1.4,
   range: 60,
 } as const;

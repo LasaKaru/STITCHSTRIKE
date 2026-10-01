@@ -65,7 +65,7 @@ export function createGarage(): World {
     boxes, spawns, waypoints, coop,
     pickups: [
       { pos: [0, 0, 26], kind: 0 }, { pos: [-30, 0, 0], kind: 0 }, { pos: [26, 0, -18], kind: 0 },
-      { pos: [-8, 14, -2], kind: 1 }, { pos: [17, 9, -30], kind: 1 }, { pos: [35.5, 24, -15], kind: 2 },
+      { pos: [-8, 14, -2], kind: 1 }, { pos: [17, 9, -30], kind: 1 }, { pos: [35.5, 24, -15], kind: 2 }, { pos: [-14, 0, 18], kind: 3 },
     ],
     jumpPads: [
       { x: 28.5, y: 0, z: -15, r: 1.1, launch: 22 },

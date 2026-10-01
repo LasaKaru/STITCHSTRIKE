@@ -63,7 +63,30 @@ function powerPom(): THREE.Group {
   return g;
 }
 
-const MAKERS = [stuffing, thimble, powerPom];
+/** A wicker basket heaped with balls of yarn: ammo for every weapon. */
+function yarnBasket(): THREE.Group {
+  const g = new THREE.Group();
+  const basket = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.32, 0.36, 18, 1, true), createWoolMaterial({ color: 0xb08850, pattern: 'garter', uvSize: [2.6, 0.4], gauge: 2.5 }));
+  (basket.material as THREE.Material).side = THREE.DoubleSide;
+  basket.position.y = 0.2;
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.05, 8, 20), createWoolMaterial({ color: 0x8a6438, pattern: 'rib', uvSize: [2.6, 0.1], gauge: 3 }));
+  rim.rotation.x = Math.PI / 2;
+  rim.position.y = 0.38;
+  g.add(basket, rim);
+  const cols = [0xd9772e, 0x4a8a8a, 0xe8b04a, 0xb5452a, 0x8bcb3a];
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2;
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(0.17, 14, 10), createWoolMaterial({ color: cols[i], pattern: 'wound', uvSize: [1, 0.5], gauge: 3 }));
+    ball.position.set(Math.cos(a) * 0.18, 0.42 + (i % 2) * 0.08, Math.sin(a) * 0.18);
+    g.add(ball);
+  }
+  const light = new THREE.PointLight(0xffd890, 0.8, 3, 2);
+  light.position.y = 0.6;
+  g.add(light);
+  return g;
+}
+
+const MAKERS = [stuffing, thimble, powerPom, yarnBasket];
 
 export class PickupsView {
   private spots: THREE.Group[] = [];

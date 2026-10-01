@@ -63,7 +63,7 @@ export function createToyStore(): World {
     waypoints: [[0, 0, 0], [0, 0, 30], [0, 0, -38], [-14, 0, -20], [14, 0, 20], [-24, 0, 0], [24, 0, 0], [12, 0, -36], [-12, 0, 44]],
     pickups: [
       { pos: [-14, 0, -30], kind: 0 }, { pos: [14, 0, 26], kind: 0 }, { pos: [0, 0, 4], kind: 0 },
-      { pos: [0, 12, -27], kind: 1 }, { pos: [-25, 20, -30], kind: 1 }, { pos: [25, 40, 30], kind: 2 },
+      { pos: [0, 12, -27], kind: 1 }, { pos: [-25, 20, -30], kind: 1 }, { pos: [25, 40, 30], kind: 2 }, { pos: [0, 0, 18], kind: 3 },
     ],
     jumpPads: [
       { x: -17, y: 0, z: 20, r: 1.1, launch: 22 },

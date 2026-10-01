@@ -304,6 +304,11 @@ export class Room {
     } else if (kind === PickupKind.Thimble) {
       if (p.armor >= PLAYER.maxArmor) return false;
       p.armor = Math.min(PLAYER.maxArmor, p.armor + def.amount);
+    } else if (kind === PickupKind.YarnBasket) {
+      // A basket of fresh yarn: every magazine full, no reload needed.
+      if (WEAPONS.every((w, i) => p.state.mags[i] >= w.magazine) && p.state.reload <= 0) return false;
+      p.state.mags = WEAPONS.map((w) => w.magazine);
+      p.state.reload = 0;
     } else {
       p.power = def.amount;
     }

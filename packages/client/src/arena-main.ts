@@ -398,7 +398,7 @@ net.onEvent = (e) => {
     case 'pickup':
       if (e.id === net.id) {
         sfx.play('pickup');
-        popup(e.kind === PickupKind.Stuffing ? `+${PICKUPS[0].amount} stitches` : e.kind === PickupKind.Thimble ? `+${PICKUPS[1].amount} thimble armour` : 'POWER POM! ×1.5 damage');
+        popup(e.kind === PickupKind.Stuffing ? `+${PICKUPS[0].amount} stitches` : e.kind === PickupKind.Thimble ? `+${PICKUPS[1].amount} thimble armour` : e.kind === PickupKind.YarnBasket ? 'YARN BASKET! Every magazine full' : 'POWER POM! ×1.5 damage');
       }
       break;
     case 'boss':

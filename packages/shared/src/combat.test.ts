@@ -179,6 +179,23 @@ describe('toys: armour, pickups, down and re-stitch', () => {
     expect(room.pickupMask() & (1 << i)).not.toBe(0);
   });
 
+  it('a Yarn Basket refills every magazine, and every map has one', () => {
+    const world = createBedroom();
+    const room = new Room(world, 'pvp');
+    const p = room.addPlayer('Empty')!;
+    const i = world.pickups.findIndex((s) => s.kind === PickupKind.YarnBasket);
+    expect(i).toBeGreaterThanOrEqual(0);
+    p.state = createPlayerState(world.pickups[i].pos);
+    p.state.mags = p.state.mags.map(() => 0);
+    p.state.reload = 1;
+    room.update();
+    expect(p.state.mags).toEqual(WEAPONS.map((w) => w.magazine));
+    expect(p.state.reload).toBe(0);
+    for (const m of ['garden', 'garage', 'bathroom', 'toystore', 'park'] as const) {
+      expect(createWorld(m).pickups.some((s) => s.kind === PickupKind.YarnBasket)).toBe(true);
+    }
+  });
+
   it('a Power Pom boosts damage', () => {
     const room = arena();
     const p = room.addPlayer('Pow')!;

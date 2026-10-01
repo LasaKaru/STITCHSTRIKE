@@ -64,7 +64,7 @@ export function createBathroom(): World {
     waypoints: [[0, 0, 0], [-20, 0, 4], [20, 0, 6], [10, 0, -16], [-10, 0, 20], [24, 0, 16], [-30, 0, 4], [0, 0, 22], [16, 0, -8]],
     pickups: [
       { pos: [-20, 0, 12], kind: 0 }, { pos: [22, 0, 0], kind: 0 }, { pos: [0, 0, -6], kind: 0 },
-      { pos: [-12, 1, -20], kind: 1 }, { pos: [35, 16, -6], kind: 1 }, { pos: [25, 18, -28.5], kind: 2 },
+      { pos: [-12, 1, -20], kind: 1 }, { pos: [35, 16, -6], kind: 1 }, { pos: [25, 18, -28.5], kind: 2 }, { pos: [-6, 0, -4], kind: 3 },
     ],
     jumpPads: [
       { x: -8, y: 0, z: -8.5, r: 1.1, launch: 24 },

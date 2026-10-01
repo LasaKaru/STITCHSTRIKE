@@ -36,33 +36,33 @@ export interface WeaponDef {
 
 export const WEAPONS: WeaponDef[] = [
   {
-    id: 0, name: 'Pom-Pom Popper', role: 'Assault · all-rounder', damage: 9, headshotMultiplier: 1.5, fireRate: 12, magazine: 40,
+    id: 0, name: 'Pom-Pom Popper', role: 'Assault · all-rounder', damage: 9, headshotMultiplier: 1.5, fireRate: 12, magazine: 60,
     reloadSeconds: 1.4, range: 60, pellets: 1, spread: 0, knockback: 0.2, pierce: 1, color: 0xe8742a,
   },
   {
-    id: 1, name: 'Button Buster', role: 'Shotgun · close range', damage: 11, headshotMultiplier: 1.25, fireRate: 1.2, magazine: 8,
+    id: 1, name: 'Button Buster', role: 'Shotgun · close range', damage: 11, headshotMultiplier: 1.25, fireRate: 1.2, magazine: 12,
     reloadSeconds: 1.8, range: 22, pellets: 8, spread: 0.075, knockback: 1.2, pierce: 1, color: 0xffc94a,
   },
   {
-    id: 2, name: 'Needle Lance', role: 'Sniper · pierces 3 toys', damage: 95, headshotMultiplier: 2, fireRate: 0.9, magazine: 5,
+    id: 2, name: 'Needle Lance', role: 'Sniper · pierces 3 toys', damage: 95, headshotMultiplier: 2, fireRate: 0.9, magazine: 8,
     reloadSeconds: 2.2, range: 140, pellets: 1, spread: 0, knockback: 2.5, pierce: 3, color: 0xdfe8ff,
   },
   {
-    id: 3, name: 'Crochet Hook', role: 'SMG · fast, short range', damage: 7, headshotMultiplier: 1.4, fireRate: 15, magazine: 60,
+    id: 3, name: 'Crochet Hook', role: 'SMG · fast, short range', damage: 7, headshotMultiplier: 1.4, fireRate: 15, magazine: 90,
     reloadSeconds: 1.6, range: 32, pellets: 1, spread: 0.035, knockback: 0.1, pierce: 1, color: 0xb46fd6,
   },
   {
-    id: 4, name: 'Yarn-Ball Launcher', role: 'Splash · tangles (slows)', damage: 75, headshotMultiplier: 1, fireRate: 1.1, magazine: 4,
+    id: 4, name: 'Yarn-Ball Launcher', role: 'Splash · tangles (slows)', damage: 75, headshotMultiplier: 1, fireRate: 1.1, magazine: 6,
     reloadSeconds: 2.4, range: 80, pellets: 1, spread: 0, knockback: 3, pierce: 1, color: 0x8bcb3a,
     projectile: { speed: 26, gravity: 14, radius: 3.2, slowSeconds: 3 },
   },
   {
-    id: 5, name: 'Glue Gun', role: 'Sticky · globs glue invaders in place', damage: 24, headshotMultiplier: 1, fireRate: 2.6, magazine: 10,
+    id: 5, name: 'Glue Gun', role: 'Sticky · globs glue invaders in place', damage: 24, headshotMultiplier: 1, fireRate: 2.6, magazine: 15,
     reloadSeconds: 1.9, range: 60, pellets: 1, spread: 0, knockback: 0.3, pierce: 1, color: 0xf3e6a0,
     projectile: { speed: 38, gravity: 8, radius: 1.9, slowSeconds: 4.5 },
   },
   {
-    id: 6, name: 'Static Sock', role: 'Chain zap · arcs between toys', damage: 16, headshotMultiplier: 1.2, fireRate: 3.5, magazine: 18,
+    id: 6, name: 'Static Sock', role: 'Chain zap · arcs between toys', damage: 16, headshotMultiplier: 1.2, fireRate: 3.5, magazine: 27,
     reloadSeconds: 1.7, range: 30, pellets: 1, spread: 0, knockback: 0.3, pierce: 1, color: 0x9fd8ff,
     chain: { count: 3, radius: 6, falloff: 0.7 },
   },

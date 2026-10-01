@@ -192,6 +192,8 @@ export function createBedroom(): World {
     { pos: [-14, 0, 12], kind: 0 }, { pos: [15, 0, 14], kind: 0 }, { pos: [3, 0, -12], kind: 0 },
     // Rewards for climbing: armour on the bed, power on the top shelf, armour on the desk.
     { pos: [-15, 5, -8], kind: 1 }, { pos: [18, 16, 8], kind: 2 }, { pos: [16, 7.5, -13], kind: 1 },
+    // A Yarn Basket of ammo in the middle of the rug.
+    { pos: [8, 0, 6], kind: 3 },
   ];
   // Spring toys: one by the bookshelf (to the top shelf), one by the desk.
   const jumpPads = [
