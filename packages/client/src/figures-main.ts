@@ -111,7 +111,7 @@ const buildMs = performance.now() - t0;
 
 const CAM: Record<string, [number, number, number, number, number, number]> = {
   all: [0.4, 1.6, -9.2, 0.4, 0.9, 0],
-  grumble: [-0.45, 1.42, -1.25, 0, 1.28, 0],
+  grumble: [-0.6, 1.25, -1.6, 0, 1.0, 0],
   grunt: [-1.1, 1.3, -2.8, 0, 0.9, 0],
   brute: [-1.8, 2.2, -4.8, 0, 1.4, 0],
   creatures: [-0.4, 1.0, -3.2, 0, 0.4, 0],

@@ -4,6 +4,7 @@ import type { StitchPattern } from '../wool/stitches.ts';
 import { createWoolMaterial } from '../wool/woolMaterial.ts';
 import type { Accessory, BoneDef, FigureDef, FigureInstance, RegionDef } from './rig.ts';
 import { ellipsoid, evalSDF, limb, rotXYZ, roundBox, sphere, torus, type Prim, type V3 } from './sdf.ts';
+import { amigurumiDef } from './amigurumi.ts';
 
 /**
  * A realistic knitted action figure: anatomical sculpt (skull, jaw, brow,
@@ -13,6 +14,8 @@ import { ellipsoid, evalSDF, limb, rotXYZ, roundBox, sphere, torus, type Prim, t
 
 export interface HumanoidOptions {
   name: string;
+  /** 'amigurumi' (default): the cosy crochet-doll look. 'realistic': anatomical action figure. */
+  style?: 'amigurumi' | 'realistic';
   scale?: number;
   /** Shoulder width / muscle mass multipliers. */
   shoulders?: number;
@@ -51,6 +54,7 @@ export interface HumanoidOptions {
 const PI = Math.PI;
 
 export function humanoidDef(o: HumanoidOptions): FigureDef {
+  if ((o.style ?? 'amigurumi') === 'amigurumi') return amigurumiDef(o);
   const S = o.scale ?? 1;
   const sh = o.shoulders ?? 1;
   const mu = o.muscle ?? 1;

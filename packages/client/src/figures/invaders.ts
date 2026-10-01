@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { bead, metal, plastic } from '../scene/materials.ts';
 import { createWoolMaterial } from '../wool/woolMaterial.ts';
 import { spawnFigure } from './cast.ts';
+import { AMI_HEAD } from './amigurumi.ts';
 import type { HumanoidOptions } from './humanoid.ts';
 import { buildFigure, instantiate, type Accessory, type BoneDef, type FigureDef, type FigureInstance, type FigureTemplate } from './rig.ts';
 import { ellipsoid, limb, roundBox, sphere, torus, type Prim, type V3 } from './sdf.ts';
@@ -284,28 +285,37 @@ export function createBoss(): FigureInstance {
   const f = spawnFigure(bossOptions());
   const head = f.bones.get('head');
   if (head) {
+    // Positions on the big amigurumi head (the boss is knitted at 3.05x).
     const S = 3.05;
+    const hs = bossOptions().headSize ?? 1;
+    const R = AMI_HEAD.r * hs * S;
+    // Children of the head bone are placed relative to its joint (the top of the neck).
+    const Y = (AMI_HEAD.y + (hs - 1) * 0.12 - 0.92) * S;
     const fur = createWoolMaterial({ color: 0x8a5a3a, pattern: 'felt', uvSize: [0.6, 0.6], fuzz: 2 });
     for (const sx of [-1, 1]) {
-      const ear = new THREE.Mesh(new THREE.SphereGeometry(0.05 * S, 14, 10), fur);
-      ear.position.set(0.075 * S * sx, 0.19 * S, 0.01 * S);
+      const ear = new THREE.Mesh(new THREE.SphereGeometry(R * 0.32, 16, 12), fur);
+      ear.position.set(R * 0.72 * sx, Y + R * 0.72, R * 0.05);
       ear.scale.z = 0.6;
+      const inner = new THREE.Mesh(new THREE.SphereGeometry(R * 0.2, 14, 10), createWoolMaterial({ color: 0xc89a78, pattern: 'felt', uvSize: [0.3, 0.3] }));
+      inner.position.set(0, 0, -R * 0.12);
+      inner.scale.z = 0.4;
+      ear.add(inner);
       head.add(ear);
     }
-    const snout = new THREE.Mesh(new THREE.SphereGeometry(0.05 * S, 14, 10), createWoolMaterial({ color: 0xc89a78, pattern: 'felt', uvSize: [0.5, 0.5] }));
-    snout.position.set(0, 0.06 * S, -0.08 * S);
-    snout.scale.set(1, 0.75, 0.8);
+    const snout = new THREE.Mesh(new THREE.SphereGeometry(R * 0.38, 18, 12), createWoolMaterial({ color: 0xc89a78, pattern: 'felt', uvSize: [0.5, 0.5] }));
+    snout.position.set(0, Y - R * 0.28, -R * 0.82);
+    snout.scale.set(1, 0.72, 0.62);
     head.add(snout);
     const hatMat = createWoolMaterial({ color: 0x1e1e24, pattern: 'felt', uvSize: [1, 1] });
-    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * S, 0.12 * S, 0.012 * S, 24), hatMat);
-    brim.position.set(0, 0.215 * S, 0);
-    const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.075 * S, 0.08 * S, 0.16 * S, 24), hatMat);
-    crown.position.set(0, 0.3 * S, 0);
-    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.081 * S, 0.081 * S, 0.03 * S, 24), createWoolMaterial({ color: 0xd8262e, pattern: 'rib', uvSize: [1, 0.2] }));
-    band.position.set(0, 0.24 * S, 0);
+    const brim = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.85, R * 0.85, R * 0.06, 28), hatMat);
+    brim.position.set(0, Y + R * 0.86, 0);
+    const crown = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.5, R * 0.55, R * 0.8, 28), hatMat);
+    crown.position.set(0, Y + R * 1.28, 0);
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.56, R * 0.56, R * 0.16, 28), createWoolMaterial({ color: 0xd8262e, pattern: 'rib', uvSize: [1, 0.2] }));
+    band.position.set(0, Y + R * 0.96, 0);
     head.add(brim, crown, band);
-    const monocle = new THREE.Mesh(new THREE.TorusGeometry(0.025 * S, 0.004 * S, 8, 20), metal(0xd9b24a, 0.2));
-    monocle.position.set(0.035 * S, 0.11 * S, -0.085 * S);
+    const monocle = new THREE.Mesh(new THREE.TorusGeometry(R * 0.17, R * 0.025, 8, 20), metal(0xd9b24a, 0.2));
+    monocle.position.set(R * 0.33, Y + R * 0.04, -R * 0.93);
     head.add(monocle);
   }
   f.root.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true; });
