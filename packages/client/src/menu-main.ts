@@ -3,7 +3,8 @@ import { MenuMusic } from './audio/music.ts';
 import { buildCinematic, type Cinematic } from './scene/cinematic.ts';
 import { BIND_ACTIONS, DEFAULT_KEYS, desktop, keyLabel, loadSettings, rebind, saveSettings, type BindAction, type ColorblindMode, type QualitySetting } from './settings.ts';
 import { CustomiseScreen, renderProgress } from './menu-customise.ts';
-import { levelOf, loadProfile } from './profile.ts';
+import { levelOf, loadProfile, saveProfile } from './profile.ts';
+import { dailies } from './dailies.ts';
 import { setPresence, syncAchievements } from './platform.ts';
 
 /**
@@ -31,6 +32,27 @@ function refreshWho(): void {
   $('#who-name').textContent = `${settings.name} · Lv ${levelOf(p.xp).level} · ${p.credits} credits`;
 }
 refreshWho();
+
+/** Today's three daily challenges, with progress bars, on top of the news column. */
+function renderDailies(): void {
+  const p = loadProfile();
+  const { state, defs } = dailies(p);
+  saveProfile(p);
+  let card = document.getElementById('dailies');
+  if (!card) {
+    card = Object.assign(document.createElement('article'), { id: 'dailies', className: 'news-card dailies' });
+    document.querySelector('.news')?.prepend(card);
+  }
+  const midnight = new Date(); midnight.setHours(24, 0, 0, 0);
+  const hours = Math.max(1, Math.round((midnight.getTime() - Date.now()) / 3.6e6));
+  card.innerHTML = `<span class="chip">Daily challenges</span><h3>Today's three</h3>` + defs.map((d, i) => {
+    const prog = state.progress[i] ?? 0;
+    const done = state.done[i];
+    return `<div class="daily${done ? ' done' : ''}"><div class="row"><span>${done ? '✔ ' : ''}${d.text}</span><b>+${d.credits}</b></div>
+      <div class="bar"><i style="width:${Math.round((prog / d.target) * 100)}%"></i></div><small>${done ? 'Done!' : `${Math.floor(prog)} / ${d.target}`}</small></div>`;
+  }).join('') + `<p class="hint">New challenges in ${hours} h · credits and XP pay out the moment one's done.</p>`;
+}
+renderDailies();
 
 // ---------------------------------------------------------------- the cinematic
 

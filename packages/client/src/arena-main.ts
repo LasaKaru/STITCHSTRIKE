@@ -24,6 +24,7 @@ import { ShoulderCam } from './scene/shoulderCam.ts';
 import { EMOTE_SECONDS } from './figures/emotes.ts';
 import { Radar, type Blip } from './radar.ts';
 import { DamageNumbers } from './damageNumbers.ts';
+import { trackDaily, type ChallengeEvent } from './dailies.ts';
 import { Streaks } from './streaks.ts';
 import { YarnBalls } from './scene/yarnBalls.ts';
 import { createPost, type Post } from './scene/post.ts';
@@ -36,7 +37,7 @@ import { buildWoolGarage } from './scene/woolGarage.ts';
 import { buildWoolBathroom } from './scene/woolBathroom.ts';
 import { buildWoolToyStore } from './scene/woolToyStore.ts';
 import { TraversalView } from './scene/traversalView.ts';
-import { levelOf, loadProfile } from './profile.ts';
+import { levelOf, loadProfile, saveProfile } from './profile.ts';
 import { award, wearable, XP, type Award } from './progression.ts';
 import { jacketColor } from './figures/looks.ts';
 import { cycleCard, cycleWeapon, PadReader } from './input/gamepad.ts';
@@ -273,6 +274,7 @@ net.onShot = (s) => {
     // Our own shots were drawn at fire time by prediction; the server's verdict drives hit markers.
     if (s.hit || s.enemy) {
       hitMarker(s.head);
+      if (s.head) daily('headshot');
       if (settings.damageNumbers) {
         const w = WEAPONS[net.predicted?.weapon ?? 0];
         const powered = net.me()?.powered ? 1.5 : 1;
@@ -316,6 +318,20 @@ let briefed = false;
 
 /** This match, for the results card. */
 const session = { kills: 0, revives: 0, waves: 0, xp: 0, credits: 0 };
+
+// Keep daily-challenge progress if the tab closes mid-match.
+window.addEventListener('beforeunload', () => { if (!autopilot) saveProfile(profile); });
+/** Counts towards today's challenges; pays out (and celebrates) any this finishes. */
+let dailySaved = 0;
+function daily(event: ChallengeEvent, amount = 1): void {
+  if (autopilot) return;
+  const done = trackDaily(profile, event, amount);
+  for (const d of done) {
+    progress(d.xp, d.credits);
+    setTimeout(() => { banner(`DAILY CHALLENGE: ${d.text.toUpperCase()}`, 'good', 3200); sfx.play('win', 0.7); }, 300);
+  }
+  if (!done.length && performance.now() - dailySaved > 10000) { dailySaved = performance.now(); saveProfile(profile); }
+}
 
 function progress(xp: number, credits: number, stats: Parameters<typeof award>[3] = {}, ctx: Parameters<typeof award>[4] = {}): void {
   if (autopilot) return;
@@ -371,12 +387,17 @@ net.onEvent = (e) => {
         const lost = streaks.died();
         if (lost >= (mode === 'coop' ? 25 : 5)) popup(`Streak ended at ${lost}`);
       }
-      if (e.attacker === net.id && mode !== 'coop') announceStreak(streaks.kill(performance.now() / 1000));
+      if (e.attacker === net.id && mode !== 'coop') { announceStreak(streaks.kill(performance.now() / 1000)); daily('pvpKo'); }
       if (e.attacker === net.id && mode !== 'coop') { session.kills++; progress(XP.pvpKo, 5, { kills: 1 }, { medals: session.kills >= 25 ? ['duelist'] : [] }); }
       renderScoreboard();
       break;
     }
     case 'kill':
+      if (e.by === net.id) {
+        daily('kill');
+        if (ENEMIES[e.enemyType]?.dino) daily('dinoKill');
+        if (net.predicted?.weapon === 5) daily('glueKill');
+      }
       if (e.by === net.id) { sfx.play('kill'); popup(`+${e.reward} buttons`); announceStreak(streaks.kill(performance.now() / 1000)); session.kills++; progress(XP.kill, e.enemyType === EnemyType.Boss ? 100 : 1, { kills: 1 }); }
       break;
     case 'phase':
@@ -386,14 +407,18 @@ net.onEvent = (e) => {
         if (e.wave % 2 === 0) briefing.say('sarge', nextTip());
         session.waves++;
         progress(XP.wave, 25, { waves: 1, ...(net.waves === 0 ? { bestEndless: e.wave } : {}) });
+        daily('wave');
       } else if (e.phase === Phase.Build) { banner('NEW MATCH · BUILD YOUR DEFENCE'); resultsCard(null); briefing.clear(); for (const l of missionBriefing()) briefing.say('sarge', l); Object.assign(session, { kills: 0, revives: 0, waves: 0, xp: 0, credits: 0 }); }
       else if (e.phase === Phase.Won) {
         banner('THE HEARTSPOOLS ARE SAFE!', 'good', 6000); sfx.play('win'); briefing.say('sarge', WIN_LINE);
         progress(Math.round(XP.win * (1 + 0.25 * net.difficulty)), 300, { wins: 1, matches: 1 }, { medals: net.difficulty >= 2 ? ['survivor'] : [] });
+        daily('win');
+        daily('match');
         setTimeout(() => resultsCard(true), 2500);
       } else if (e.phase === Phase.Lost) {
         banner('THE HEARTSPOOLS UNRAVELLED', 'bad', 6000); sfx.play('lose'); briefing.say('sarge', LOSE_LINE);
         progress(XP.match, 50, { matches: 1 });
+        daily('match');
         setTimeout(() => resultsCard(false), 2500);
       }
       break;
@@ -409,12 +434,13 @@ net.onEvent = (e) => {
       if (e.act === 'take') { banner(e.id === net.id ? 'YOU HAVE THEIR YARN! RUN IT HOME!' : `${ball} TAKEN!`, ours ? 'bad' : 'good', 2600); sfx.play(ours ? 'alarm' : 'collect'); feed(`${who} <span>grabbed ${ours ? 'our' : 'their'} yarn</span>`, !ours); }
       else if (e.act === 'drop') { banner(`${ball} DROPPED!`, '', 1800); sfx.play('pop', 0.6); }
       else if (e.act === 'return') { banner(`${ball} IS BACK HOME`, ours ? 'good' : '', 1800); sfx.play('spring', 0.7); }
-      else { banner(ours ? 'THEY CAPTURED OUR YARN!' : `${e.id === net.id ? 'YOU' : who.toUpperCase()} CAPTURED THEIR YARN!`, ours ? 'bad' : 'good', 3000); sfx.play(ours ? 'lose' : 'win'); }
+      else { if (e.id === net.id) daily('capture'); banner(ours ? 'THEY CAPTURED OUR YARN!' : `${e.id === net.id ? 'YOU' : who.toUpperCase()} CAPTURED THEIR YARN!`, ours ? 'bad' : 'good', 3000); sfx.play(ours ? 'lose' : 'win'); }
       break;
     }
     case 'ctyWin':
     case 'kothWin': {
       const mine = net.roster.get(net.id)?.team === e.team;
+      if (mine) daily('win');
       banner(`${TEAM_NAMES[e.team].toUpperCase()} WINS THE ROUND!`, mine ? 'good' : 'bad', 4000);
       sfx.play(mine ? 'win' : 'lose');
       break;
@@ -425,6 +451,7 @@ net.onEvent = (e) => {
       break;
     case 'built':
       if (e.by === net.id) sfx.play(e.kind === Buildable.None ? 'sell' : e.tier > 1 ? 'upgrade' : 'build');
+      if (e.by === net.id && e.kind !== Buildable.None) daily('build');
       if (e.by === net.id && e.tier > 1) popup(`${BUILDABLES[e.kind].short} tier ${e.tier}!`);
       if (e.by === 0 && e.kind === Buildable.None) sfx.play('alarm', 0.5);
       break;
@@ -436,14 +463,14 @@ net.onEvent = (e) => {
     }
     case 'revived': {
       if (e.id === net.id) { banner('RE-STITCHED!', 'good'); sfx.play('revived'); }
-      else if (e.by === net.id) { popup('Teammate re-stitched!'); sfx.play('revived'); session.revives++; progress(XP.revive, 10, { revives: 1 }); }
+      else if (e.by === net.id) { popup('Teammate re-stitched!'); sfx.play('revived'); session.revives++; progress(XP.revive, 10, { revives: 1 }); daily('revive'); }
       if (e.by) feed(`${escapeHtml(net.roster.get(e.by)?.name ?? '?')} <span>re-stitched</span> ${escapeHtml(net.roster.get(e.id)?.name ?? '?')}`, e.by === net.id || e.id === net.id);
       break;
     }
     case 'emote': {
       const a = e.id === net.id ? ownAvatar : avatars.get(e.id);
       a?.emote(e.kind);
-      if (e.id === net.id) emoteCam = EMOTE_SECONDS;
+      if (e.id === net.id) { emoteCam = EMOTE_SECONDS; daily('emote'); }
       break;
     }
     case 'vehicle':
@@ -458,7 +485,7 @@ net.onEvent = (e) => {
       break;
     case 'boss':
       if (e.state === 'arrive') { banner(`${BOSS_NAME} APPROACHES!`, 'bad', 4000); sfx.play('boss'); briefing.say('baron', mission === Mission.Stampede ? REX_LINE : BOSS_LINE); }
-      else { banner(`${BOSS_NAME} IS UNPICKED!`, 'good', 4000); sfx.play('win'); progress(XP.boss, 200, { bossKills: 1 }); }
+      else { banner(`${BOSS_NAME} IS UNPICKED!`, 'good', 4000); sfx.play('win'); progress(XP.boss, 200, { bossKills: 1 }); daily('boss'); }
       break;
     case 'stomp': {
       const at = new THREE.Vector3(e.x, 0, e.z);
@@ -1058,6 +1085,7 @@ let springSounded = false;
 let last = performance.now();
 let flash = 0;
 let hudTimer = 0;
+let driveMeters = 0;
 let radarTimer = 0;
 
 // ---------------------------------------------------------------- radar
@@ -1188,7 +1216,7 @@ function frame(): void {
     pendingAction = 0;
     const r = photo.on ? net.input(0, photo.yaw, photo.pitch, now, wantWeapon, 0) : net.input(buttons, yaw + aimFix.yaw, pitch + aimFix.pitch, now, wantWeapon, action);
     if (r.mantled && now - lastMantle > 400) { sfx.play('mantle', 0.8); lastMantle = now; }
-    if (r.hook === 1) sfx.play('yarnShot');
+    if (r.hook === 1) { sfx.play('yarnShot'); daily('swing'); }
     else if (r.hook === -1) sfx.play('yarnMiss', 0.7);
     if (r.fired && net.predicted) {
       const s = net.predicted;
@@ -1333,6 +1361,8 @@ function frame(): void {
   if (seeSelf && ownAvatar && flash > 0) ownAvatar.muzzle(muzzleFlash.position);
   if (p && driving) {
     const speed = Math.abs(p.carSpeed);
+    driveMeters += speed * dt;
+    if (driveMeters >= 10) { daily('drive', Math.floor(driveMeters)); driveMeters -= Math.floor(driveMeters); }
     driven.push({ key: -1, kind: driving, x: eye.x, y: eye.y - VEHICLES[driving].seatHeight, z: eye.z, yaw: p.carYaw, aimYaw: yaw, speed });
   }
   vehicleView.update(net.vehicles(), driven, dt);
@@ -1386,6 +1416,7 @@ function frame(): void {
   for (const c of traversal.update(t, p && !autopilot ? p : null)) {
     // Secrets: golden thimbles, weapon parts and credit buttons, kept in your profile.
     profile.collected.push(c.id);
+    daily('secret');
     const found = world.collectibles.filter((k) => profile.collected.includes(k.id)).length;
     const reward = c.kind === 2 ? 150 : 60;
     progress(50, reward, {}, { mapComplete: found === world.collectibles.length });

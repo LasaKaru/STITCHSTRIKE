@@ -25,6 +25,8 @@ export interface Profile {
   unlocked: string[];
   look: Look;
   stats: Stats;
+  /** Today's daily challenges (see dailies.ts). */
+  daily?: { day: string; ids: string[]; progress: number[]; done: boolean[] };
 }
 
 const KEY = 'ss-profile';

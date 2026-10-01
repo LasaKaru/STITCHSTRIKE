@@ -254,3 +254,14 @@ body:not(.desktop) .desktop-only { display: none !important; }
 
 body.pvp-mode .coop-opts { display: none; }
 .choice-row.diff { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+
+/* Daily challenges card. */
+.news-card.dailies { border-color: rgba(139, 203, 58, .55); }
+.daily { margin-top: 8px; }
+.daily .row { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.daily .row b { color: var(--gold, #ffc94a); white-space: nowrap; }
+.daily .bar { height: 6px; border-radius: 99px; background: rgba(0,0,0,.35); overflow: hidden; margin: 4px 0 2px; }
+.daily .bar i { display: block; height: 100%; background: repeating-linear-gradient(115deg, #8bcb3a 0 6px, #a8de5a 6px 10px); }
+.daily small { font-size: 11px; color: var(--muted); }
+.daily.done .row span { color: #a8de5a; }
+.news-card.dailies .hint { margin-top: 8px; font-size: 11px; }
