@@ -1,11 +1,12 @@
 import { HISTORY_MS, INPUT_DT, MAX_PLAYERS, MAX_REWIND_MS, PLAYER, TICK_DT, TICK_RATE } from './constants.ts';
 import { BUILDABLES, CORE, CoopDirector, Phase, ShotKind, type CoopHost, type CoopOptions } from './coop.ts';
-import { ENEMIES, type Enemy } from './enemies.ts';
+import { ENEMIES, NavGrid, type Enemy } from './enemies.ts';
 import { Action, Buttons, createPlayerState, eyePosition, fitsAt, lookDirection, stepPlayer, type InputCmd, type PlayerState } from './movement.ts';
 import { ENTER_RANGE, RAM_COOLDOWN, RAM_MIN_SPEED, VEHICLES, type NetVehicle } from './vehicles.ts';
 import { DROP_CHANCE, DROP_SECONDS, MAX_DROPS, PICKUP_RADIUS, PickupKind, PICKUPS, POWER_MULTIPLIER, type Drop } from './pickups.ts';
 import { isTeamMode, type CoopState, type GameEvent, type GameMode, type Look, type NetDrop, type NetPlayer, type NetProjectile, type RosterEntry, type Shot, type Snapshot } from './protocol.ts';
 import { KothDirector, type KothState } from './koth.ts';
+import { CtyDirector, ctyBases, type CtyState } from './cty.ts';
 import { hasLineOfSight, rayBox, rayPlayer, rayWorld } from './raycast.ts';
 import { launchProjectile, pelletDirections, stepProjectile, WEAPONS, type Projectile } from './weapons.ts';
 import type { Vec3, World } from './world.ts';
@@ -62,6 +63,7 @@ export interface SharedSnapshot {
   coop: CoopState | null;
   koth: KothState | null;
   vehicles: NetVehicle[];
+  cty: CtyState | null;
 }
 
 const MAX_QUEUE = 24;
@@ -86,6 +88,9 @@ export class Room {
   readonly mode: GameMode;
   readonly coop: CoopDirector | null;
   readonly koth: KothDirector | null;
+  readonly cty: CtyDirector | null;
+  /** Capture the Yarn: flow fields to each base, so bots can find their way round the map. */
+  readonly ctyNav: NavGrid | null;
   readonly players = new Map<number, RoomPlayer>();
   tick = 0;
   private events: GameEvent[] = [];
@@ -111,6 +116,8 @@ export class Room {
     this.coop = mode === 'coop' ? new CoopDirector(world, coopOptions) : null;
     // King of the Spool: the spool hops between the map's Heartspool spots.
     this.koth = mode === 'koth' ? new KothDirector(world.coop.cores) : null;
+    this.cty = mode === 'cty' ? new CtyDirector(ctyBases(world.coop.cores)) : null;
+    this.ctyNav = mode === 'cty' ? new NavGrid(world) : null;
     // Built spring pads launch toys exactly like the map's own jump pads.
     world.springs = this.coop ? this.coop.springs : [];
     this.pickupTimers = world.pickups.map(() => 0);
@@ -231,6 +238,10 @@ export class Room {
       const toys = [...this.players.values()].filter((p) => p.alive).map((p) => ({ team: p.team, x: p.state.x, y: p.state.y, z: p.state.z }));
       // A round won: everyone back to their side of the room, full stitches.
       if (this.koth.update(TICK_DT, toys, (e) => this.events.push(e)) >= 0) for (const p of this.players.values()) this.spawn(p);
+    }
+    if (this.cty) {
+      const toys = [...this.players.values()].map((p) => ({ id: p.id, team: p.team, alive: p.alive, x: p.state.x, y: p.state.y, z: p.state.z }));
+      if (this.cty.update(TICK_DT, toys, (e) => this.events.push(e)) >= 0) for (const p of this.players.values()) this.spawn(p);
     }
     this.stepProjectiles();
     this.stepPickups();
@@ -450,7 +461,9 @@ export class Room {
           nearest = Math.min(nearest, Math.hypot(o.state.x - s[0], o.state.z - s[2]));
         }
       }
-      const score = (this.coop ? 0 : nearest) + Math.random() * 4;
+      // Capture the Yarn: re-stitch near your own base.
+      const home = this.cty?.bases[p.team];
+      const score = home ? -Math.hypot(home[0] - s[0], home[2] - s[2]) + Math.random() * 8 : (this.coop ? 0 : nearest) + Math.random() * 4;
       if (score > bestScore) { bestScore = score; best = s; }
     }
     const yaw = Math.fround(Math.atan2(best[0], best[2]));
@@ -759,6 +772,7 @@ export class Room {
       drops: this.netDrops(),
       coop: this.coopState(withEnemies),
       koth: this.koth ? this.koth.state() : null,
+      cty: this.cty ? this.cty.state() : null,
       vehicles: this.netVehicles(),
     };
   }

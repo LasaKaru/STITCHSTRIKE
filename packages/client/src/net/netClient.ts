@@ -3,7 +3,7 @@ import {
   stepPlayer, TICK_RATE,
   Buildable, SPRING,
   type CoopState, type GameEvent, type GameMode, type InputCmd, type Look, type NetEnemy, type NetPlayer, type PlayerState, type RosterEntry,
-  type ServerText, type Shot, type Snapshot, type World, type KothState, type NetVehicle } from '@stitchstrike/shared';
+  type ServerText, type Shot, type Snapshot, type World, type KothState, type NetVehicle, type CtyState } from '@stitchstrike/shared';
 import type { Frame, Transport } from './transport.ts';
 
 /**
@@ -58,6 +58,7 @@ export class NetClient {
   coop: CoopState | null = null;
   /** King of the Spool round state. */
   koth: KothState | null = null;
+  cty: CtyState | null = null;
   roster = new Map<number, RosterEntry>();
   /** Predicted local state; null while unravelled (dead). */
   predicted: PlayerState | null = null;
@@ -230,6 +231,7 @@ export class NetClient {
     while (this.buffer.length > 30) this.buffer.shift();
     for (const s of snap.shots) this.onShot(s);
     this.koth = snap.koth ?? null;
+    this.cty = snap.cty ?? null;
     if (snap.coop) {
       this.coop = snap.coop;
       if (snap.coop.enemies) this.pushEnemies(snap.tick, snap.coop.enemies);

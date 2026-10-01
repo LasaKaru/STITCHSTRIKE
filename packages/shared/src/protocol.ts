@@ -1,6 +1,7 @@
 import { WORLD_BOUNDS } from './constants.ts';
 import type { InputCmd, PlayerState } from './movement.ts';
 import type { KothState } from './koth.ts';
+import type { CtyState, YarnBall } from './cty.ts';
 import type { NetVehicle } from './vehicles.ts';
 import type { MapId, Vec3 } from './world.ts';
 
@@ -9,11 +10,11 @@ import type { MapId, Vec3 } from './world.ts';
  * messages (hello, roster, events, ping) are JSON text frames.
  */
 
-export type GameMode = 'coop' | 'pvp' | 'tdm' | 'koth';
+export type GameMode = 'coop' | 'pvp' | 'tdm' | 'koth' | 'cty';
 
 /** Modes played in two teams (no friendly fire, team colours). */
 export function isTeamMode(mode: GameMode): boolean {
-  return mode === 'tdm' || mode === 'koth';
+  return mode === 'tdm' || mode === 'koth' || mode === 'cty';
 }
 
 /**
@@ -85,6 +86,9 @@ export type GameEvent =
   /** King of the Spool: the spool hopped to another spot / a team won the round. */
   | { type: 'hillMove'; hill: number }
   | { type: 'kothWin'; team: number }
+  /** Capture the Yarn: team's ball was taken, dropped, sent home or captured (id = the toy who did it). */
+  | { type: 'yarn'; team: number; act: 'take' | 'drop' | 'return' | 'capture'; id: number }
+  | { type: 'ctyWin'; team: number }
   /** A toy climbed into (enter) or out of a vehicle. */
   | { type: 'vehicle'; id: number; kind: number; enter: boolean }
   | { type: 'snap'; pad: number };
@@ -279,6 +283,8 @@ export interface Snapshot {
   koth?: KothState | null;
   /** Vehicles parked on the map (driven ones travel with their drivers). */
   vehicles?: NetVehicle[];
+  /** Capture the Yarn round state. */
+  cty?: CtyState | null;
 }
 
 /** Bytes per record, for bandwidth maths: player 21, shot 9 (15 with a start point), enemy 8, projectile 7. */
@@ -429,6 +435,18 @@ export function encodeSnapshot(s: Snapshot): Uint8Array {
     w.u16(Math.round(k.scores[1] * 10));
     w.u8(Math.min(255, Math.ceil(k.timer)));
   }
+  // Capture the Yarn rides last (optional).
+  w.u8(s.cty ? 1 : 0);
+  if (s.cty) {
+    for (const b of s.cty.balls) {
+      w.u8(b.state);
+      w.u8(b.carrier);
+      w.u16(quantPos(b.x, 0)); w.u16(quantPos(b.y, 1)); w.u16(quantPos(b.z, 2));
+      w.u8(Math.min(255, Math.ceil(b.timer)));
+    }
+    w.u8(s.cty.scores[0]);
+    w.u8(s.cty.scores[1]);
+  }
   return w.done();
 }
 
@@ -535,7 +553,13 @@ export function decodeSnapshot(buf: Uint8Array): Snapshot | null {
       const a = r.u16() / 10, b = r.u16() / 10;
       koth = { hill, holder, scores: [a, b], timer: r.u8() };
     }
-    return { tick, ack, self, respawn, players, shots, projectiles, pickups, drops, coop, koth, vehicles };
+    let cty: CtyState | null = null;
+    if (r.left > 0 && r.u8() === 1) {
+      const ball = (): YarnBall => ({ state: r.u8(), carrier: r.u8(), x: dequantPos(r.u16(), 0), y: dequantPos(r.u16(), 1), z: dequantPos(r.u16(), 2), timer: r.u8() });
+      const balls: [YarnBall, YarnBall] = [ball(), ball()];
+      cty = { balls, scores: [r.u8(), r.u8()] };
+    }
+    return { tick, ack, self, respawn, players, shots, projectiles, pickups, drops, coop, koth, vehicles, cty };
   } catch {
     return null;
   }

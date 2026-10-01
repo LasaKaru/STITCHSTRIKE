@@ -3,7 +3,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import {
   BUILDABLES, Buttons, createWorld, DIFFICULTIES, ENEMIES, eyePosition, lookDirection, MAPS, VEHICLES, MAX_PITCH, pelletDirections, Phase, PLAYER,
   randomLook, rayWorld, ShotKind, TURRET, TURRET_SHOT_BASE, WEAPONS, ENEMY_SHOT_ID, RoomHost, DECK,
-  KOTH, type GameMode, type MapId, type PlayerState,
+  KOTH, CTY, ctyBases, type GameMode, type MapId, type PlayerState,
 } from '@stitchstrike/shared';
 import { CombatMusic, type Intensity } from './audio/combatMusic.ts';
 import { Sfx } from './audio/sfx.ts';
@@ -15,6 +15,7 @@ import { loadProfile } from './profile.ts';
 import { createAvatar, type Avatar } from './scene/avatar.ts';
 import { YarnRopes, type RopeSpec } from './scene/yarnRopes.ts';
 import { SpoolHill } from './scene/spoolHill.ts';
+import { YarnBalls } from './scene/yarnBalls.ts';
 import { CoopProps } from './scene/coopProps.ts';
 import { EnemyRenderer, type EnemyView } from './scene/enemyRenderer.ts';
 import { Fx } from './scene/fx.ts';
@@ -41,7 +42,7 @@ import { QUALITY_LAYERS, setWoolLayers, updateShellLod } from './wool/woolMateri
 const params = new URLSearchParams(location.search);
 const map: MapId = MAPS.some((m) => m.id === params.get('map')) ? (params.get('map') as MapId) : 'garden';
 const modeParam = params.get('mode');
-const mode: GameMode = modeParam === 'pvp' || modeParam === 'tdm' || modeParam === 'koth' ? modeParam : 'coop';
+const mode: GameMode = modeParam === 'pvp' || modeParam === 'tdm' || modeParam === 'koth' || modeParam === 'cty' ? modeParam : 'coop';
 const waves = [0, 5, 10].includes(Number(params.get('waves'))) ? Number(params.get('waves')) : 10;
 const difficulty = Math.max(0, Math.min(3, Number(params.get('difficulty') ?? 1) || 0));
 const settings = loadSettings();
@@ -146,6 +147,7 @@ const main = locals[0].net;
 const avatars = new Map<number, Avatar>();
 const yarnRopes = new YarnRopes(scene);
 const spoolHill = mode === 'koth' ? new SpoolHill(scene, world, palette(settings.colorblind).team) : null;
+const yarnBalls = mode === 'cty' ? new YarnBalls(scene, ctyBases(world.coop.cores), palette(settings.colorblind).team) : null;
 const ropeSpecs: RopeSpec[] = [];
 function syncAvatars(): void {
   for (const [id, a] of avatars) if (!main.roster.has(id)) { scene.remove(a.root); avatars.delete(id); }
@@ -213,6 +215,13 @@ main.onEvent = (e) => {
     else if (e.phase === Phase.Build && e.wave > 0) banner(`WAVE ${e.wave} CLEARED!`, 'good');
     else if (e.phase === Phase.Won) { banner('THE HEARTSPOOLS ARE SAFE!', 'good'); sfx.play('win'); }
     else if (e.phase === Phase.Lost) { banner('THE HEARTSPOOLS UNRAVELLED', 'bad'); sfx.play('lose'); }
+  } else if (e.type === 'yarn') {
+    const team = e.team === 0 ? 'COTTON' : 'WOOL';
+    if (e.act === 'take') { banner(`${team} YARN TAKEN!`, 'bad'); sfx.play('alarm', 0.6); }
+    else if (e.act === 'capture') { banner(`${team} YARN CAPTURED!`, 'good'); sfx.play('win', 0.7); }
+    else if (e.act === 'return') banner(`${team} YARN IS BACK HOME`, 'good');
+  } else if (e.type === 'ctyWin') {
+    banner(`TEAM ${e.team === 0 ? 'COTTON' : 'WOOL'} WINS THE ROUND!`, 'good');
   } else if (e.type === 'boss') {
     const boss = mission === 1 ? 'REX, THE YARNASAUR,' : 'THE UNRAVELLER';
     banner(e.state === 'arrive' ? `${boss} APPROACHES!` : `${boss} IS UNPICKED!`, e.state === 'arrive' ? 'bad' : 'good');
@@ -332,10 +341,12 @@ function updateHud(): void {
     $('phase').innerHTML = c.phase === Phase.Build ? `Build · <b>${Math.ceil(c.timer)}s</b> · ${c.buttons} buttons · ${DIFFICULTIES[c.difficulty].name}` : `${c.buttons} buttons${c.boss >= 0 ? ` · BOSS ${Math.round(c.boss * 100)}%` : ''}`;
     $('cores-line').textContent = c.cores.map((k, i) => `${'ABC'[i]} ${Math.round(k.health * 100)}%`).join(' · ');
   } else {
-    $('wave').textContent = mode === 'tdm' ? 'TEAM DEATHMATCH' : mode === 'koth' ? 'KING OF THE SPOOL' : 'FREE-FOR-ALL';
+    $('wave').textContent = mode === 'tdm' ? 'TEAM DEATHMATCH' : mode === 'koth' ? 'KING OF THE SPOOL' : mode === 'cty' ? 'CAPTURE THE YARN' : 'FREE-FOR-ALL';
     $('phase').textContent = locals.map((l) => `${l.net.roster.get(l.net.id)?.name ?? '?'} ${l.net.me()?.kos ?? 0} KO`).join(' · ');
     const k = main.koth;
-    $('cores-line').textContent = k ? `Cotton ${Math.floor(k.scores[0])} · Wool ${Math.floor(k.scores[1])} / ${KOTH.target}${k.holder === 2 ? ' · CONTESTED' : ''}` : '';
+    const cy = main.cty;
+    $('cores-line').textContent = k ? `Cotton ${Math.floor(k.scores[0])} · Wool ${Math.floor(k.scores[1])} / ${KOTH.target}${k.holder === 2 ? ' · CONTESTED' : ''}`
+      : cy ? `Cotton ${cy.scores[0]} · Wool ${cy.scores[1]} / ${CTY.target}${cy.balls.some((b) => b.state === 1) ? ' · YARN TAKEN!' : ''}` : '';
   }
 }
 
@@ -444,6 +455,7 @@ function frame(): void {
   yarnRopes.update(ropeSpecs, dt);
   vehicles.update(main.vehicles(), driven, dt);
   spoolHill?.update(main.koth, t, dt);
+  yarnBalls?.update(main.cty, t, dt);
 
   if (enemyRenderer) {
     const views: EnemyView[] = main.enemySamples(now).map((e) => {

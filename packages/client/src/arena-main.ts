@@ -4,7 +4,7 @@ import {
   BUILD_RANGE, Buildable, BUILDABLES, Buttons, createWorld, ENEMIES, ENEMY_INTERP_DELAY_MS, eyePosition, lookDirection, MAX_PITCH,
   pelletDirections, Phase, PLAYER, ENTER_RANGE, VEHICLES, VehicleKind, rayBox, rayPlayer, rayWorld, TURRET, TURRET_SHOT_BASE, WEAPONS,
   GRAPPLE, KOTH, MAPS, TEAM_COLORS, TEAM_NAMES, type GameMode, type MapId, type PlayerState, type Vec3,
-  Action, DECK, DIFFICULTIES, Mission, MISSIONS, ENEMY_SHOT_ID, EnemyType, launchProjectile, LAUNCHER, MAX_TIER, PICKUPS, PickupKind, ShotKind, upgradeCost, WEAPON_COUNT,
+  Action, CTY, ctyBases, YarnState, DECK, DIFFICULTIES, Mission, MISSIONS, ENEMY_SHOT_ID, EnemyType, launchProjectile, LAUNCHER, MAX_TIER, PICKUPS, PickupKind, ShotKind, upgradeCost, WEAPON_COUNT,
 } from '@stitchstrike/shared';
 import { CombatMusic, type Intensity } from './audio/combatMusic.ts';
 import { PickupsView } from './scene/pickupsView.ts';
@@ -20,6 +20,7 @@ import { EnemyRenderer, type EnemyView } from './scene/enemyRenderer.ts';
 import { Fx } from './scene/fx.ts';
 import { YarnRopes, type RopeSpec } from './scene/yarnRopes.ts';
 import { SpoolHill } from './scene/spoolHill.ts';
+import { YarnBalls } from './scene/yarnBalls.ts';
 import { createPost, type Post } from './scene/post.ts';
 import { ViewModel } from './scene/viewModel.ts';
 import { buildWoolGarden } from './scene/woolGarden.ts';
@@ -49,7 +50,7 @@ const params = new URLSearchParams(location.search);
 const map: MapId = MAPS.some((m) => m.id === params.get('map')) ? (params.get('map') as MapId) : 'bedroom';
 const world = createWorld(map);
 const modeParam = params.get('mode');
-const mode: GameMode = modeParam === 'pvp' || modeParam === 'tdm' || modeParam === 'koth' ? modeParam : 'coop';
+const mode: GameMode = modeParam === 'pvp' || modeParam === 'tdm' || modeParam === 'koth' || modeParam === 'cty' ? modeParam : 'coop';
 const wavesParam = Number(params.get('waves') ?? 10);
 const waves = [0, 5, 10].includes(wavesParam) ? wavesParam : 10;
 const difficulty = Math.max(0, Math.min(3, Math.floor(Number(params.get('difficulty') ?? 1)) || 0));
@@ -79,8 +80,9 @@ document.body.classList.add(mode);
 document.getElementById('modeline')!.textContent = mode === 'coop'
   ? `${MISSIONS[mission].name} · ${waves === 0 ? 'Endless' : `${waves} waves`} · ${DIFFICULTIES[difficulty].name}`
   : mode === 'tdm' ? 'Team Deathmatch · Team Cotton vs Team Wool'
-  : mode === 'koth' ? `King of the Spool · hold the Golden Spool · first to ${KOTH.target}` : 'PvP free-for-all · first to unravel the most toys';
-if (mode === 'tdm' || mode === 'koth') document.body.classList.add('pvp');
+  : mode === 'koth' ? `King of the Spool · hold the Golden Spool · first to ${KOTH.target}`
+  : mode === 'cty' ? `Capture the Yarn · steal their yarn ball and bring it home · first to ${CTY.target}` : 'PvP free-for-all · first to unravel the most toys';
+if (mode === 'tdm' || mode === 'koth' || mode === 'cty') document.body.classList.add('pvp');
 
 // ---------------------------------------------------------------- transport
 
@@ -378,6 +380,18 @@ net.onEvent = (e) => {
       banner('THE GOLDEN SPOOL HAS MOVED!', '', 2200);
       sfx.play('spring');
       break;
+    case 'yarn': {
+      const myTeam = net.roster.get(net.id)?.team ?? 0;
+      const ours = e.team === myTeam;
+      const who = e.id === net.id ? 'You' : escapeHtml(net.roster.get(e.id)?.name ?? 'Someone');
+      const ball = ours ? 'OUR YARN' : 'THEIR YARN';
+      if (e.act === 'take') { banner(e.id === net.id ? 'YOU HAVE THEIR YARN! RUN IT HOME!' : `${ball} TAKEN!`, ours ? 'bad' : 'good', 2600); sfx.play(ours ? 'alarm' : 'collect'); feed(`${who} <span>grabbed ${ours ? 'our' : 'their'} yarn</span>`, !ours); }
+      else if (e.act === 'drop') { banner(`${ball} DROPPED!`, '', 1800); sfx.play('pop', 0.6); }
+      else if (e.act === 'return') { banner(`${ball} IS BACK HOME`, ours ? 'good' : '', 1800); sfx.play('spring', 0.7); }
+      else { banner(ours ? 'THEY CAPTURED OUR YARN!' : `${e.id === net.id ? 'YOU' : who.toUpperCase()} CAPTURED THEIR YARN!`, ours ? 'bad' : 'good', 3000); sfx.play(ours ? 'lose' : 'win'); }
+      break;
+    }
+    case 'ctyWin':
     case 'kothWin': {
       const mine = net.roster.get(net.id)?.team === e.team;
       banner(`${TEAM_NAMES[e.team].toUpperCase()} WINS THE ROUND!`, mine ? 'good' : 'bad', 4000);
@@ -824,8 +838,8 @@ function updateHud(): void {
     }
     hud.deckhint.innerHTML = open ? `<b>1–7</b> build or upgrade · <b>${KL.rebuild}</b> build again · <b>${KL.deck}</b> close` : `<b>${KL.deck}</b> build deck · <b>${KL.rebuild}</b> build again`;
   } else {
-    hud.wave.textContent = mode === 'tdm' ? 'TEAM DEATHMATCH' : mode === 'koth' ? 'KING OF THE SPOOL' : 'FREE-FOR-ALL';
-    hud.phase.innerHTML = mode === 'tdm' ? teamScoreText() : mode === 'koth' ? kothText() : '';
+    hud.wave.textContent = mode === 'tdm' ? 'TEAM DEATHMATCH' : mode === 'koth' ? 'KING OF THE SPOOL' : mode === 'cty' ? 'CAPTURE THE YARN' : 'FREE-FOR-ALL';
+    hud.phase.innerHTML = mode === 'tdm' ? teamScoreText() : mode === 'koth' ? kothText() : mode === 'cty' ? ctyText() : '';
   }
 
   if (net.status === 'connecting') hud.status.textContent = `Connecting to ${solo ? 'solo worker' : 'server'}…`;
@@ -873,7 +887,20 @@ function kothText(): string {
   return `<b style="color:${hexOf(PAL.team[0])}">Cotton ${Math.floor(k.scores[0])}</b> · <b style="color:${hexOf(PAL.team[1])}">Wool ${Math.floor(k.scores[1])}</b> / ${KOTH.target} · ${held} · moves in ${Math.ceil(k.timer)} s`;
 }
 
-const MODE_NAMES: Record<GameMode, string> = { coop: 'Co-op', pvp: 'Free-for-all', tdm: 'Team Deathmatch', koth: 'King of the Spool' };
+function ctyText(): string {
+  const c = net.cty;
+  if (!c) return '';
+  const mine = net.roster.get(net.id)?.team ?? 0;
+  const status = (team: number) => {
+    const b = c.balls[team];
+    return b.state === YarnState.Home ? 'home' : b.state === YarnState.Carried ? `<b>taken by ${escapeHtml(net.roster.get(b.carrier)?.name ?? '?')}</b>` : `<b>dropped</b> (home in ${Math.ceil(b.timer)} s)`;
+  };
+  const carrying = c.balls[1 - mine].state === YarnState.Carried && c.balls[1 - mine].carrier === net.id;
+  return `<b style="color:${hexOf(PAL.team[0])}">Cotton ${c.scores[0]}</b> · <b style="color:${hexOf(PAL.team[1])}">Wool ${c.scores[1]}</b> / ${CTY.target} · our yarn ${status(mine)} · theirs ${status(1 - mine)}`
+    + (carrying ? ' · <b>RUN IT HOME!</b>' : '');
+}
+
+const MODE_NAMES: Record<GameMode, string> = { coop: 'Co-op', pvp: 'Free-for-all', tdm: 'Team Deathmatch', koth: 'King of the Spool', cty: 'Capture the Yarn' };
 /** Rich presence (Steam): what this toy is up to. */
 function presenceText(): string {
   const c = net.coop;
@@ -894,6 +921,7 @@ const pickupsView = new PickupsView(scene, world);
 const vehicleView = new VehicleView(scene);
 const driven: DrivenVehicle[] = [];
 const spoolHill = mode === 'koth' ? new SpoolHill(scene, world, PAL.team) : null;
+const yarnBalls = mode === 'cty' ? new YarnBalls(scene, ctyBases(world.coop.cores), PAL.team) : null;
 const traversal = new TraversalView(scene, world, new Set(profile.collected));
 const music = new CombatMusic();
 
@@ -1067,6 +1095,7 @@ function frame(): void {
       jungle: [-26, 6, 6, -40, 10, 28],
       river: [12, 5, -22, -18, 1, -34],
       thumb: [16, 10, -14, -2, 7, 22],
+      base: [-20, 7, -6, -32, 1, -18],
     } : world.id === 'toystore' ? {
       overview: [0, 26, 48, 0, 4, -20],
       core: [6, 4, -4, 0, 1, -12],
@@ -1153,6 +1182,7 @@ function frame(): void {
 
   // Co-op set pieces: Heartspools spin, turrets track the nearest enemy, pad under you glows.
   spoolHill?.update(net.koth, t, dt);
+  yarnBalls?.update(net.cty, t, dt);
   if (coopProps) {
     const highlight = p ? coopProps.nearestPad(p.x, p.z, BUILD_RANGE) : -1;
     coopProps.update(net.coop, t, highlight, (x, z) => {

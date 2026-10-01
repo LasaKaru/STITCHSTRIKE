@@ -4,6 +4,7 @@ import { Buildable, BUILDABLES, DECK, MAX_TIER, Phase, upgradeCost } from './coo
 import { ENEMIES } from './enemies.ts';
 import { Buttons, eyePosition, type InputCmd } from './movement.ts';
 import { PickupKind } from './pickups.ts';
+import { CTY, YarnState } from './cty.ts';
 import { PLAYER } from './constants.ts';
 import { hasLineOfSight } from './raycast.ts';
 import type { Room, RoomPlayer } from './room.ts';
@@ -73,6 +74,48 @@ export class Bot {
     return w[Math.floor(Math.random() * w.length)];
   }
 
+  private routeCache: { tick: number; goal: Vec3 | null; via: Vec3 | null } = { tick: -1, goal: null, via: null };
+
+  /**
+   * Capture the Yarn: a goal at (or near) a base is reached along that base's
+   * flow field, two nodes ahead, so bots go round bridges and walls instead of
+   * walking into them. Anything else (a carrier, a dropped ball) is chased directly.
+   */
+  private route(me: RoomPlayer, goal: Vec3 | null): Vec3 | null {
+    const nav = this.room.ctyNav;
+    if (!nav || !goal) return goal;
+    const c = this.routeCache;
+    if (c.tick === this.room.tick && c.goal && c.goal[0] === goal[0] && c.goal[2] === goal[2]) return c.via;
+    let via: Vec3 = goal;
+    const cores = this.room.world.coop.cores;
+    const ci = cores.findIndex((k) => Math.hypot(k[0] - goal[0], k[2] - goal[2]) < 5);
+    if (ci >= 0 && Math.hypot(goal[0] - me.state.x, goal[2] - me.state.z) > 5) {
+      let n = nav.nearest(me.state.x, me.state.z, this.room.world.boxes);
+      for (let k = 0; k < 2 && n >= 0 && nav.next[ci][n] >= 0 && nav.dist[ci][n] > 0; k++) n = nav.next[ci][n];
+      if (n >= 0) via = [nav.nodes[n].x, 0, nav.nodes[n].z];
+    }
+    this.routeCache = { tick: this.room.tick, goal, via };
+    return via;
+  }
+
+  /** Where the mode wants this bot to be: the spool, or the yarn-ball errand of the moment. */
+  private objective(me: RoomPlayer): Vec3 | null {
+    const koth = this.room.koth;
+    if (koth) return koth.hills[koth.hill];
+    const cty = this.room.cty;
+    if (!cty || me.team > 1) return null;
+    const own = cty.balls[me.team], theirs = cty.balls[1 - me.team];
+    const base = cty.bases[me.team];
+    // Carrying theirs: run it home.
+    if (theirs.state === YarnState.Carried && theirs.carrier === me.id) return base;
+    // Ours taken or dropped: chase it down / send it home.
+    if (own.state !== YarnState.Home) return [own.x, Math.max(0, own.y - CTY.carryHeight), own.z];
+    // One in three bots stays home to guard; the rest raid (or escort the carrier home).
+    if (me.id % 3 === 0) return [base[0] + Math.sin(me.id) * 3, base[1], base[2] + Math.cos(me.id) * 3];
+    if (theirs.state === YarnState.Carried) return base;
+    return [theirs.x, theirs.y, theirs.z];
+  }
+
   update(): void {
     const me = this.room.players.get(this.id);
     if (!me) return;
@@ -83,7 +126,8 @@ export class Bot {
 
   private findTarget(me: RoomPlayer, eye: Vec3): Target | null {
     let best: Target | null = null;
-    let bestD = this.room.coop ? 22 : 28;
+    // Capture the Yarn raiders keep running: they only stop for toys right in their way.
+    let bestD = this.room.coop ? 22 : this.room.cty && me.id % 3 !== 0 ? 12 : 28;
     const consider = (t: Target) => {
       const d = Math.hypot(t.x - me.state.x, t.y - me.state.y, t.z - me.state.z);
       if (d >= bestD || !hasLineOfSight(eye, [t.x, t.y, t.z], this.room.world.boxes)) return;
@@ -148,10 +192,10 @@ export class Bot {
       if (dist > 10) buttons |= Buttons.Forward;
       if (dist < 4) buttons |= Buttons.Back;
       this.weapon = this.chooseWeapon(target, dist);
-      const koth = this.room.koth;
-      if (koth) {
-        // King of the Spool: fight on the move, but keep heading for the spool.
-        const h = koth.hills[koth.hill];
+      const obj = this.route(me, this.objective(me));
+      if (obj) {
+        // King of the Spool and Capture the Yarn: fight on the move, but keep heading for the objective.
+        const h = obj;
         const hx = h[0] - s.x, hz = h[2] - s.z;
         const hd = Math.hypot(hx, hz);
         if (hd > 3) {
@@ -167,12 +211,13 @@ export class Bot {
       const yawErr = Math.abs(wrapAngle(desiredYaw - this.yaw));
       if (this.reaction <= 0 && yawErr < 0.2) buttons |= Buttons.Fire;
     } else {
+      if (this.room.cty) this.goal = this.route(me, this.objective(me)) ?? this.goal;
       this.coopChores(me);
       this.errands(me);
       const dx = this.goal[0] - s.x;
       const dz = this.goal[2] - s.z;
       if (Math.hypot(dx, dz) < 1.2) {
-        if ((!this.room.coop && !this.room.koth) || Math.random() < 0.01) this.goal = this.pickGoal();
+        if ((!this.room.coop && !this.room.koth && !this.room.cty) || Math.random() < 0.01) this.goal = this.pickGoal();
       } else {
         desiredYaw = Math.atan2(-dx, -dz);
         buttons |= Buttons.Forward;
