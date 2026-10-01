@@ -1,18 +1,18 @@
 # STITCHSTRIKE
 
-**Soft toys. Hard fights.** An indie first- and third-person shooter that blends wave-based tower defence with intense action, and a love letter to 90s childhoods. You are a 5-inch knitted action figure in a giant house. Everything is wool: the heroes, Baron von Ravel's Mass-Knit Army, and every room. Defend the glowing **Heartspools** in a messy **bedroom**, the **back garden** or the **garage**: alone with bots, online with up to 4 friends, or two to a couch in split-screen. PvP Free-for-All and Team Deathmatch are in too. It's built with Three.js and TypeScript, with server-authoritative netcode, and ships as a desktop app ready for Steam.
+**Soft toys. Hard fights.** An indie first- and third-person shooter that blends wave-based tower defence with intense action, and a love letter to 90s childhoods. You are a little amigurumi toy in a giant, cosy, hand-knitted world. Everything is wool: the toys, Baron von Ravel's Mass-Knit Army, every room, the trees, the water and the city outside the window, all in the warm look of a stop-motion knit film. Defend the glowing **Heartspools** in a messy **bedroom**, the **back garden**, the **garage**, the **bathroom**, a **toy store aisle** or an autumn **city park**: alone with bots, online with up to 4 friends, or up to four to a couch in split-screen. PvP Free-for-All, Team Deathmatch and King of the Spool are in too. It's built with Three.js and TypeScript, with server-authoritative netcode, and ships as a desktop app ready for Steam.
 
 ![Main menu over the live in-engine cinematic](docs/screenshots/menu.jpg)
 
-| The Mass-Knit Army and The Unraveller | Wave 7 in the Garage | Customise your figure (earned, never bought) |
+| The City Park | Wave 5 at the bandstand | The parade balloon |
 |---|---|---|
-| ![](docs/screenshots/army.jpg) | ![](docs/screenshots/garage-combat.jpg) | ![](docs/screenshots/customise.jpg) |
-| **Split-screen on one PC** | **Progress: level, medals, secrets** | **Play: mode, mission, difficulty, map** |
-| ![](docs/screenshots/split-screen.jpg) | ![](docs/screenshots/progress.jpg) | ![](docs/screenshots/menu-play.jpg) |
-| **The Back Garden** | **First person in the yarn grass** | **The messy bedroom** |
-| ![](docs/screenshots/garden-overview.jpg) | ![](docs/screenshots/garden-firstperson.jpg) | ![](docs/screenshots/coop-overview.jpg) |
-| **Grumble, a realistic knitted action figure** | **The knitted cast** | **PvP along the garden fence** |
-| ![](docs/screenshots/figure-grumble.jpg) | ![](docs/screenshots/figure-cast.jpg) | ![](docs/screenshots/garden-pvp.jpg) |
+| ![](docs/screenshots/park.jpg) | ![](docs/screenshots/park-combat.jpg) | ![](docs/screenshots/park-balloon.jpg) |
+| **The cosy bedroom** | **The autumn Back Garden** | **The Bathroom** |
+| ![](docs/screenshots/coop-overview.jpg) | ![](docs/screenshots/garden-overview.jpg) | ![](docs/screenshots/bathroom.jpg) |
+| **The amigurumi cast** | **Grumble, up close** | **The Unraveller and his army** |
+| ![](docs/screenshots/figure-cast.jpg) | ![](docs/screenshots/figure-grumble.jpg) | ![](docs/screenshots/army.jpg) |
+| **Tin Drummer and Jack-in-the-Box** | **Play: mode, mission, difficulty, map** | **Customise your toy (earned, never bought)** |
+| ![](docs/screenshots/recruits.jpg) | ![](docs/screenshots/menu-play.jpg) | ![](docs/screenshots/customise.jpg) |
 
 _Screenshots are headless renders with SwiftShader, so real GPUs look sharper._
 
@@ -118,6 +118,7 @@ Every keyboard action can be rebound in Settings → Key bindings.
   - **The Garage:** a car you crawl under and climb onto, steel shelving, a workbench and pegboard, and a roll-up door stuck half open.
   - **The Bathroom:** a bubble-bath tub, a climbable shower curtain, the toilet tank as a sniper perch, a toilet-roll staircase.
   - **The Toy Store Aisle:** towering shelves of boxed 90s toys, SALE banners to climb, a ball pit, a trolley and the checkout.
+  - **The City Park:** an autumn park of pom-pom trees, a knitted pond under a humped footbridge, a bandstand perch, hills, benches and lamp posts, ringed by a knitted city, with a giant turkey parade balloon overhead.
 - **Modes:** co-op defence (solo with bots, online up to 4, split-screen for 2–4), Free-for-All, Team Deathmatch and **King of the Spool** (two teams fight to stand on a Golden Spool that hops around the map; first to 100).
 - **Accessibility:** colour-blind palettes, subtitles and sound captions, reduced camera shake, full key rebinding.
 - **Steam:** medals unlock Steam achievements and rich presence shows what you're playing (desktop build with steamworks.js; see [docs/DESKTOP_AND_STEAM.md](docs/DESKTOP_AND_STEAM.md)).
@@ -127,12 +128,12 @@ Balance check (full simulated matches, bots only, 2-second build phases): 4 bots
 
 ### URL options
 
-`?mode=coop|pvp|tdm|koth` · `?map=bedroom|garden|garage|bathroom|toystore` · `?waves=5|10|0` · `?difficulty=0..3` · `?wave=N` (solo practice start) · `?room=ABCD` · `?solo=1` · `?bots=0..7` · `?lag=150` · `?name=Pip` · `?quality=low|medium|high` · `?server=ws://host:8787` · `?cam=overview|core|…` (fixed spectator camera) · `?autopilot=1` (headless smoke tests) · `?lod=0` (full-detail invaders at any distance). Split-screen: `split.html?players=2|3|4`.
+`?mode=coop|pvp|tdm|koth` · `?map=bedroom|garden|garage|bathroom|toystore|park` · `?waves=5|10|0` · `?difficulty=0..3` · `?wave=N` (solo practice start) · `?room=ABCD` · `?solo=1` · `?bots=0..7` · `?lag=150` · `?name=Pip` · `?quality=low|medium|high` · `?server=ws://host:8787` · `?cam=overview|core|…` (fixed spectator camera) · `?autopilot=1` (headless smoke tests) · `?lod=0` (full-detail invaders at any distance). Split-screen: `split.html?players=2|3|4`.
 
 Server env: `PORT` (8787), `FILL_BOTS` (4), `FAKE_LAG_MS` (one-way per direction), `STATIC_DIR` (also serve the built client).
 
 ```bash
-pnpm test         # 107 tests: movement, mantle and yarn-swing, weapons, pickups, down/re-stitch, invaders, traps,
+pnpm test         # 110 tests: movement, mantle and yarn-swing, weapons, pickups, down/re-stitch, invaders, traps,
                   # mazing, missions, King of the Spool, protocol, lag comp, prediction, co-op on every map,
                   # progression and weapon parts, settings, SDF mesher, rig
 pnpm typecheck    # tsc -b across all packages
@@ -166,9 +167,17 @@ packages/
 docs/BUILD_PLAN.md       the full design
 ```
 
-### Realistic 3D figures, then wool
+### The cosy stop-motion look
 
-The characters are real 3D sculpts rather than capsules, and there are no model files: each one is sculpted in code (`src/figures/`).
+The game aims for the feel of a hand-made stop-motion knit film:
+- **Amigurumi toys** (`src/figures/amigurumi.ts`): big round crochet heads with bead eyes, felt blush and a stitched smile, chubby sweaters with ribbed turtlenecks, mitten hands and round felt shoes, knitted hair caps, bobble beanies and fuzzy beards. The boss is a felted teddy bear in a top hat.
+- **Chunky knit everywhere:** environment stitches are big and deep, and every yarn colour is softened and warmed by a hand-dyed tone (`yarnDye`).
+- **Golden light and a film grade** (`src/scene/post.ts`): warm split-toning, soft bloom and an optional tilt-shift "miniature focus" that keeps the aiming area sharp.
+- **Set dressing** (`src/scene/cozyDressing.ts`): a knitted city skyline with lit windows outside every window and on every horizon, autumn leaf bunting, knitted pumpkins, shaggy pom-pom trees and glossy knitted water.
+
+### 3D figures, sculpted in code
+
+The characters are real 3D sculpts rather than capsules, and there are no model files: each one is sculpted in code (`src/figures/`). The amigurumi style is the default; the original realistic action-figure sculpt below is still available as `style: 'realistic'`.
 
 1. **Sculpt:** the figure is a signed-distance description of its anatomy.
    - Head: skull, jaw, cheekbones, brow ridge, nose, lips, ears and carved eye sockets.

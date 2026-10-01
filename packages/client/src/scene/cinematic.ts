@@ -96,7 +96,7 @@ export async function buildCinematic(
   setWoolLayers(QUALITY_LAYERS[quality === 'low' ? 'low' : 'medium']);
   const world = createWorld('garden');
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xc4d6e6);
+  scene.background = new THREE.Color(0xf2d9b0);
   scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
   scene.environmentIntensity = 0.5;
 

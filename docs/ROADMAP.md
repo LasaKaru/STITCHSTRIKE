@@ -75,7 +75,8 @@ The checklist tracks what is in the game (✅) and what is still ahead (⬜).
   - support: Tin Drummers (speed up everyone nearby)
   - ambushers: Jack-in-the-Boxes (spring out at toys)
   - boss: The Unraveller
-- ✅ Maps at toy scale: The Bedroom, The Back Garden, The Garage, The Bathroom, The Toy Store Aisle
+- ✅ Maps at toy scale: The Bedroom, The Back Garden, The Garage, The Bathroom, The Toy Store Aisle, The City Park
+- ✅ The cosy stop-motion look: amigurumi toys, chunky knit, golden light and a film grade, autumn set dressing, a knitted city outside every window
 - ✅ Verticality: climbable fabric and bark, jump pads, book and crate steps, shelves and roofs, ledge mantle, the yarn-swing grapple
 - ✅ Collectibles: 8 secrets per map (golden thimbles, weapon parts, credit stashes)
 - ✅ Customisation with zero pay-to-win:

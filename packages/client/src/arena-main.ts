@@ -802,7 +802,7 @@ function resultsCard(won: boolean | null): void {
     <div class="bubble">
       <div class="sticker">NEW!<br>Collect<br>them all!</div>
       <div class="name">${escapeHtml(name)}</div>
-      <div class="tag">Knitted action figure with ${WEAPONS.length} blasters and real re-stitch action!</div>
+      <div class="tag">Hand-knitted amigurumi with ${WEAPONS.length} blasters and real re-stitch action!</div>
       <div class="stats"><div><b>${session.kills}</b><span>unravelled</span></div><div><b>${session.revives}</b><span>re-stitched</span></div><div><b>${session.waves}</b><span>waves held</span></div></div>
     </div>
     <div class="reward"><span>+${session.xp} XP</span><span>+${session.credits} credits</span><span>Level ${lv.level}</span></div>
