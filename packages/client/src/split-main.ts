@@ -15,6 +15,7 @@ import { loadProfile } from './profile.ts';
 import { createAvatar, type Avatar } from './scene/avatar.ts';
 import { YarnRopes, type RopeSpec } from './scene/yarnRopes.ts';
 import { SpoolHill } from './scene/spoolHill.ts';
+import { ShoulderCam } from './scene/shoulderCam.ts';
 import { YarnBalls } from './scene/yarnBalls.ts';
 import { CoopProps } from './scene/coopProps.ts';
 import { EnemyRenderer, type EnemyView } from './scene/enemyRenderer.ts';
@@ -99,6 +100,10 @@ interface Local {
   hud: HTMLElement;
   down: HTMLElement;
   lastWeapon: number;
+  /** Over-the-shoulder camera (V on the keyboard, the camera button on a pad). */
+  cam: ShoulderCam;
+  third: boolean;
+  aimFix: { yaw: number; pitch: number };
 }
 
 function makeLocal(index: number): Local {
@@ -124,7 +129,10 @@ function makeLocal(index: number): Local {
   const l: Local = {
     index, net, camera, viewModel, yaw: 0, pitch: 0, weapon: 0, action: 0, lastBuild: DECK[0], deck: false, pad: null, acc: 0,
     hud: el.querySelector('.phud')!, down: el.querySelector('.pdown')!, lastWeapon: 0,
+    cam: new ShoulderCam(), third: (params.get('view') ?? settings.view) === 'third', aimFix: { yaw: 0, pitch: 0 },
   };
+  l.cam.side = settings.shoulder;
+  l.cam.snap(l.third);
   net.onSpawn = (s: PlayerState) => { l.yaw = s.yaw; l.pitch = 0; };
   return l;
 }
@@ -276,6 +284,8 @@ document.addEventListener('keydown', (e) => {
   else if (e.code === settings.keys.rebuild) l.action = l.lastBuild;
   else if (e.code === settings.keys.recycle) l.action = 20;
   else if (e.code === settings.keys.ready) l.action = 21;
+  else if (e.code === settings.keys.camera) l.third = !l.third;
+  else if (e.code === settings.keys.shoulder) l.cam.side = l.cam.side > 0 ? -1 : 1;
 });
 document.addEventListener('keyup', (e) => keys.delete(e.code));
 
@@ -315,6 +325,7 @@ function sample(l: Local, dt: number): number {
     if (f.cardDelta) l.lastBuild = cycleCard(l.lastBuild, f.cardDelta);
     if (l.pad.ltEdge) l.action = l.lastBuild;
     if (f.action) l.action = f.action;
+    if (f.thirdPerson) l.third = !l.third;
   }
   return b;
 }
@@ -370,7 +381,7 @@ function frame(): void {
       l.acc -= 1 / 60;
       const action = l.action;
       l.action = 0;
-      const r = l.net.input(buttons, l.yaw, l.pitch, now, l.weapon, action);
+      const r = l.net.input(buttons, l.yaw + l.aimFix.yaw, l.pitch + l.aimFix.pitch, now, l.weapon, action);
       if (r.fired && l.net.predicted) {
         const s = l.net.predicted;
         const o = eyePosition(s, (buttons & Buttons.Crouch) !== 0);
@@ -397,6 +408,13 @@ function frame(): void {
       l.camera.position.set(e[0] + l.net.correction.x, e[1] + l.net.correction.y, e[2] + l.net.correction.z);
       if (fx.shake > 0.01) l.camera.position.x += (Math.random() - 0.5) * fx.shake * (settings.reduceShake ? 0.03 : 0.2);
       l.camera.rotation.set(l.pitch, l.yaw, 0);
+      // Third person: over the shoulder, aim bent so shots land under this player's crosshair.
+      const eyeV = l.camera.position.clone();
+      l.camera.position.copy(l.cam.update(dt, l.third && !p.car, p.weapon === 2, eyeV, l.yaw, l.pitch, world.boxes));
+      const a = l.cam.aim(eyeV, l.yaw, l.pitch, (o, d, range) => rayWorld(o, d, world.boxes, range));
+      l.aimFix.yaw = p.car ? 0 : Math.atan2(Math.sin(a.yaw - l.yaw), Math.cos(a.yaw - l.yaw));
+      l.aimFix.pitch = p.car ? 0 : a.pitch - l.pitch;
+      if (l.cam.blend > 0.35) l.camera.layers.enable(5 + l.index); else l.camera.layers.disable(5 + l.index);
       if (p.car) {
         // Driving: a chase camera behind the aim.
         const back = lookDirection(l.yaw, Math.min(l.pitch, 0.2) - 0.25);
@@ -407,7 +425,7 @@ function frame(): void {
       }
       if (p.weapon !== l.lastWeapon) { l.viewModel.setWeapon(p.weapon); l.lastWeapon = p.weapon; }
       l.viewModel.update(dt, Math.hypot(p.vx, p.vz), p.onGround);
-      l.viewModel.group.visible = !p.downed && !p.car;
+      l.viewModel.group.visible = !p.downed && !p.car && l.cam.blend <= 0.35;
     } else if (main.latest) {
       l.camera.position.set(Math.sin(t * 0.2 + l.index * 3) * 20, 18, Math.cos(t * 0.2 + l.index * 3) * 20);
       l.camera.lookAt(0, 1, 0);
@@ -432,6 +450,7 @@ function frame(): void {
       } else if (p) {
         a.root.position.set(p.x, p.y, p.z);
         a.root.rotation.y = l.yaw;
+        a.setWeapon(p.weapon);
         a.update(dt, t, Math.hypot(p.vx, p.vz) / PLAYER.runSpeed, l.pitch, false, !p.onGround, p.downed);
         if (p.hooked) ropeSpecs.push({ key: id, from: new THREE.Vector3(p.x, p.y + 0.9, p.z), to: new THREE.Vector3(p.hx, p.hy, p.hz) });
       }
@@ -448,6 +467,7 @@ function frame(): void {
     } else if (r) {
       a.root.position.set(r.x, r.y, r.z);
       a.root.rotation.y = r.yaw;
+      a.setWeapon(r.weapon);
       a.update(dt, t, 0.6, r.pitch, r.crouch, false, !r.alive || r.downed);
       if (r.hook && r.alive) ropeSpecs.push({ key: id, from: new THREE.Vector3(r.x, r.y + 0.9, r.z), to: new THREE.Vector3(...r.hook) });
     }

@@ -10,7 +10,7 @@ import { CombatMusic, type Intensity } from './audio/combatMusic.ts';
 import { PickupsView } from './scene/pickupsView.ts';
 import { VehicleView, type DrivenVehicle } from './scene/vehicleView.ts';
 import { Sfx } from './audio/sfx.ts';
-import { keyLabel, loadSettings, palette } from './settings.ts';
+import { keyLabel, loadSettings, palette, saveSettings } from './settings.ts';
 import { setPresence, syncAchievements, unlockAchievement } from './platform.ts';
 import { NetClient, type EnemySample } from './net/netClient.ts';
 import { withFakeLag, workerTransport, wsTransport, type Transport } from './net/transport.ts';
@@ -20,6 +20,7 @@ import { EnemyRenderer, type EnemyView } from './scene/enemyRenderer.ts';
 import { Fx } from './scene/fx.ts';
 import { YarnRopes, type RopeSpec } from './scene/yarnRopes.ts';
 import { SpoolHill } from './scene/spoolHill.ts';
+import { ShoulderCam } from './scene/shoulderCam.ts';
 import { YarnBalls } from './scene/yarnBalls.ts';
 import { createPost, type Post } from './scene/post.ts';
 import { ViewModel } from './scene/viewModel.ts';
@@ -42,7 +43,7 @@ import { QUALITY_LAYERS, setWoolLayers, updateShellLod } from './wool/woolMateri
  * STITCHSTRIKE: wool toys defending the Heartspools (co-op) or fighting each
  * other (PvP) in a fully knitted bedroom. Server-authoritative multiplayer.
  *
- * URL params: ?mode=coop|pvp  ?solo=1 (server in a Web Worker)  ?room=CODE  ?bots=N  ?lag=RTT_MS  ?drive=1[&vehicle=K] (autopilot drives)
+ * URL params: ?mode=coop|pvp  ?solo=1 (server in a Web Worker)  ?room=CODE  ?bots=N  ?lag=RTT_MS  ?drive=1[&vehicle=K] (autopilot drives)  ?view=first|third
  *             ?name=Pip  ?server=ws://host:port  ?quality=low|medium|high  ?autopilot=1 (headless tests)
  */
 
@@ -490,7 +491,23 @@ net.onSpawn = (s: PlayerState) => { yaw = s.yaw; pitch = 0; };
 
 const keys = new Set<string>();
 let mouseDown = false;
-let thirdPerson = false;
+/** Third person (over the shoulder) or first person; V toggles, H swaps shoulders. Remembered between matches. */
+let thirdPerson = params.get('view') ? params.get('view') === 'third' : settings.view === 'third';
+const shoulderCam = new ShoulderCam();
+shoulderCam.side = settings.shoulder;
+shoulderCam.snap(thirdPerson);
+/** Third-person aim correction (so shots land under the crosshair), from the last rendered frame. */
+const aimFix = { yaw: 0, pitch: 0 };
+function toggleView(): void {
+  thirdPerson = !thirdPerson;
+  settings.view = thirdPerson ? 'third' : 'first';
+  saveSettings(settings);
+}
+function swapShoulder(): void {
+  shoulderCam.side = shoulderCam.side > 0 ? -1 : 1;
+  settings.shoulder = shoulderCam.side as 1 | -1;
+  saveSettings(settings);
+}
 const sensitivity = settings.sensitivity;
 const invertY = settings.invertY ? -1 : 1;
 
@@ -525,7 +542,8 @@ document.addEventListener('mouseup', (e) => { if (e.button === 0) mouseDown = fa
 document.addEventListener('contextmenu', (e) => { if (document.pointerLockElement) e.preventDefault(); });
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Tab') { e.preventDefault(); scoreboard.classList.remove('hidden'); }
-  if (e.code === settings.keys.camera && !e.repeat) thirdPerson = !thirdPerson;
+  if (e.code === settings.keys.camera && !e.repeat) toggleView();
+  if (e.code === settings.keys.shoulder && !e.repeat) swapShoulder();
   if (e.code === 'F3') { e.preventDefault(); netPanel.classList.toggle('hidden'); }
   keys.add(e.code);
 });
@@ -600,7 +618,7 @@ function pollPad(dt: number): number {
   if (f.cardDelta) lastBuild = cycleCard(lastBuild, f.cardDelta);
   if (pad.ltEdge && mode === 'coop') pendingAction = lastBuild;
   if (f.action && mode === 'coop') pendingAction = f.action;
-  if (f.thirdPerson) thirdPerson = !thirdPerson;
+  if (f.thirdPerson) toggleView();
   scoreboard.classList.toggle('hidden', !f.scoreboard && !keys.has('Tab'));
   return f.buttons;
 }
@@ -986,6 +1004,7 @@ function frame(): void {
     lastPos.set(r.id, new THREE.Vector3(r.x, r.y, r.z));
     a.root.position.set(r.x, r.y, r.z);
     a.root.rotation.y = r.yaw;
+    a.setWeapon(r.weapon);
     a.update(dt, t, r.downed ? 0 : Math.min(1.3, speed / PLAYER.runSpeed), r.pitch, r.crouch, airborne, !r.alive || r.downed);
     if (r.alive) remoteNow.set(r.id, new THREE.Vector3(r.x, r.y, r.z));
   }
@@ -1024,7 +1043,7 @@ function frame(): void {
     const buttons = autopilot ? autopilotButtons(now, net.predicted) : locked ? sampleButtons() | padButtons : 0;
     const action = pendingAction;
     pendingAction = 0;
-    const r = net.input(buttons, yaw, pitch, now, wantWeapon, action);
+    const r = net.input(buttons, yaw + aimFix.yaw, pitch + aimFix.pitch, now, wantWeapon, action);
     if (r.mantled && now - lastMantle > 400) { sfx.play('mantle', 0.8); lastMantle = now; }
     if (r.hook === 1) sfx.play('yarnShot');
     else if (r.hook === -1) sfx.play('yarnMiss', 0.7);
@@ -1033,7 +1052,7 @@ function frame(): void {
       const weapon = WEAPONS[r.weapon];
       const crouch = (buttons & Buttons.Crouch) !== 0;
       const o = eyePosition(s, crouch);
-      const muzzle = viewModel.muzzle();
+      const muzzle = shoulderCam.third && ownAvatar ? ownAvatar.muzzle() : viewModel.muzzle();
       const aim = lookDirection(s.yaw, s.pitch);
       if (weapon.projectile) {
         // Lob a predicted yarn ball from the same spot the server launches it.
@@ -1049,6 +1068,7 @@ function frame(): void {
       }
       sfx.play(WEAPON_SOUNDS[r.weapon] ?? 'popper');
       viewModel.fire();
+      if (shoulderCam.third) fx.puff(muzzle, 0xffd890, 0.25);
       flash = 0.05;
     }
   }
@@ -1135,21 +1155,31 @@ function frame(): void {
     tmp.set(eye.x - back[0] * dist, eye.y - back[1] * dist + 0.8, eye.z - back[2] * dist);
     camera.position.copy(tmp);
     camera.lookAt(eye.x + back[0] * 6, eye.y + back[1] * 6 + 0.6, eye.z + back[2] * 6);
-  } else if (p && thirdPerson) {
-    const back: Vec3 = lookDirection(yaw, pitch);
-    tmp.set(eye.x - back[0] * 3, eye.y - back[1] * 3 + 0.4, eye.z - back[2] * 3);
-    camera.position.copy(tmp);
+  } else if (p && !fixedCam) {
+    // First person, third person over the shoulder, or easing between them.
+    camera.position.copy(shoulderCam.update(dt, thirdPerson, p.weapon === 2, eye, yaw, pitch, world.boxes));
+    // Bend the real aim so the shot lands under the crosshair (one frame behind, which is invisible).
+    const a = shoulderCam.aim(eye, yaw, pitch, (o, d, range) => predictedHit(o, d, range).to.distanceTo(new THREE.Vector3(...o)));
+    aimFix.yaw = wrapAngle(a.yaw - yaw);
+    aimFix.pitch = a.pitch - pitch;
   } else if (!fixedCam) {
     camera.position.copy(eye);
   }
-  viewModel.group.visible = !!p && !p.downed && !thirdPerson && !fixedCam && !driving;
+  if (!p || driving || fixedCam || !shoulderCam.third) { aimFix.yaw = 0; aimFix.pitch = 0; }
+  const seeSelf = shoulderCam.blend > 0.35;
+  viewModel.group.visible = !!p && !p.downed && !seeSelf && !fixedCam && !driving;
+  // The muzzle light follows whichever gun is on screen.
+  if (seeSelf && ownAvatar && muzzleFlash.parent !== scene) scene.add(muzzleFlash);
+  if (!seeSelf && muzzleFlash.parent !== camera) { camera.add(muzzleFlash); muzzleFlash.position.set(0.26, -0.18, -0.9); }
+  if (seeSelf && ownAvatar && flash > 0) ownAvatar.muzzle(muzzleFlash.position);
   if (p && driving) {
     const speed = Math.abs(p.carSpeed);
     driven.push({ key: -1, kind: driving, x: eye.x, y: eye.y - VEHICLES[driving].seatHeight, z: eye.z, yaw: p.carYaw, aimYaw: yaw, speed });
   }
   vehicleView.update(net.vehicles(), driven, dt);
   if (ownAvatar) {
-    ownAvatar.root.visible = !!p && (thirdPerson || !!fixedCam || !!driving);
+    ownAvatar.root.visible = !!p && (seeSelf || !!fixedCam || !!driving);
+    if (p) ownAvatar.setWeapon(p.weapon);
     if (p && driving) {
       ownAvatar.root.position.set(eye.x, eye.y - PLAYER.eyeHeight + 0.1, eye.z);
       ownAvatar.root.rotation.y = yaw;
@@ -1163,16 +1193,16 @@ function frame(): void {
   // Yarn-swing strands: ours from the hand (or chest in third person), everyone else's from the chest.
   if (p?.hooked) {
     const from = eye.clone();
-    if (thirdPerson || fixedCam) from.y -= PLAYER.eyeHeight - 0.9;
+    if (seeSelf || fixedCam) from.y -= PLAYER.eyeHeight - 0.9;
     else from.add(tmp.set(0.3, -0.32, -1.4).applyQuaternion(camera.quaternion));
-    ropeSpecs.push({ key: -1, from, to: new THREE.Vector3(p.hx, p.hy, p.hz), width: thirdPerson || fixedCam ? 0.06 : 0.018 });
+    ropeSpecs.push({ key: -1, from, to: new THREE.Vector3(p.hx, p.hy, p.hz), width: seeSelf || fixedCam ? 0.06 : 0.018 });
   }
   yarnRopes.update(ropeSpecs, dt);
   // The crosshair rings when a yarn strand would catch.
   let canSwing = false;
   if (p && !p.hooked && !p.downed && p.hookCd <= 0) {
     const o: Vec3 = [eye.x, eye.y, eye.z];
-    const d = lookDirection(yaw, pitch);
+    const d = lookDirection(yaw + aimFix.yaw, pitch + aimFix.pitch);
     const t = rayWorld(o, d, world.boxes, GRAPPLE.range);
     canSwing = t < GRAPPLE.range && o[1] + d[1] * t >= p.y + PLAYER.eyeHeight + GRAPPLE.minRise;
   }
@@ -1233,3 +1263,9 @@ function frame(): void {
 if (autopilot || fixedCam) overlay.classList.add('hidden');
 renderScoreboard();
 frame();
+
+function wrapAngle(a: number): number {
+  while (a > Math.PI) a -= Math.PI * 2;
+  while (a < -Math.PI) a += Math.PI * 2;
+  return a;
+}

@@ -33,6 +33,8 @@ export interface RemoteView {
   hook: [number, number, number] | null;
   /** Vehicle being driven (VehicleKind) and its heading. */
   car: number; carYaw: number;
+  /** Weapon in hand. */
+  weapon: number;
 }
 
 export interface NetStats {
@@ -374,6 +376,7 @@ export class NetClient {
         hook: g < 0.5 ? pa.hook : pc.hook,
         car: g < 0.5 ? pa.car : pc.car,
         carYaw: pa.carYaw + angleDelta(pa.carYaw, pc.carYaw) * g,
+        weapon: pc.weapon,
       });
     }
     return out;

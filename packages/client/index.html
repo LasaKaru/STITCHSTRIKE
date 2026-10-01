@@ -178,6 +178,12 @@
           <label class="set">Mouse sensitivity <input id="s-sens" type="range" min="0.0006" max="0.006" step="0.0001" /><output></output></label>
           <label class="set">Field of view <input id="s-fov" type="range" min="70" max="110" step="1" /><output></output></label>
           <label class="set check">Invert look <input id="s-invert" type="checkbox" /></label>
+          <label class="set">Camera
+            <select id="s-view"><option value="first">First person (through your toy's eyes)</option><option value="third">Third person (over the shoulder)</option></select>
+          </label>
+          <label class="set">Third-person shoulder
+            <select id="s-shoulder"><option value="1">Right</option><option value="-1">Left</option></select>
+          </label>
           <h4>Key bindings <button id="s-keys-reset" class="mini">Reset</button></h4>
           <div id="s-keys" class="keybinds"></div>
           <p class="hint">Click an action, then press the new key (Esc cancels). Taking a key another action uses swaps them. Mouse: left fire, right yarn-swing.</p>
@@ -193,6 +199,8 @@
             <select id="s-quality"><option value="low">Low (laptops)</option><option value="medium">Medium</option><option value="high">High</option></select>
           </label>
           <label class="set check">Net stats overlay <input id="s-net" type="checkbox" /></label>
+          <label class="set check">Radar (minimap) <input id="s-radar" type="checkbox" /></label>
+          <label class="set check">Floating damage numbers <input id="s-dmg" type="checkbox" /></label>
           <label class="set check desktop-only">Fullscreen <button id="s-fullscreen" class="mini">Toggle (F11)</button></label>
           <h4>Audio</h4>
           <label class="set">Effects volume <input id="s-sfx" type="range" min="0" max="1" step="0.05" /><output></output></label>
@@ -218,7 +226,8 @@
               <tr><td>Q · G</td><td>build the last trap again · recycle (50%)</td></tr>
               <tr><td>Hold E</td><td>re-stitch a downed teammate</td></tr>
               <tr><td>E by a vehicle</td><td>drive the jeep or wind-up tank (WASD drive, click to fire the tank's cannon, E to hop out)</td></tr>
-              <tr><td>Enter · V · Tab · Esc</td><td>ready up · camera · scores · pause</td></tr>
+              <tr><td>Enter · Tab · Esc</td><td>ready up · scores · pause</td></tr>
+              <tr><td>V · H</td><td>first / third person (over the shoulder) · swap shoulder</td></tr>
               <tr><td>Walk into fabric</td><td>climb bedsheets, curtains, bark, pegboards</td></tr>
               <tr><td>Jump at a ledge</td><td>mantle: hold forward to pull yourself up</td></tr>
               <tr><td>Hold right mouse · X</td><td>yarn-swing: hook anything above you (the crosshair rings), jump to let go</td></tr>

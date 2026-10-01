@@ -11,6 +11,7 @@ export const BIND_ACTIONS = {
   forward: 'Move forward', back: 'Move back', left: 'Strafe left', right: 'Strafe right',
   jump: 'Jump', sprint: 'Sprint', crouch: 'Crouch', reload: 'Reload', use: 'Re-stitch (hold)', grapple: 'Yarn-swing (hold)',
   deck: 'Build deck', rebuild: 'Build last trap', recycle: 'Recycle trap', ready: 'Ready up', camera: 'Camera view',
+  shoulder: 'Swap shoulder (3rd person)', photo: 'Photo mode',
 } as const;
 export type BindAction = keyof typeof BIND_ACTIONS;
 
@@ -18,6 +19,7 @@ export const DEFAULT_KEYS: Record<BindAction, string> = {
   forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD',
   jump: 'Space', sprint: 'ShiftLeft', crouch: 'KeyC', reload: 'KeyR', use: 'KeyE', grapple: 'KeyX',
   deck: 'KeyB', rebuild: 'KeyQ', recycle: 'KeyG', ready: 'Enter', camera: 'KeyV',
+  shoulder: 'KeyH', photo: 'KeyP',
 };
 
 /** "KeyW" -> "W", "ShiftLeft" -> "Left Shift", for menus and hints. */
@@ -52,6 +54,14 @@ export interface Settings {
   reduceShake: boolean;
   /** Tilt-shift blur at the top and bottom of the screen (the miniature look). */
   miniature: boolean;
+  /** Camera you start in: first person (through the toy's eyes) or third person (over the shoulder). */
+  view: 'first' | 'third';
+  /** Third-person shoulder: 1 right, -1 left. */
+  shoulder: 1 | -1;
+  /** HUD radar in the corner. */
+  radar: boolean;
+  /** Floating damage numbers on hits. */
+  damageNumbers: boolean;
 }
 
 const KEY = 'ss-settings';
@@ -71,6 +81,10 @@ export const DEFAULTS: Settings = {
   subtitles: true,
   reduceShake: false,
   miniature: true,
+  view: 'first',
+  shoulder: 1,
+  radar: true,
+  damageNumbers: true,
 };
 
 export function loadSettings(): Settings {
