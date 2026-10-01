@@ -21,6 +21,7 @@ import { Fx } from './scene/fx.ts';
 import { YarnRopes, type RopeSpec } from './scene/yarnRopes.ts';
 import { SpoolHill } from './scene/spoolHill.ts';
 import { ShoulderCam } from './scene/shoulderCam.ts';
+import { Radar, type Blip } from './radar.ts';
 import { YarnBalls } from './scene/yarnBalls.ts';
 import { createPost, type Post } from './scene/post.ts';
 import { ViewModel } from './scene/viewModel.ts';
@@ -1009,6 +1010,38 @@ let springSounded = false;
 let last = performance.now();
 let flash = 0;
 let hudTimer = 0;
+let radarTimer = 0;
+
+// ---------------------------------------------------------------- radar
+
+const radar = new Radar(document.getElementById('radar') as HTMLCanvasElement, world);
+if (!settings.radar) document.body.classList.add('no-radar');
+function updateRadar(): void {
+  const p = net.predicted;
+  const at = p ? new THREE.Vector3(p.x, p.y, p.z) : camera.position;
+  const blips: Blip[] = [];
+  const myTeam = net.roster.get(net.id)?.team ?? 0;
+  const teamPlay = mode !== 'pvp';
+  for (const [id, pos] of remoteNow) {
+    const ally = mode === 'coop' || (teamPlay && net.roster.get(id)?.team === myTeam);
+    // Rivals only show up close by (you can hear them); teammates always.
+    if (!ally && pos.distanceTo(at) > 14) continue;
+    blips.push({ x: pos.x, z: pos.z, kind: ally ? 'ally' : 'foe', color: ally ? '#6fd06a' : hexOf(PAL.bad) });
+  }
+  for (const e of enemies) {
+    const boss = !!ENEMIES[e.type]?.boss;
+    blips.push({ x: e.x, z: e.z, kind: boss ? 'boss' : 'foe', color: boss ? '#a0204a' : hexOf(PAL.bad) });
+  }
+  const c = net.coop;
+  if (c) world.coop.cores.forEach((k, i) => blips.push({ x: k[0], z: k[2], kind: 'core', color: hexOf(CORE_COLORS[i]), label: CORE_LETTERS[i], dim: (c.cores[i]?.health ?? 1) <= 0 }));
+  for (const v of net.vehicles()) blips.push({ x: v.x, z: v.z, kind: 'vehicle', color: '#e8c070' });
+  const k = net.koth;
+  if (k) { const h = world.coop.cores[k.hill]; if (h) blips.push({ x: h[0], z: h[2], kind: 'objective', color: '#ffd24a' }); }
+  const cy = net.cty;
+  if (cy) cy.balls.forEach((b, team) => blips.push({ x: b.x, z: b.z, kind: 'ball', color: hexOf(PAL.team[team]), label: team === myTeam ? 'U' : '!' }));
+  const yawNow = p ? yaw : camera.rotation.y;
+  radar.draw(at.x, at.z, yawNow, blips);
+}
 syncAchievements(profile.medals);
 let lastHealth: number = PLAYER.maxHealth;
 let lastWeapon = 0;
@@ -1319,6 +1352,8 @@ function frame(): void {
   damageTimer = Math.max(0, damageTimer - dt);
   hud.damage.style.opacity = String(damageTimer * 2);
 
+  radarTimer -= dt;
+  if (radarTimer <= 0 && settings.radar && !photo.on) { radarTimer = 1 / 15; updateRadar(); }
   hudTimer -= dt;
   if (hudTimer <= 0) {
     hudTimer = 0.1;

@@ -216,3 +216,9 @@ body.photo #photo-hint {
   padding: 6px 14px; border-radius: 999px; background: rgba(20, 16, 12, 0.55); color: #f6ead2;
   font: 600 12px/1.4 system-ui, sans-serif; letter-spacing: 0.04em; pointer-events: none;
 }
+
+/* Radar: a round knitted patch above the stitches bar. */
+#radar { position: fixed; left: 20px; bottom: 112px; width: 160px; height: 160px; filter: drop-shadow(0 3px 6px rgba(0,0,0,.35)); }
+body.coop #radar { bottom: 140px; }
+body.no-radar #radar { display: none; }
+@media (max-height: 640px) { #radar { width: 120px; height: 120px; } }
