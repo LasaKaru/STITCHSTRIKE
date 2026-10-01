@@ -132,6 +132,10 @@ export class Room {
         this.damage(null, p, dmg * PLAYER.coopDamageScale * (this.coop?.diff.damageTaken ?? 1), enemyType);
         if (push && p.alive && p.bleed <= 0) { p.state.vx += push[0]; p.state.vz += push[1]; p.state.vy = Math.max(p.state.vy, 4); p.state.onGround = false; }
       },
+      healPlayer: (id, amount) => {
+        const p = this.players.get(id);
+        if (p && p.alive && !p.state.downed) p.health = Math.min(PLAYER.maxHealth, p.health + amount);
+      },
       shot: (s) => this.shots.push(s),
       event: (e) => this.events.push(e),
       enemyDied: (e) => this.maybeDrop(e),

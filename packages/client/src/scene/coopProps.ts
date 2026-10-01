@@ -215,6 +215,107 @@ function springModel(): THREE.Group {
 }
 
 /** Upgrade tier: gold felt pom-poms around the base (one per tier). */
+/** Healing Sewing Kit: a wicker sewing basket of spools with a tomato pincushion, and a soft green healing ring. */
+function sewingKitModel(): THREE.Group {
+  const g = new THREE.Group();
+  const basket = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.52, 0.5, 20), createWoolMaterial({ color: 0xc89a58, pattern: 'rib', uvSize: [2.4, 0.6], gauge: 1.6 }));
+  basket.position.y = 0.25;
+  basket.castShadow = true;
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.05, 8, 28).rotateX(Math.PI / 2), wood(0x8a5a3a));
+  rim.position.y = 0.5;
+  const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.64, 0.64, 0.06, 24), createWoolMaterial({ color: 0xd8262e, pattern: 'felt', uvSize: [1.2, 1.2] }));
+  lid.position.set(0, 0.72, -0.48);
+  lid.rotation.x = -1.15;
+  g.add(basket, rim, lid);
+  // Spools of thread poking out.
+  [0x8bcb3a, 0x6fb4ff, 0xffc94a, 0xe8742a].forEach((c, k) => {
+    const a = (k / 4) * Math.PI * 2 + 0.4;
+    const spool = new THREE.Group();
+    const thread = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.22, 14), createWoolMaterial({ color: c, pattern: 'wound', uvSize: [0.5, 0.3], gauge: 2 }));
+    const ends = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.26, 14), wood(0xe8c890));
+    ends.scale.y = 0.1;
+    const top = ends.clone(); top.position.y = 0.12;
+    const bottom = ends.clone(); bottom.position.y = -0.12;
+    spool.add(thread, top, bottom);
+    spool.position.set(Math.cos(a) * 0.3, 0.6, Math.sin(a) * 0.3);
+    spool.rotation.z = Math.cos(a) * 0.4;
+    g.add(spool);
+  });
+  // The tomato pincushion, with a needle and a strawberry charm.
+  const tomato = new THREE.Mesh(new THREE.SphereGeometry(0.22, 18, 14), createWoolMaterial({ color: 0xd8262e, pattern: 'crochet', uvSize: [0.6, 0.6], gauge: 2 }));
+  tomato.scale.y = 0.75;
+  tomato.position.set(0.05, 0.86, 0.12);
+  const needle = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.5, 6), metal(0xd0d4da, 0.2));
+  needle.position.set(0.1, 1.05, 0.12);
+  needle.rotation.z = -0.4;
+  g.add(tomato, needle);
+  // A green stitched plus over it, and the ring on the floor that shows where it heals.
+  const plus = new THREE.Group();
+  const glow = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x7dffa0).multiplyScalar(1.4), transparent: true, opacity: 0.9 });
+  plus.add(new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.1, 0.06), glow), new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.34, 0.06), glow));
+  plus.position.y = 1.55;
+  g.add(plus);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(3.1, 3.4, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x7dffa0, transparent: true, opacity: 0.35, depthWrite: false }));
+  ring.position.y = 0.05;
+  g.add(ring);
+  g.userData.plus = plus;
+  g.userData.ring = ring;
+  return g;
+}
+
+/** Desk Fan: a knitted cage on a stalk, its blades spinning as the head oscillates. */
+function fanModel(): THREE.Group {
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 0.18, 24), createWoolMaterial({ color: 0x6fb4ff, pattern: 'garter', uvSize: [1.2, 1.2], gauge: 1.6 }));
+  base.position.y = 0.09;
+  const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 1.1, 10), metal(0xc9ccd2, 0.3));
+  stalk.position.y = 0.7;
+  g.add(base, stalk);
+  const head = new THREE.Group();
+  head.position.y = 1.35;
+  const motor = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 12), createWoolMaterial({ color: 0x6fb4ff, pattern: 'stocking', uvSize: [0.6, 0.6], gauge: 1.8 }));
+  motor.scale.z = 1.4;
+  motor.position.z = 0.12;
+  head.add(motor);
+  const cageMat = createWoolMaterial({ color: 0xefe3c8, pattern: 'rib', uvSize: [0.4, 0.4], gauge: 3 });
+  for (const r of [0.2, 0.42, 0.62]) {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(r, 0.025, 6, 32), cageMat);
+    ring.position.z = -0.16;
+    head.add(ring);
+  }
+  for (let k = 0; k < 8; k++) {
+    const spoke = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.62, 5), cageMat);
+    spoke.rotation.z = (k / 8) * Math.PI;
+    spoke.position.z = -0.16;
+    head.add(spoke);
+  }
+  const blades = new THREE.Group();
+  blades.position.z = -0.08;
+  const bladeMat = createWoolMaterial({ color: 0xffc94a, pattern: 'felt', uvSize: [0.5, 0.5] });
+  for (let k = 0; k < 3; k++) {
+    const blade = new THREE.Mesh(new THREE.SphereGeometry(0.26, 12, 8), bladeMat);
+    blade.scale.set(0.55, 1, 0.12);
+    blade.position.set(Math.cos((k / 3) * Math.PI * 2) * 0.27, Math.sin((k / 3) * Math.PI * 2) * 0.27, 0);
+    blade.rotation.z = (k / 3) * Math.PI * 2 - Math.PI / 2;
+    blades.add(blade);
+  }
+  head.add(blades);
+  g.add(head);
+  // Puffs of air drifting away from it.
+  const puffs: THREE.Mesh[] = [];
+  const puffMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, depthWrite: false });
+  for (let k = 0; k < 6; k++) {
+    const puff = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), puffMat);
+    g.add(puff);
+    puffs.push(puff);
+  }
+  g.traverse((o) => { if ((o as THREE.Mesh).isMesh && o !== g) o.castShadow = true; });
+  g.userData.head = head;
+  g.userData.blades = blades;
+  g.userData.puffs = puffs;
+  return g;
+}
+
 function tierBadge(tier: number): THREE.Group {
   const g = new THREE.Group();
   const mat = createWoolMaterial({ color: 0xffc94a, pattern: 'felt', uvSize: [0.3, 0.3], fuzz: 2 });
@@ -230,6 +331,7 @@ function tierBadge(tier: number): THREE.Group {
 const MODELS: Record<number, () => THREE.Group> = {
   [Buildable.Turret]: turretModel, [Buildable.Wall]: wallModel, [Buildable.Mat]: matModel,
   [Buildable.Barricade]: barricadeModel, [Buildable.Zapper]: zapperModel, [Buildable.Mousetrap]: mousetrapModel, [Buildable.Spring]: springModel,
+  [Buildable.SewingKit]: sewingKitModel, [Buildable.Fan]: fanModel,
 };
 
 export class CoopProps {
@@ -337,6 +439,23 @@ export class CoopProps {
           bar.rotation.x += (target - bar.rotation.x) * (p.snap > 0 ? 0.6 : 0.08);
         } else if (kind === Buildable.Spring) {
           (p.item.userData.arrow as THREE.Mesh).position.y = 0.72 + Math.abs(Math.sin(t * 3)) * 0.15;
+        } else if (kind === Buildable.SewingKit) {
+          const plus = p.item.userData.plus as THREE.Group;
+          plus.position.y = 1.55 + Math.sin(t * 2.4) * 0.08;
+          plus.rotation.y = t * 1.2;
+          ((p.item.userData.ring as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = 0.25 + Math.sin(t * 3) * 0.12;
+        } else if (kind === Buildable.Fan) {
+          const head = p.item.userData.head as THREE.Group;
+          // The head sweeps all the way round: it blows everything away from the pad.
+          head.rotation.y = t * 0.9 + i;
+          (p.item.userData.blades as THREE.Group).rotation.z = t * 28;
+          (p.item.userData.puffs as THREE.Mesh[]).forEach((puff, k) => {
+            const ph = (t * 0.8 + k / 6) % 1;
+            const a = head.rotation.y + Math.PI + (k % 3 - 1) * 0.25;
+            puff.position.set(Math.sin(a) * (0.6 + ph * 5), 1.35 + Math.sin(k + t) * 0.2, Math.cos(a) * (0.6 + ph * 5));
+            puff.scale.setScalar(0.6 + ph * 2.2);
+            (puff.material as THREE.MeshBasicMaterial).opacity = 0.35 * (1 - ph);
+          });
         }
         if (kind === Buildable.Turret) {
           const pos = this.world.coop.pads[i].pos;

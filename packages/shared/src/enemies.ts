@@ -126,7 +126,12 @@ export interface Enemy {
   rush?: number;
   /** Seconds until Rex roars again. */
   roar?: number;
+  /** Seconds spent neither moving nor attacking (a stuck invader gives up after a while). */
+  stuck?: number;
 }
+
+/** An invader that neither moves nor attacks for this long unravels by itself, so a wave can never stall. */
+export const STUCK_SECONDS = 20;
 
 // ---------------------------------------------------------------- navigation
 

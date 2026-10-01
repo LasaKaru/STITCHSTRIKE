@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { PLAYER, TICK_RATE } from './constants.ts';
-import { Buildable, BUILDABLES, DIFFICULTIES, MAX_TIER, Phase, ShotKind, upgradeCost, WAVES } from './coop.ts';
-import { ENEMIES, EnemyType, type Enemy } from './enemies.ts';
+import { Buildable, BUILDABLES, DECK, DIFFICULTIES, MAX_TIER, Phase, ShotKind, upgradeCost, WAVES } from './coop.ts';
+import { ENEMIES, EnemyType, STUCK_SECONDS, type Enemy } from './enemies.ts';
 import { RoomHost } from './host.ts';
 import { Action, Buttons, createPlayerState, stepPlayer, type InputCmd } from './movement.ts';
 import { PickupKind, PICKUPS } from './pickups.ts';
 import { Room } from './room.ts';
 import { WEAPONS } from './weapons.ts';
-import { createBedroom, createWorld, type World } from './world.ts';
+import { box, createBedroom, createWorld, type World } from './world.ts';
 
 function cmd(seq: number, buttons: number, weapon = 0, action = 0, yaw = 0, pitch = 0, renderTick = 0): InputCmd {
   return { seq, buttons, yaw: Math.fround(yaw), pitch: Math.fround(pitch), renderTick, weapon, action };
@@ -511,5 +511,62 @@ describe('traversal', () => {
       expect(world.collectibles.length).toBeGreaterThanOrEqual(8);
       expect(new Set(world.collectibles.map((c) => c.id)).size).toBe(world.collectibles.length);
     }
+  });
+});
+
+describe('new traps', () => {
+  /** A co-op room mid-wave with nothing queued and a trap on the first pad. */
+  function withTrap(kind: number): Room {
+    const room = new Room(flat(), 'coop');
+    room.coop!.phase = Phase.Wave;
+    (room.coop as unknown as { queue: unknown[] }).queue = [{ at: 1e9, type: 0, spawn: 0 }];
+    room.coop!.pads[0] = { kind, tier: 1, hp: BUILDABLES[kind].hp, cooldown: 0 };
+    return room;
+  }
+
+  it('the deck has nine traps, keys 1-9', () => {
+    expect(DECK).toHaveLength(9);
+    expect(DECK).toContain(Buildable.SewingKit);
+    expect(DECK).toContain(Buildable.Fan);
+  });
+
+  it('a Healing Sewing Kit re-stitches toys standing near it', () => {
+    const room = withTrap(Buildable.SewingKit);
+    const pad = room.world.coop.pads[0].pos;
+    const p = room.addPlayer('Patched')!;
+    p.state = createPlayerState([pad[0] + 1, 0, pad[2]]);
+    p.health = 50;
+    p.sinceHurt = 0;
+    for (let i = 0; i < TICK_RATE; i++) room.update();
+    expect(p.health).toBeGreaterThan(50 + 10);
+  });
+
+  it('a Desk Fan blows invaders away and drags flyers down', () => {
+    const room = withTrap(Buildable.Fan);
+    const pad = room.world.coop.pads[0].pos;
+    const grunt = enemy(1, EnemyType.Grunt, pad[0] + 2, pad[2]);
+    const moth = enemy(2, EnemyType.Moth, pad[0] - 2, pad[2]);
+    moth.y = 3.2;
+    room.coop!.enemies.push(grunt, moth);
+    room.update();
+    expect(grunt.kx).toBeGreaterThan(1);
+    expect(moth.kx).toBeLessThan(-1);
+    expect(moth.y).toBeLessThan(3.2);
+    // Gusts, not a gale: it rests before blowing again.
+    expect(room.coop!.pads[0].cooldown).toBeGreaterThan(2);
+  });
+});
+
+describe('stuck invaders', () => {
+  it('an invader caged in where it can neither move nor fight gives up, so the wave can end', () => {
+    const w = flat();
+    // A tight cage of boxes around (10, 10).
+    const cage = [box(8, 0, 8, 12, 3, 8.6, 'furniture'), box(8, 0, 11.4, 12, 3, 12, 'furniture'), box(8, 0, 8, 8.6, 3, 12, 'furniture'), box(11.4, 0, 8, 12, 3, 12, 'furniture')];
+    const room = new Room({ ...w, boxes: [...w.boxes, ...cage] }, 'coop');
+    room.coop!.phase = Phase.Wave;
+    const caged = enemy(1, EnemyType.Grunt, 10, 10);
+    room.coop!.enemies.push(caged);
+    for (let i = 0; i < TICK_RATE * (STUCK_SECONDS + 3); i++) room.update();
+    expect(room.coop!.enemies.includes(caged)).toBe(false);
   });
 });

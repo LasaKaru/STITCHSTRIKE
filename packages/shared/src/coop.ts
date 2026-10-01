@@ -1,4 +1,4 @@
-import { BOSS_STOMP, DRONE_DROP, DRUM, ENEMIES, JACK_POP, EnemyType, NavGrid, PTERO_SWOOP, pushOutOfBoxes, RAPTOR_LEAP, REX_ROAR, TRIKE_CHARGE, SNIP_CUT, SOLDIER_ACCURACY, type Enemy } from './enemies.ts';
+import { STUCK_SECONDS, BOSS_STOMP, DRONE_DROP, DRUM, ENEMIES, JACK_POP, EnemyType, NavGrid, PTERO_SWOOP, pushOutOfBoxes, RAPTOR_LEAP, REX_ROAR, TRIKE_CHARGE, SNIP_CUT, SOLDIER_ACCURACY, type Enemy } from './enemies.ts';
 import type { GameEvent, Shot } from './protocol.ts';
 import { hasLineOfSight } from './raycast.ts';
 import type { Vec3, World } from './world.ts';
@@ -21,6 +21,10 @@ export const Buildable = {
   Mousetrap: 6,
   /** Spring pad: launches toys up onto furniture. */
   Spring: 7,
+  /** Healing Sewing Kit: re-stitches toys standing near it. */
+  SewingKit: 8,
+  /** Desk Fan: blows invaders back and drags flyers out of the air. */
+  Fan: 9,
 } as const;
 
 export interface BuildableDef { name: string; short: string; cost: number; hp: number; blurb: string }
@@ -33,9 +37,11 @@ export const BUILDABLES: BuildableDef[] = [
   { name: 'Battery Zapper', short: 'Zapper', cost: 175, hp: 150, blurb: 'Chains shocks through up to 4 invaders' },
   { name: 'Mousetrap', short: 'Trap', cost: 90, hp: 120, blurb: 'Huge snap, then re-arms' },
   { name: 'Spring Pad', short: 'Spring', cost: 60, hp: 100, blurb: 'Launches toys up to high ground' },
+  { name: 'Healing Sewing Kit', short: 'Sew Kit', cost: 120, hp: 130, blurb: 'Re-stitches toys standing nearby' },
+  { name: 'Desk Fan', short: 'Fan', cost: 110, hp: 170, blurb: 'Blows invaders back; drags flyers down' },
 ];
-/** Keys 3-9 in the build deck, in this order. */
-export const DECK = [Buildable.Turret, Buildable.Wall, Buildable.Mat, Buildable.Barricade, Buildable.Zapper, Buildable.Mousetrap, Buildable.Spring];
+/** Keys 1-9 in the build deck, in this order. */
+export const DECK = [Buildable.Turret, Buildable.Wall, Buildable.Mat, Buildable.Barricade, Buildable.Zapper, Buildable.Mousetrap, Buildable.Spring, Buildable.SewingKit, Buildable.Fan];
 export const MAX_TIER = 3;
 /** Cost to take a buildable from `tier` to `tier + 1`. */
 export function upgradeCost(kind: number, tier: number): number {
@@ -49,6 +55,14 @@ export const TURRET = { range: 10, fireRate: 2.5, damage: 8, height: 1.3 };
 export const ZAPPER = { range: 5.5, every: 1.2, damage: 18, targets: 4, height: 1.2 };
 export const MOUSETRAP = { radius: 1.3, damage: 160, rearm: 6 };
 export const SPRING = { radius: 1.1, launch: 17 };
+/** Sewing kit: stitches per second healed for toys within radius (tiers heal faster). */
+export const SEWKIT = { radius: 3.4, heal: 14 };
+/**
+ * Desk fan: every few seconds a gust blows invaders within radius away from
+ * it (about a metre and a half), and slows flyers and knocks them down. It
+ * delays a push; it can't hold one back forever.
+ */
+export const FAN = { radius: 6, gust: 8, every: 3.5, flyerSlow: 1.5, flyerDrop: 1.5 };
 export const WALL_RADIUS = 1.1;
 export const BARRICADE_RADIUS = 1.0;
 export const MAT_RADIUS = 1.8;
@@ -143,6 +157,8 @@ export interface CoopHost {
   /** Standing toys only (downed toys are ignored by invaders). */
   livePlayers(): { id: number; x: number; y: number; z: number }[];
   damagePlayer(id: number, damage: number, enemyType: number, push?: [number, number]): void;
+  /** Heal a toy (sewing kits). */
+  healPlayer?(id: number, amount: number): void;
   shot(s: Shot): void;
   event(e: GameEvent): void;
   /** An invader just unravelled (for drops). */
@@ -474,6 +490,7 @@ export class CoopDirector {
     for (const e of this.enemies) {
       if (e.hp <= 0) continue;
       const def = ENEMIES[e.type];
+      const sx = e.x, sz = e.z;
       if (!this.cores[e.core].alive) { e.core = aliveCores[e.id % aliveCores.length]; e.node = -1; }
       e.cooldown = Math.max(0, e.cooldown - dt);
       e.slow = Math.max(0, e.slow - dt);
@@ -718,6 +735,10 @@ export class CoopDirector {
         attack();
         e.cooldown = 1 / def.attackRate;
       }
+      // Wedged somewhere it can't get out of, and not fighting: after a while it just falls apart.
+      const moving = Math.hypot(e.x - sx, e.z - sz) > def.speed * 0.15 * dt;
+      e.stuck = attack || hold || moving ? 0 : (e.stuck ?? 0) + dt;
+      if (e.stuck > STUCK_SECONDS) e.hp = 0;
     }
     this.enemies.push(...spawned);
 
@@ -793,6 +814,30 @@ export class CoopDirector {
           from = to;
         }
         if (hit.size > 0) pad.cooldown = ZAPPER.every / power;
+      } else if (pad.kind === Buildable.SewingKit) {
+        const r = SEWKIT.radius + (pad.tier - 1) * 0.6;
+        for (const t of host.livePlayers()) {
+          if (Math.hypot(t.x - p.pos[0], t.z - p.pos[2]) < r && Math.abs(t.y - p.pos[1]) < 3) host.healPlayer?.(t.id, SEWKIT.heal * power * dt);
+        }
+      } else if (pad.kind === Buildable.Fan) {
+        const r = FAN.radius + (pad.tier - 1);
+        let blew = false;
+        for (const e of this.enemies) {
+          const def = ENEMIES[e.type];
+          if (e.hp <= 0) continue;
+          const dx = e.x - p.pos[0], dz = e.z - p.pos[2];
+          const d = Math.hypot(dx, dz);
+          if (d > r || d < 1e-3) continue;
+          blew = true;
+          // Strongest up close; bosses, brutes and trikes barely budge.
+          const heavy = def.boss || e.type === EnemyType.Brute || e.type === EnemyType.Trike ? 0.2 : 1;
+          const k = FAN.gust * heavy * (1 - (d / r) * 0.5);
+          const nx = dx / d, nz = dz / d;
+          // Push outwards, unless something is already flinging it away faster.
+          if (e.kx * nx + e.kz * nz < k) { e.kx = nx * k; e.kz = nz * k; }
+          if (def.flying) { e.slow = Math.max(e.slow, FAN.flyerSlow); e.y = Math.max(0.6, e.y - FAN.flyerDrop * heavy); }
+        }
+        if (blew) pad.cooldown = FAN.every / power;
       } else if (pad.kind === Buildable.Mousetrap) {
         for (const e of this.enemies) {
           const def = ENEMIES[e.type];

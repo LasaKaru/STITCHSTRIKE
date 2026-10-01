@@ -92,7 +92,7 @@ if (mode === 'tdm' || mode === 'koth' || mode === 'cty') document.body.classList
 // ---------------------------------------------------------------- transport
 
 function connect(): Transport {
-  if (solo) return withFakeLag(workerTransport(bots === null ? 4 : Number(bots), mode, map, waves, difficulty, Number(params.get('wave') ?? 1) || 1, mission), lag);
+  if (solo) return withFakeLag(workerTransport(bots === null ? 4 : Number(bots), mode, map, waves, difficulty, Number(params.get('wave') ?? 1) || 1, mission, params.get('showcase') === '1'), lag);
   const q = new URLSearchParams();
   q.set('room', params.get('room') ?? 'LOBBY');
   q.set('mode', mode);
@@ -948,12 +948,12 @@ function updateHud(): void {
     if (pad >= 0) {
       const kind = here?.kind ?? 0;
       hud.padhint.innerHTML = kind === Buildable.None
-        ? `Build pad ${CORE_LETTERS[world.coop.pads[pad].core]} · ${open ? 'press <b>1–7</b> to build' : `press <b>${KL.deck}</b> for the build deck`}`
+        ? `Build pad ${CORE_LETTERS[world.coop.pads[pad].core]} · ${open ? 'press <b>1–9</b> to build' : `press <b>${KL.deck}</b> for the build deck`}`
         : `${BUILDABLES[kind].name} ${'★'.repeat(here!.tier)} · ${Math.round((here?.health ?? 0) * 100)}% · <b>${DECK.indexOf(kind as never) + 1}</b> upgrade · <b>${KL.recycle}</b> recycle`;
     } else {
       hud.padhint.textContent = c.phase === Phase.Build ? 'Stand on a stitched pad to build' : '';
     }
-    hud.deckhint.innerHTML = open ? `<b>1–7</b> build or upgrade · <b>${KL.rebuild}</b> build again · <b>${KL.deck}</b> close` : `<b>${KL.deck}</b> build deck · <b>${KL.rebuild}</b> build again`;
+    hud.deckhint.innerHTML = open ? `<b>1–9</b> build or upgrade · <b>${KL.rebuild}</b> build again · <b>${KL.deck}</b> close` : `<b>${KL.deck}</b> build deck · <b>${KL.rebuild}</b> build again`;
   } else {
     hud.wave.textContent = mode === 'tdm' ? 'TEAM DEATHMATCH' : mode === 'koth' ? 'KING OF THE SPOOL' : mode === 'cty' ? 'CAPTURE THE YARN' : 'FREE-FOR-ALL';
     hud.phase.innerHTML = mode === 'tdm' ? teamScoreText() : mode === 'koth' ? kothText() : mode === 'cty' ? ctyText() : '';
@@ -1246,6 +1246,7 @@ function frame(): void {
       jeep: [-3, 4.5, 33, -10, 1, 40],
       tank: [-33, 4.5, -2, -40, 1, -8],
       gate: [9, 7, 24, 0, 3, 40],
+      coreB: [-25.5, 2.6, 7.5, -30, 0.6, 12],
     } : world.id === 'dinoden' ? {
       overview: [48, 42, -56, 0, 4, 6],
       core: [8, 5, -10, 0, 1, 0],

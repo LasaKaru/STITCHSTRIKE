@@ -333,7 +333,7 @@ export class Bot {
       return;
     }
     // Mostly turrets and zappers, with blockades, traps and the odd spring pad.
-    const weights: [number, number][] = [[Buildable.Turret, 5], [Buildable.Zapper, 3], [Buildable.Wall, 2], [Buildable.Barricade, 2], [Buildable.Mat, 2], [Buildable.Mousetrap, 2], [Buildable.Spring, 0.5]];
+    const weights: [number, number][] = [[Buildable.Turret, 5], [Buildable.Zapper, 3], [Buildable.Wall, 2], [Buildable.Barricade, 2], [Buildable.Mat, 2], [Buildable.Mousetrap, 2], [Buildable.Spring, 0.5], [Buildable.SewingKit, 1.5], [Buildable.Fan, 1.5]];
     const affordable = weights.filter(([k]) => DECK.includes(k as never) && BUILDABLES[k].cost <= coop.buttons);
     const total = affordable.reduce((a, [, w]) => a + w, 0);
     let roll = Math.random() * total;
