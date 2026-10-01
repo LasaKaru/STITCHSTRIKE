@@ -42,6 +42,11 @@ export const BRIEFINGS: Record<MapId, string[]> = {
     'Climb the SALE banners to the top shelves and rain yarn down the aisle.',
     'They are coming through the sliding doors and from behind the checkout. Hold the aisle!',
   ],
+  dinoden: [
+    "Welcome to the Dino Den, soldiers. A knitted prehistoric playset, and the Baron's lot are pouring through every gap in the cliffs.",
+    'Climb the volcano ledge by ledge, or take the spring at its foot straight to the crater. The fossil spine makes a fine sniper perch.',
+    'There are jeeps by the river and a wind-up tank in the jungle. Use them!',
+  ],
 };
 
 const TAUNTS = [

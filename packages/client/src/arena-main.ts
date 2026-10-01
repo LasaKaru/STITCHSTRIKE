@@ -23,6 +23,7 @@ import { SpoolHill } from './scene/spoolHill.ts';
 import { createPost, type Post } from './scene/post.ts';
 import { ViewModel } from './scene/viewModel.ts';
 import { buildWoolGarden } from './scene/woolGarden.ts';
+import { buildWoolDinoDen } from './scene/woolDinoDen.ts';
 import { buildWoolPark } from './scene/woolPark.ts';
 import { buildWoolRoom } from './scene/woolRoom.ts';
 import { buildWoolGarage } from './scene/woolGarage.ts';
@@ -116,7 +117,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(world.outdoor ? 0xf2d9b0 : 0x3a2a22);
 scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environmentIntensity = world.outdoor ? 0.5 : 0.22;
-const room = world.id === 'park' ? buildWoolPark(scene, world, quality) : world.outdoor ? buildWoolGarden(scene, world, quality) : world.id === 'garage' ? buildWoolGarage(scene, world) : world.id === 'bathroom' ? buildWoolBathroom(scene, world) : world.id === 'toystore' ? buildWoolToyStore(scene, world) : buildWoolRoom(scene, world);
+const room = world.id === 'dinoden' ? buildWoolDinoDen(scene, world, quality) : world.id === 'park' ? buildWoolPark(scene, world, quality) : world.outdoor ? buildWoolGarden(scene, world, quality) : world.id === 'garage' ? buildWoolGarage(scene, world) : world.id === 'bathroom' ? buildWoolBathroom(scene, world) : world.id === 'toystore' ? buildWoolToyStore(scene, world) : buildWoolRoom(scene, world);
 (window as unknown as { __stitchstrike: unknown }).__stitchstrike = { net, scene, renderer, get enemyRenderer() { return enemyRenderer; } };
 
 const camera = new THREE.PerspectiveCamera(settings.fov, window.innerWidth / window.innerHeight, 0.03, world.outdoor ? 900 : 200);
@@ -1058,6 +1059,14 @@ function frame(): void {
       jeep: [-3, 4.5, 33, -10, 1, 40],
       tank: [-33, 4.5, -2, -40, 1, -8],
       gate: [9, 7, 24, 0, 3, 40],
+    } : world.id === 'dinoden' ? {
+      overview: [48, 42, -56, 0, 4, 6],
+      core: [8, 5, -10, 0, 1, 0],
+      volcano: [-18, 14, -6, 0, 9, 22],
+      fossil: [22, 9, -8, 34, 6, 6],
+      jungle: [-26, 6, 6, -40, 10, 28],
+      river: [12, 5, -22, -18, 1, -34],
+      thumb: [16, 10, -14, -2, 7, 22],
     } : world.id === 'toystore' ? {
       overview: [0, 26, 48, 0, 4, -20],
       core: [6, 4, -4, 0, 1, -12],
