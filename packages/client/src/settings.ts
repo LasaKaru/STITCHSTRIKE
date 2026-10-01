@@ -50,6 +50,8 @@ export interface Settings {
   subtitles: boolean;
   /** Less camera shake from blasts and stomps. */
   reduceShake: boolean;
+  /** Tilt-shift blur at the top and bottom of the screen (the miniature look). */
+  miniature: boolean;
 }
 
 const KEY = 'ss-settings';
@@ -68,6 +70,7 @@ export const DEFAULTS: Settings = {
   colorblind: 'off',
   subtitles: true,
   reduceShake: false,
+  miniature: true,
 };
 
 export function loadSettings(): Settings {

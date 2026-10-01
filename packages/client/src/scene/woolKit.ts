@@ -8,12 +8,20 @@ import { createWoolMaterial } from '../wool/woolMaterial.ts';
 
 const cache = new Map<string, THREE.MeshPhysicalMaterial>();
 
+/**
+ * Environment stitches are knitted chunky, like the hand-made sets in stop-motion
+ * films: big, deep stitches you can count from across the room.
+ */
+export const CHUNKY = 0.55;
+
 /** Cached world-space (triplanar) wool material: one shader program for all of them. */
 export function wool(pattern: StitchPattern, color: number, gauge = 1, roughness = 0.92): THREE.MeshPhysicalMaterial {
   const key = `${pattern}-${color}-${gauge}-${roughness}`;
   let m = cache.get(key);
   if (!m) {
-    m = createWoolMaterial({ color, pattern, uvSize: [1, 1], triplanar: true, gauge, roughness });
+    m = createWoolMaterial({ color, pattern, uvSize: [1, 1], triplanar: true, gauge: gauge * CHUNKY, roughness });
+    // Deeper relief on the big chunky stitches.
+    m.normalScale.setScalar(2.1);
     cache.set(key, m);
   }
   return m;

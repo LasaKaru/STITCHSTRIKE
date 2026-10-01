@@ -214,6 +214,9 @@ cbSel.addEventListener('change', () => { settings.colorblind = cbSel.value as Co
 const subsBox = $<HTMLInputElement>('#s-subs');
 subsBox.checked = settings.subtitles;
 subsBox.addEventListener('change', () => { settings.subtitles = subsBox.checked; saveSettings(settings); });
+const miniBox = $<HTMLInputElement>('#s-mini');
+miniBox.checked = settings.miniature;
+miniBox.addEventListener('change', () => { settings.miniature = miniBox.checked; saveSettings(settings); });
 const shakeBox = $<HTMLInputElement>('#s-shake');
 shakeBox.checked = settings.reduceShake;
 shakeBox.addEventListener('change', () => { settings.reduceShake = shakeBox.checked; saveSettings(settings); });

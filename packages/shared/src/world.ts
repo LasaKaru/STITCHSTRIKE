@@ -116,11 +116,11 @@ export function createBedroom(): World {
   const H = 25;
   const T = 1;
   const boxes: Box[] = [
-    box(-W - T, -1, -D - T, W + T, 0, D + T, 'floor', 0x8a93a8),
-    box(-W - T, 0, -D - T, W + T, H, -D, 'wall', 0x5e6b86),
-    box(-W - T, 0, D, W + T, H, D + T, 'wall', 0x5e6b86),
-    box(-W - T, 0, -D, -W, H, D, 'wall', 0x66728c),
-    box(W, 0, -D, W + T, H, D, 'wall', 0x66728c),
+    box(-W - T, -1, -D - T, W + T, 0, D + T, 'floor', 0x9a6a44),
+    box(-W - T, 0, -D - T, W + T, H, -D, 'wall', 0xe6d3b3),
+    box(-W - T, 0, D, W + T, H, D + T, 'wall', 0xe6d3b3),
+    box(-W - T, 0, -D, -W, H, D, 'wall', 0xeadcc0),
+    box(W, 0, -D, W + T, H, D, 'wall', 0xeadcc0),
 
     // Bed along the back wall: mattress top at 5 u.
     { ...box(-W, 0, -D, -W + 11, 5, -D + 18, 'furniture', 0x3a5da8), shape: 'bed', climb: true },
@@ -152,7 +152,7 @@ export function createBedroom(): World {
     { ...box(4, 0, 2, 6, 2.6, 4, 'prop', 0x2f7fe0), shape: 'blocks' },
     { ...box(-12, 0, 6, -9, 1.2, 9, 'prop', 0xd8262e), shape: 'car' },
     { ...box(2, 0, 10, 8, 1, 11, 'prop', 0xefe3c8), shape: 'ruler' },
-    { ...box(-4, 0, -12, -1, 4, -11, 'prop', 0x5e6b86), shape: 'book' },
+    { ...box(-4, 0, -12, -1, 4, -11, 'prop', 0x8a3a2a), shape: 'book' },
     { ...box(12, 0, -2, 14, 3, 0, 'prop', 0xffc94a), shape: 'drum' },
   ];
 

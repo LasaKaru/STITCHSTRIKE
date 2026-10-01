@@ -213,7 +213,7 @@ export function buildWoolGarage(scene: THREE.Scene, world: World): WoolGarage {
     const hood = mesh(new THREE.BoxGeometry(2.2, 0.6, 15), metal(0xcfd4da, 0.4), false);
     hood.position.set(x, 38.1, z);
     group.add(hood);
-    const l = new THREE.PointLight(0xe8f0ff, 260, 70, 1.6);
+    const l = new THREE.PointLight(0xffe2c0, 260, 70, 1.6);
     l.position.set(x, 35.5, z);
     group.add(l);
   }
@@ -249,7 +249,7 @@ export function buildWoolGarage(scene: THREE.Scene, world: World): WoolGarage {
   sun.shadow.bias = -0.0004;
   sun.shadow.normalBias = 0.05;
   scene.add(sun, sun.target);
-  scene.add(new THREE.HemisphereLight(0xdfe6f0, 0x4a3a2c, 0.55));
+  scene.add(new THREE.HemisphereLight(0xffe2c0, 0x5a3a2a, 0.55));
 
   return {
     update(t) {

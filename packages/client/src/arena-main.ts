@@ -103,7 +103,7 @@ renderer.toneMappingExposure = world.outdoor ? 1.0 : 1.15;
 document.getElementById('app')!.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(world.outdoor ? 0xcfdfea : 0x2a2f3a);
+scene.background = new THREE.Color(world.outdoor ? 0xf2d9b0 : 0x3a2a22);
 scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environmentIntensity = world.outdoor ? 0.5 : 0.22;
 const room = world.outdoor ? buildWoolGarden(scene, world, quality) : world.id === 'garage' ? buildWoolGarage(scene, world) : world.id === 'bathroom' ? buildWoolBathroom(scene, world) : world.id === 'toystore' ? buildWoolToyStore(scene, world) : buildWoolRoom(scene, world);
@@ -115,7 +115,8 @@ scene.add(camera);
 
 let post: Post | null = null;
 if (quality !== 'low') {
-  post = createPost(renderer, scene, camera, { dof: false, ao: quality === 'high', bloomStrength: world.outdoor ? 0.12 : 0.35, vignette: 0.22, grain: 0.015 });
+  // The cozy stop-motion look: warm grade, soft bloom, tilt-shift miniature edges.
+  post = createPost(renderer, scene, camera, { dof: false, ao: quality === 'high', bloomStrength: world.outdoor ? 0.22 : 0.4, vignette: 0.3, grain: 0.012, grade: 1, tilt: settings.miniature ? 0.7 : 0 });
 }
 
 const viewModel = new ViewModel(camera);

@@ -184,7 +184,7 @@ export function buildWoolBathroom(scene: THREE.Scene, world: World): WoolBathroo
   const lamp = new THREE.Mesh(new THREE.SphereGeometry(3, 20, 14), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xfff6e4).multiplyScalar(1.6) }));
   lamp.position.set(0, 48, 0);
   group.add(lamp);
-  const light = new THREE.PointLight(0xfff0dc, 240, 120, 1.7);
+  const light = new THREE.PointLight(0xffd8a8, 260, 120, 1.7);
   light.position.set(0, 44, 0);
   group.add(light);
   const holder = mesh(new THREE.CylinderGeometry(0.3, 0.3, 6, 8).rotateX(Math.PI / 2), metal(0xd9dde2, 0.2));
@@ -193,7 +193,7 @@ export function buildWoolBathroom(scene: THREE.Scene, world: World): WoolBathroo
   scatterMess(group, world, { count: 60, seed: 41, outdoor: false });
   scene.add(group);
 
-  const sun = new THREE.DirectionalLight(0xfff0d8, 1.7);
+  const sun = new THREE.DirectionalLight(0xffd6a0, 1.8);
   sun.position.set(-90, 60, 10);
   sun.target.position.set(0, 0, 0);
   sun.castShadow = true;
@@ -201,6 +201,6 @@ export function buildWoolBathroom(scene: THREE.Scene, world: World): WoolBathroo
   Object.assign(sun.shadow.camera, { left: -50, right: 50, top: 50, bottom: -50, near: 10, far: 220 });
   sun.shadow.bias = -0.0004;
   sun.shadow.normalBias = 0.05;
-  scene.add(sun, sun.target, new THREE.HemisphereLight(0xf2fbff, 0x7a9094, 0.4));
+  scene.add(sun, sun.target, new THREE.HemisphereLight(0xffe6c4, 0x8a6a50, 0.45));
   return { update() { /* the bathroom is calm */ } };
 }

@@ -156,7 +156,8 @@ function windowWall(group: THREE.Group, b: Box): void {
 
 /** Concentric crochet rag rug in the middle of the floor. */
 function ragRug(group: THREE.Group): void {
-  const rings = [0xd8262e, 0xefe3c8, 0x3a5da8, 0xffc94a, 0x8bcb3a, 0xefe3c8, 0xe8742a, 0x5e6b86];
+  // Autumn stripes, like a hand-knitted rag rug.
+  const rings = [0xb5452a, 0xefe3c8, 0xd9772e, 0xe8c07a, 0x8a3a2a, 0xefe3c8, 0xc8642a, 0x6a4a3a];
   const step = 0.9;
   rings.forEach((c, i) => {
     const inner = i * step, outer = (i + 1) * step;
@@ -203,7 +204,7 @@ export function buildWoolRoom(scene: THREE.Scene, world: World): WoolRoom {
   group.name = 'wool-room';
   world.boxes.forEach((b, i) => renderBox(group, b, i));
   // Knitted ceiling so the window is the only way in for the sun.
-  group.add(boxMesh([-21, CEILING, -18.5], [21, CEILING + 1, 18.5], wool('stocking', 0x7a8499, 0.6)));
+  group.add(boxMesh([-21, CEILING, -18.5], [21, CEILING + 1, 18.5], wool('stocking', 0xf0e4cc, 0.6)));
   ragRug(group);
   shelfBooks(group);
   roomDetails(group, wool);
@@ -233,7 +234,7 @@ export function buildWoolRoom(scene: THREE.Scene, world: World): WoolRoom {
 
   // Sun through the window: the only direct light.
   const dir = new THREE.Vector3(-1, 0.85, 0.3).normalize();
-  const sun = new THREE.DirectionalLight(0xffd9a0, 7);
+  const sun = new THREE.DirectionalLight(0xffc98a, 5.2);
   sun.position.copy(dir).multiplyScalar(45);
   sun.target.position.set(0, 0, 0);
   sun.castShadow = true;
@@ -245,8 +246,9 @@ export function buildWoolRoom(scene: THREE.Scene, world: World): WoolRoom {
   sun.shadow.radius = 3;
   scene.add(sun, sun.target);
   // Soft interior fill: cool sky bounce from above, warm wool bounce from below.
-  scene.add(new THREE.HemisphereLight(0xaebfe0, 0x8a6a4a, 0.22));
-  const lamp = new THREE.PointLight(0xffc98a, 3.5, 30, 1.6);
+  // Warm fill: honey light from above, wool bounce from below (a cozy room, not a cold one).
+  scene.add(new THREE.HemisphereLight(0xffe0b8, 0x8a5a3a, 0.55));
+  const lamp = new THREE.PointLight(0xffb870, 6, 34, 1.5);
   lamp.position.set(14, 10, -12);
   scene.add(lamp);
 
@@ -278,7 +280,7 @@ function lightShaft(sunDir: THREE.Vector3): { mesh: THREE.Mesh; update(camera: T
   geo.setAttribute('along', new THREE.Float32BufferAttribute([0, 0, 0, 0, 1, 1, 1, 1], 1));
   geo.setIndex([0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7, 6, 3, 0, 4, 3, 4, 7]);
   const mat = new THREE.ShaderMaterial({
-    uniforms: { uColor: { value: new THREE.Color(0xffd9a0) }, uIntensity: { value: 0.009 } },
+    uniforms: { uColor: { value: new THREE.Color(0xffc98a) }, uIntensity: { value: 0.0045 } },
     vertexShader: /* glsl */ `
       attribute float along;
       varying float vAlong;

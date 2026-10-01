@@ -39,6 +39,55 @@ const VignetteGrain = {
     }`,
 };
 
+/**
+ * The cozy stop-motion look: warm split-toning (golden highlights, warm brown
+ * shadows), a little extra saturation and contrast, and a tilt-shift blur at the
+ * top and bottom of the frame so the knitted sets read as a miniature while the
+ * middle of the screen (where you aim) stays sharp.
+ */
+const CozyGrade = {
+  uniforms: {
+    tDiffuse: { value: null },
+    uGrade: { value: 1 },
+    uTilt: { value: 1 },
+    uTexel: { value: new THREE.Vector2(1 / 1280, 1 / 720) },
+  },
+  vertexShader: /* glsl */ `
+    varying vec2 vUv;
+    void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }`,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D tDiffuse;
+    uniform float uGrade;
+    uniform float uTilt;
+    uniform vec2 uTexel;
+    varying vec2 vUv;
+    void main() {
+      // Tilt-shift: blur grows away from a sharp band through the middle.
+      float band = smoothstep( 0.2, 0.5, abs( vUv.y - 0.52 ) ) * uTilt;
+      vec4 c = texture2D( tDiffuse, vUv );
+      if ( band > 0.01 ) {
+        vec3 acc = c.rgb;
+        float r = band * 7.0;
+        for ( int i = 0; i < 12; i++ ) {
+          float a = float( i ) * 2.39996;
+          float d = sqrt( ( float( i ) + 0.5 ) / 12.0 ) * r;
+          acc += texture2D( tDiffuse, vUv + vec2( cos( a ), sin( a ) ) * d * uTexel ).rgb;
+        }
+        c.rgb = acc / 13.0;
+      }
+      vec3 col = c.rgb;
+      float l = dot( col, vec3( 0.299, 0.587, 0.114 ) );
+      // Saturation and a gentle S-curve.
+      col = mix( vec3( l ), col, 1.0 + 0.18 * uGrade );
+      col = mix( col, col * col * ( 3.0 - 2.0 * col ), 0.25 * uGrade );
+      // Split-tone: warm brown shadows, golden highlights.
+      vec3 shadowTint = vec3( 1.06, 0.98, 0.9 );
+      vec3 highTint = vec3( 1.06, 1.0, 0.86 );
+      col *= mix( vec3( 1.0 ), mix( shadowTint, highTint, smoothstep( 0.2, 0.8, l ) ), uGrade );
+      gl_FragColor = vec4( col, c.a );
+    }`,
+};
+
 export interface PostSettings {
   ao: boolean;
   dof: boolean;
@@ -49,6 +98,10 @@ export interface PostSettings {
   maxBlur: number;
   vignette: number;
   grain: number;
+  /** 0..1 warm cozy colour grade. */
+  grade: number;
+  /** 0..1 tilt-shift miniature blur at the top and bottom of the frame. */
+  tilt: number;
 }
 
 export interface Post {
@@ -65,7 +118,7 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
   const composer = new EffectComposer(renderer, target);
   const settings: PostSettings = {
     ao: true, dof: true, bloom: true, bloomStrength: 0.45, focus: 3, aperture: 0.0022, maxBlur: 0.005,
-    vignette: 0.28, grain: 0.025, ...initial,
+    vignette: 0.28, grain: 0.025, grade: 1, tilt: 0.6, ...initial,
   };
 
   composer.addPass(new RenderPass(scene, camera));
@@ -77,6 +130,8 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
   const bloom = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), settings.bloomStrength, 0.55, 0.92);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
+  const cozy = new ShaderPass(CozyGrade);
+  composer.addPass(cozy);
   const vg = new ShaderPass(VignetteGrain);
   composer.addPass(vg);
 
@@ -95,15 +150,20 @@ export function createPost(renderer: THREE.WebGLRenderer, scene: THREE.Scene, ca
       bokehUniforms.maxblur.value = settings.maxBlur;
       vg.uniforms.uVignette.value = settings.vignette;
       vg.uniforms.uGrain.value = settings.grain;
+      cozy.uniforms.uGrade.value = settings.grade;
+      cozy.uniforms.uTilt.value = settings.tilt;
+      cozy.enabled = settings.grade > 0 || settings.tilt > 0;
     },
     setSize(w, h) {
       composer.setSize(w, h);
+      (cozy.uniforms.uTexel.value as THREE.Vector2).set(1 / w, 1 / h);
     },
     render(t) {
       vg.uniforms.uTime.value = t;
       composer.render();
     },
   };
+  (cozy.uniforms.uTexel.value as THREE.Vector2).set(1 / size.x, 1 / size.y);
   post.apply();
   return post;
 }

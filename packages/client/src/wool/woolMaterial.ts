@@ -35,8 +35,8 @@ export const QUALITY_LAYERS: Record<Quality, WoolLayers> = {
 /** Shared by every wool material so a debug panel can tune all of them live without recompiling. */
 export const woolUniforms = {
   uWoolWrap: { value: 0.4 },
-  uWoolTint: { value: 0.07 },
-  uWoolAO: { value: 0.75 },
+  uWoolTint: { value: 0.1 },
+  uWoolAO: { value: 0.9 },
   uWoolRim: { value: 0.9 },
   uWoolShellLength: { value: 0.028 },
   uWoolShellCount: { value: 12 },
@@ -45,9 +45,9 @@ export const woolUniforms = {
 };
 
 export const woolParams = {
-  normalScale: 1.15,
+  normalScale: 1.6,
   /** Stitches per world unit. Plan §13.3 suggests 6-8; the reference photos read closer to 10-12 on a 15 cm toy. */
-  density: 11,
+  density: 7.5,
   sheenRoughness: 0.55,
   shellMaxDistance: 8,
   maxShells: 16,
@@ -241,6 +241,21 @@ function syncLayerUniforms(mat: THREE.MeshPhysicalMaterial): void {
   shader.uniforms.uWoolWrap = scale.wrap ? woolUniforms.uWoolWrap : { value: 0 };
 }
 
+/**
+ * Real yarn is never a pure primary: dyed wool reads a little softer and warmer.
+ * Every wool colour passes through this, so the whole world shares one cozy,
+ * hand-dyed palette (bright plastic reds and blues become brick and denim).
+ */
+export function yarnDye(c: THREE.Color): THREE.Color {
+  const hsl = { h: 0, s: 0, l: 0 };
+  c.getHSL(hsl);
+  const warm = hsl.h < 0.15 || hsl.h > 0.93;
+  c.setHSL(hsl.h, hsl.s * (warm ? 0.9 : 0.74), hsl.l);
+  c.r = Math.min(1, c.r * 1.03);
+  c.b *= 0.92;
+  return c;
+}
+
 let currentLayers: WoolLayers = { ...QUALITY_LAYERS.high };
 
 export function createWoolMaterial(options: WoolOptions, shell = false): THREE.MeshPhysicalMaterial {
@@ -257,7 +272,7 @@ export function createWoolMaterial(options: WoolOptions, shell = false): THREE.M
     );
   const normalMap = maps.normal.clone();
   normalMap.repeat.copy(repeat);
-  const color = new THREE.Color(options.color);
+  const color = yarnDye(new THREE.Color(options.color));
   const mat = new THREE.MeshPhysicalMaterial({
     color,
     roughness: options.roughness ?? 0.92,

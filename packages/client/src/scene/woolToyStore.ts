@@ -203,13 +203,13 @@ export function buildWoolToyStore(scene: THREE.Scene, world: World): WoolToyStor
     group.add(p);
   }
   for (const z of [-30, 0, 30]) {
-    const l = new THREE.PointLight(0xfff6ea, 260, 110, 1.6);
+    const l = new THREE.PointLight(0xffe0b8, 260, 110, 1.6);
     l.position.set(0, 54, z);
     group.add(l);
   }
   scene.add(group);
 
-  const key = new THREE.DirectionalLight(0xfff4e4, 1.5);
+  const key = new THREE.DirectionalLight(0xffdcb0, 1.5);
   key.position.set(20, 90, 30);
   key.target.position.set(0, 0, 0);
   key.castShadow = true;
@@ -217,6 +217,6 @@ export function buildWoolToyStore(scene: THREE.Scene, world: World): WoolToyStor
   Object.assign(key.shadow.camera, { left: -60, right: 60, top: 70, bottom: -70, near: 20, far: 220 });
   key.shadow.bias = -0.0004;
   key.shadow.normalBias = 0.05;
-  scene.add(key, key.target, new THREE.HemisphereLight(0xffffff, 0x8a8270, 0.4));
+  scene.add(key, key.target, new THREE.HemisphereLight(0xffe8c8, 0x8a6a4a, 0.45));
   return { update() { /* shoppers not included */ } };
 }
