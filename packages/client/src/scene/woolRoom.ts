@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { bunting, pumpkin, skyCard, skylineStrip } from './cozyDressing.ts';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { Box, World } from '@stitchstrike/shared';
 import type { StitchPattern } from '../wool/stitches.ts';
@@ -147,11 +148,26 @@ function windowWall(group: THREE.Group, b: Box): void {
   rod.rotation.x = Math.PI / 2;
   rod.position.set(x1 + 0.5, W.y1 + 1.2, (W.z0 + W.z1) / 2);
   group.add(rod);
-  // Bright sky behind the glass so the window blooms.
-  const sky = new THREE.Mesh(new THREE.PlaneGeometry(40, 30), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xdcecff).multiplyScalar(1.7) }));
+  // Outside: a knitted city at golden hour, lit windows and all.
+  const zc = (W.z0 + W.z1) / 2;
+  const sky = skyCard(260, 120, 0x6a96d0, 0xf8d4a0);
   sky.rotation.y = Math.PI / 2;
-  sky.position.set(x0 - 6, 12, (W.z0 + W.z1) / 2);
+  sky.position.set(x0 - 90, 40, zc);
   group.add(sky);
+  for (const [dist, scale, seed, lit] of [[70, 0.9, 11, 0.5], [40, 0.6, 12, 0.4], [22, 0.38, 13, 0.3]] as const) {
+    const city = skylineStrip(200, seed, { height: 60, lit, spire: seed === 11 });
+    city.rotation.y = Math.PI / 2;
+    city.scale.setScalar(scale);
+    city.position.set(x0 - dist, -6 + (70 - dist) * 0.05, zc);
+    group.add(city);
+  }
+  // Autumn leaf bunting over the window, pumpkins on the sill.
+  group.add(bunting(new THREE.Vector3(x1 + 0.7, W.y1 + 1.7, W.z0 - 2.5), new THREE.Vector3(x1 + 0.7, W.y1 + 1.7, W.z1 + 2.5), { sag: 1.2, size: 0.75, seed: 3 }));
+  for (const [z, r, c] of [[W.z0 + 1.2, 0.55, 0xd9772e], [W.z0 + 2.6, 0.38, 0xe8b04a], [W.z1 - 1.4, 0.48, 0xd9772e]] as const) {
+    const pk = pumpkin(r, Math.floor(z * 7), c);
+    pk.position.set(x1 + 0.6, W.y0, z);
+    group.add(pk);
+  }
 }
 
 /** Concentric crochet rag rug in the middle of the floor. */
@@ -206,6 +222,14 @@ export function buildWoolRoom(scene: THREE.Scene, world: World): WoolRoom {
   // Knitted ceiling so the window is the only way in for the sun.
   group.add(boxMesh([-21, CEILING, -18.5], [21, CEILING + 1, 18.5], wool('stocking', 0xf0e4cc, 0.6)));
   ragRug(group);
+  // Autumn bunting swagged across the back and side walls, pumpkins about the room.
+  group.add(bunting(new THREE.Vector3(-18, 21, -17.2), new THREE.Vector3(18, 21, -17.2), { sag: 2.2, size: 1, seed: 21 }));
+  group.add(bunting(new THREE.Vector3(19.2, 21, -16), new THREE.Vector3(19.2, 21, 16), { sag: 2.2, size: 1, seed: 22 }));
+  for (const [x, y, z, r, c] of [[16.5, 7.5, -15.5, 0.8, 0xd9772e], [18.4, 7.5, -12.8, 0.55, 0xe8b04a], [-17.5, 0, 15.5, 1.3, 0xd9772e], [-15.6, 0, 16.2, 0.8, 0xc8642a], [17.5, 0, 16, 1.0, 0xe8b04a]] as const) {
+    const pk = pumpkin(r, Math.floor(x * 13 + z), c);
+    pk.position.set(x, y, z);
+    group.add(pk);
+  }
   shelfBooks(group);
   roomDetails(group, wool);
   // A kid's room is never tidy: socks, crayons, open books, blocks and loose yarn.

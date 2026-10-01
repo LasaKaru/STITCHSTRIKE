@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { knitWater, skylineStrip } from './cozyDressing.ts';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { circleClear, type Box, type World } from '@stitchstrike/shared';
 import { limb, meshSDF, sphere, type Prim, type V3 } from '../figures/sdf.ts';
@@ -44,7 +45,7 @@ function sky(scene: THREE.Scene): { update(t: number): void } {
         varying vec3 vDir;
         void main() {
           float h = clamp( vDir.y, 0.0, 1.0 );
-          vec3 col = mix( vec3( 0.86, 0.9, 0.93 ), vec3( 0.42, 0.62, 0.9 ), pow( h, 0.55 ) );
+          vec3 col = mix( vec3( 0.98, 0.84, 0.64 ), vec3( 0.44, 0.62, 0.86 ), pow( h, 0.6 ) );
           float s = max( dot( vDir, uSun ), 0.0 );
           col += vec3( 1.0, 0.85, 0.6 ) * ( pow( s, 400.0 ) * 6.0 + pow( s, 12.0 ) * 0.35 );
           gl_FragColor = vec4( col, 1.0 );
@@ -54,7 +55,7 @@ function sky(scene: THREE.Scene): { update(t: number): void } {
   dome.renderOrder = -10;
   scene.add(dome);
   // Felted clouds.
-  const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, emissive: 0xdde6f0, emissiveIntensity: 0.35, fog: false });
+  const cloudMat = new THREE.MeshStandardMaterial({ color: 0xfff4e4, roughness: 1, emissive: 0xffe2c0, emissiveIntensity: 0.35, fog: false });
   const clouds = new THREE.Group();
   const r = rng(77);
   for (let i = 0; i < 14; i++) {
@@ -92,7 +93,7 @@ function grass(group: THREE.Group, world: World, N: number): { material: THREE.M
   blade.setIndex(idx);
   blade.computeVertexNormals();
   const uniforms = { uTime: { value: 0 } };
-  const mat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.88, sheen: 0.8, sheenRoughness: 0.6, sheenColor: new THREE.Color(0xc8f0a0), side: THREE.DoubleSide });
+  const mat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.88, sheen: 0.8, sheenRoughness: 0.6, sheenColor: new THREE.Color(0xf0dca0), side: THREE.DoubleSide });
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = uniforms.uTime;
     shader.vertexShader = shader.vertexShader
@@ -116,7 +117,8 @@ function grass(group: THREE.Group, world: World, N: number): { material: THREE.M
   const q = new THREE.Quaternion();
   const e = new THREE.Euler();
   const col = new THREE.Color();
-  const greens = [0x5a9a3a, 0x6aaa44, 0x4a8a34, 0x7ab84c, 0x8ab85a, 0x5e9444];
+  // Late-autumn lawn: olive and moss with mustard and rust strands knitted through.
+  const greens = [0x7a8a3a, 0x8a9a42, 0x6a7a34, 0x9aa04a, 0xb89a42, 0x7a8a3a];
   let n = 0;
   for (let tries = 0; tries < N * 3 && n < N; tries++) {
     const x = min[0] - 1 + r() * (max[0] - min[0] + 2);
@@ -130,7 +132,7 @@ function grass(group: THREE.Group, world: World, N: number): { material: THREE.M
     m.compose(new THREE.Vector3(x, 0, z), q, new THREE.Vector3(1, h, 1));
     inst.setMatrixAt(n, m);
     col.setHex(greens[Math.floor(r() * greens.length)]).multiplyScalar(0.8 + r() * 0.35);
-    if (r() < 0.04) col.setHex(0xb8b060); // a few dry straw-coloured strands
+    if (r() < 0.08) col.setHex(r() < 0.5 ? 0xc89a4a : 0xa85a3a); // dry straw and rust strands
     inst.setColorAt(n, col);
     n++;
   }
@@ -178,14 +180,15 @@ function tree(group: THREE.Group, b: Box, seed: number): THREE.Group {
   g.add(mesh(geo, wool('rib', 0x6a4a2e, 0.9)));
   // Felted foliage: dozens of fuzzy clumps around each branch end and the
   // crown, merged per shade so a whole canopy is a few draws.
-  const greens = [0x4a7a32, 0x5a8a3a, 0x3c6a2c, 0x668f40];
+  // Autumn pom-poms: rust, orange, mustard and burgundy, like a knitted park in October.
+  const greens = [0xb5452a, 0xd9772e, 0xe8b04a, 0x8a2a3a, 0xc8642a];
   const byShade: THREE.BufferGeometry[][] = greens.map(() => []);
   for (const [i, end] of ends.entries()) {
-    const clumps = 7 + Math.floor(r() * 4);
+    const clumps = 11 + Math.floor(r() * 5);
     for (let k = 0; k < clumps; k++) {
-      const rad = 2.4 + r() * 2.6;
+      const rad = 2.0 + r() * 1.8;
       const a = r() * Math.PI * 2, d = r() * 6;
-      const geo = lumpy(rad, 0.38, seed * 100 + i * 20 + k, 3);
+      const geo = lumpy(rad, 0.12, seed * 100 + i * 20 + k, 3);
       geo.scale(1, 0.72 + r() * 0.2, 1).rotateY(r() * 6);
       geo.translate(end[0] + Math.cos(a) * d, end[1] + 1.5 + (r() - 0.3) * 4.5, end[2] + Math.sin(a) * d);
       byShade[(i + k) % greens.length].push(geo);
@@ -516,7 +519,7 @@ function renderBox(group: THREE.Group, b: Box, i: number, trees: THREE.Group[]):
     case 'hedge': {
       const r = rng(i * 31);
       for (let x = b.min[0] + 2; x < b.max[0] - 1; x += 3.2) {
-        const blob = mesh(lumpy(3.2, 0.5, i * 100 + Math.floor(x), 2), wool('felt', [0x3e6a34, 0x4a7a3a, 0x36602e][Math.floor(r() * 3)], 1.4));
+        const blob = mesh(lumpy(3.2, 0.5, i * 100 + Math.floor(x), 2), wool('felt', [0x5a6a2e, 0x6a7a34, 0x8a7a34, 0xa8582e][Math.floor(r() * 4)], 1.4));
         blob.position.set(x, 3.4 + r() * 0.6, c.z + (r() - 0.5));
         blob.scale.set(1, 1.1, 0.95);
         group.add(blob);
@@ -610,7 +613,7 @@ function renderBox(group: THREE.Group, b: Box, i: number, trees: THREE.Group[]):
 }
 
 function pondAndFlamingos(group: THREE.Group): void {
-  const water = mesh(new THREE.CircleGeometry(POND.r, 40).rotateX(-Math.PI / 2), new THREE.MeshPhysicalMaterial({ color: 0x3a7a9a, roughness: 0.04, clearcoat: 1, metalness: 0.1 }), false);
+  const water = knitWater(new THREE.CircleGeometry(POND.r, 40).rotateX(-Math.PI / 2));
   water.position.set(POND.x, 0.06, POND.z);
   group.add(water);
   const r = rng(55);
@@ -706,7 +709,7 @@ function neighbourhood(group: THREE.Group): void {
     for (let k = 0; k < count; k++) {
       const g = new THREE.Group();
       const w = 40 + r() * 20, h = 30 + r() * 15;
-      const col = [0xd9cdb5, 0xa8c0d8, 0xe8d4a0, 0xc8a8a0][Math.floor(r() * 4)];
+      const col = [0xd9cdb5, 0xa86a50, 0xe8d4a0, 0xc8a8a0, 0x8a5a4a][Math.floor(r() * 5)];
       g.add(put(mesh(new THREE.BoxGeometry(w, h, 30), wool('garter', col, 0.4)), new THREE.Vector3(0, h / 2, 0)));
       const shape = new THREE.Shape();
       shape.moveTo(-w / 2 - 2, 0); shape.lineTo(w / 2 + 2, 0); shape.lineTo(0, 14); shape.closePath();
@@ -728,22 +731,22 @@ function neighbourhood(group: THREE.Group): void {
     const d = 130 + r() * 110;
     const t = new THREE.Group();
     t.add(put(mesh(new THREE.CylinderGeometry(1.5, 2.5, 18, 8), wool('rib', 0x5a3e28, 0.5), false), new THREE.Vector3(0, 9, 0)));
-    t.add(put(mesh(lumpy(12 + r() * 6, 0.5, k, 2), wool('felt', [0x4e7e36, 0x3e6e2e, 0x5e8e3e][k % 3], 0.5), false), new THREE.Vector3(0, 26, 0)));
+    t.add(put(mesh(lumpy(12 + r() * 6, 0.5, k, 2), wool('felt', [0xb5452a, 0xd9772e, 0xe8b04a, 0x8a2a3a][k % 4], 0.5), false), new THREE.Vector3(0, 26, 0)));
     t.position.set(Math.cos(a) * d, 0, Math.sin(a) * d);
     group.add(t);
   }
 }
 
 export function buildWoolGarden(scene: THREE.Scene, world: World, quality: 'low' | 'medium' | 'high' = 'high'): WoolGarden {
-  scene.fog = new THREE.Fog(0xc4d6e6, 160, 520);
+  scene.fog = new THREE.Fog(0xf0d8b4, 170, 560);
   const skyFx = sky(scene);
   const group = new THREE.Group();
   group.name = 'wool-garden';
 
   // Knitted lawn reaching to the horizon.
-  const lawn = mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), wool('garter', 0x5a8a3a, 0.35), false);
+  const lawn = mesh(new THREE.PlaneGeometry(900, 900).rotateX(-Math.PI / 2), wool('garter', 0x7a8a3a, 0.35), false);
   group.add(lawn);
-  const yard = mesh(new THREE.PlaneGeometry(92, 88).rotateX(-Math.PI / 2), wool('stocking', 0x629a3e, 0.7), false);
+  const yard = mesh(new THREE.PlaneGeometry(92, 88).rotateX(-Math.PI / 2), wool('stocking', 0x86963e, 0.7), false);
   yard.position.set(0, 0.02, 2);
   group.add(yard);
 
@@ -754,6 +757,15 @@ export function buildWoolGarden(scene: THREE.Scene, world: World, quality: 'low'
   const grassFx = grass(group, world, { low: 12000, medium: 26000, high: 42000 }[quality]);
   fallenLeaves(group, world);
   neighbourhood(group);
+  // A knitted city on the horizon, all the way round: the garden sits on the edge of town.
+  for (let k = 0; k < 6; k++) {
+    const a = (k / 6) * Math.PI * 2 + 0.3;
+    const city = skylineStrip(150, 40 + k, { height: 70, lit: 0.35, spire: k === 1 });
+    city.scale.setScalar(1.6);
+    city.position.set(Math.sin(a) * 330, 0, Math.cos(a) * 330);
+    city.rotation.y = a + Math.PI;
+    group.add(city);
+  }
   // Flower beds along the house and the fences.
   flowerRow(group, -44, -33, 0, -38.5, 1);
   flowerRow(group, -2, 22, 0, -38.5, 2);
@@ -764,7 +776,7 @@ export function buildWoolGarden(scene: THREE.Scene, world: World, quality: 'low'
 
   // Bright midday sun with a big shadow frustum over the whole yard.
   const dir = new THREE.Vector3(0.5, 0.75, 0.42).normalize();
-  const sun = new THREE.DirectionalLight(0xfff0d8, 3.4);
+  const sun = new THREE.DirectionalLight(0xffd8a0, 3.2);
   sun.position.copy(dir).multiplyScalar(160);
   sun.target.position.set(0, 0, 0);
   sun.castShadow = true;
@@ -774,7 +786,7 @@ export function buildWoolGarden(scene: THREE.Scene, world: World, quality: 'low'
   sun.shadow.bias = -0.0003;
   sun.shadow.normalBias = 0.06;
   scene.add(sun, sun.target);
-  scene.add(new THREE.HemisphereLight(0xbcd8f4, 0x4a6a2e, 0.8));
+  scene.add(new THREE.HemisphereLight(0xffe2b8, 0x6a5a2e, 0.85));
 
   return {
     sun,
