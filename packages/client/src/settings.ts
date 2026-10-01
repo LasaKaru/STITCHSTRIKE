@@ -62,6 +62,8 @@ export interface Settings {
   radar: boolean;
   /** Floating damage numbers on hits. */
   damageNumbers: boolean;
+  /** Gamepad aim assist (slowdown and a gentle pull near targets). Never applies to the mouse. */
+  aimAssist: boolean;
 }
 
 const KEY = 'ss-settings';
@@ -85,6 +87,7 @@ export const DEFAULTS: Settings = {
   shoulder: 1,
   radar: true,
   damageNumbers: true,
+  aimAssist: true,
 };
 
 export function loadSettings(): Settings {

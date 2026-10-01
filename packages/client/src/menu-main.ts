@@ -245,6 +245,9 @@ viewSel.addEventListener('change', () => { settings.view = viewSel.value === 'th
 const shoulderSel = $<HTMLSelectElement>('#s-shoulder');
 shoulderSel.value = String(settings.shoulder);
 shoulderSel.addEventListener('change', () => { settings.shoulder = shoulderSel.value === '-1' ? -1 : 1; saveSettings(settings); });
+const assistBox = $<HTMLInputElement>('#s-assist');
+assistBox.checked = settings.aimAssist;
+assistBox.addEventListener('change', () => { settings.aimAssist = assistBox.checked; saveSettings(settings); });
 const radarBox = $<HTMLInputElement>('#s-radar');
 radarBox.checked = settings.radar;
 radarBox.addEventListener('change', () => { settings.radar = radarBox.checked; saveSettings(settings); });

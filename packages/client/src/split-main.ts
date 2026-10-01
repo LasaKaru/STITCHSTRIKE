@@ -16,6 +16,7 @@ import { createAvatar, type Avatar } from './scene/avatar.ts';
 import { YarnRopes, type RopeSpec } from './scene/yarnRopes.ts';
 import { SpoolHill } from './scene/spoolHill.ts';
 import { ShoulderCam } from './scene/shoulderCam.ts';
+import { assistAim } from './input/aimAssist.ts';
 import { YarnBalls } from './scene/yarnBalls.ts';
 import { CoopProps } from './scene/coopProps.ts';
 import { EnemyRenderer, type EnemyView } from './scene/enemyRenderer.ts';
@@ -319,8 +320,17 @@ function sample(l: Local, dt: number): number {
     const f = l.pad.poll(dt, settings.sensitivity / 0.0022, settings.invertY);
     if (f.active && !join.classList.contains('hidden')) { join.classList.add('hidden'); sfx.unlock(); music.start(settings.musicVolume); }
     b |= f.buttons;
-    l.yaw += f.dYaw;
-    l.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, l.pitch + f.dPitch));
+    let look = { dYaw: f.dYaw, dPitch: f.dPitch };
+    const ps = l.net.predicted;
+    if (ps && settings.aimAssist) {
+      const myTeam = l.net.roster.get(l.net.id)?.team ?? 0;
+      const targets = mode === 'coop'
+        ? main.enemySamples(performance.now()).map((e) => ({ x: e.x, y: e.y + (ENEMIES[e.type]?.height ?? 1) * 0.55, z: e.z }))
+        : main.remotes().filter((r) => r.alive && r.id !== l.net.id && (mode === 'pvp' || l.net.roster.get(r.id)?.team !== myTeam)).map((r) => ({ x: r.x, y: r.y + 1, z: r.z }));
+      look = assistAim(eyePosition(ps, false), l.yaw + l.aimFix.yaw, l.pitch + l.aimFix.pitch, f.dYaw, f.dPitch, targets);
+    }
+    l.yaw += look.dYaw;
+    l.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, l.pitch + look.dPitch));
     if (f.weaponDelta) l.weapon = cycleWeapon(l.weapon, f.weaponDelta);
     if (f.toggleDeck) l.deck = !l.deck;
     if (f.cardDelta) l.lastBuild = cycleCard(l.lastBuild, f.cardDelta);

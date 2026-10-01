@@ -23,6 +23,7 @@ import { SpoolHill } from './scene/spoolHill.ts';
 import { ShoulderCam } from './scene/shoulderCam.ts';
 import { EMOTE_SECONDS } from './figures/emotes.ts';
 import { Radar, type Blip } from './radar.ts';
+import { assistAim } from './input/aimAssist.ts';
 import { DamageNumbers } from './damageNumbers.ts';
 import { trackDaily, type ChallengeEvent } from './dailies.ts';
 import { Streaks } from './streaks.ts';
@@ -739,13 +740,30 @@ function pollPad(dt: number): number {
   if (!f.connected) return 0;
   if (f.active && !padActive) { padActive = true; overlay.classList.add('hidden'); sfx.unlock(); music.start(settings.musicVolume); briefing.unlock(); }
   if (!padActive) return 0;
-  yaw += f.dYaw;
-  pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, pitch + f.dPitch));
+  // Aim assist (pads only): slowdown near a target and a gentle pull while you look.
+  const s = net.predicted;
+  let look = { dYaw: f.dYaw, dPitch: f.dPitch };
+  if (s && settings.aimAssist && !photo.on) {
+    const eyeAt = eyePosition(s, false);
+    const myTeam = net.roster.get(net.id)?.team ?? 0;
+    const targets = mode === 'coop'
+      ? enemies.map((e) => ({ x: e.x, y: e.y + (ENEMIES[e.type]?.height ?? 1) * 0.55, z: e.z }))
+      : [...remoteNow.entries()].filter(([id]) => mode === 'pvp' || net.roster.get(id)?.team !== myTeam).map(([, q]) => ({ x: q.x, y: q.y + 1, z: q.z }));
+    look = assistAim(eyeAt, yaw + aimFix.yaw, pitch + aimFix.pitch, f.dYaw, f.dPitch, targets);
+  }
+  yaw += look.dYaw;
+  pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, pitch + look.dPitch));
   if (f.weaponDelta) wantWeapon = cycleWeapon(wantWeapon, f.weaponDelta);
   if (f.toggleDeck) deckToggled = !deckToggled;
   if (f.cardDelta) lastBuild = cycleCard(lastBuild, f.cardDelta);
   if (pad.ltEdge && mode === 'coop') pendingAction = lastBuild;
   if (f.action && mode === 'coop') pendingAction = f.action;
+  // Outside co-op the D-pad isn't the build deck: down waves, up cheers, left/right swap shoulders.
+  if (mode !== 'coop') {
+    if (f.action === Action.Sell) pendingAction = Action.Emote;
+    if (f.toggleDeck) pendingAction = Action.Emote + 1;
+    if (f.cardDelta) swapShoulder();
+  }
   if (f.thirdPerson) toggleView();
   scoreboard.classList.toggle('hidden', !f.scoreboard && !keys.has('Tab'));
   return f.buttons;
