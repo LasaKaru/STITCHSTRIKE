@@ -77,7 +77,7 @@ The checklist tracks what is in the game (✅) and what is still ahead (⬜).
   - boss: The Unraveller
 - ✅ Dino Stampede herd: Knitted Raptors (pack hunters that leap), Woolly Trikes (charge and smash traps), Felt Pteros (swoop from high up), boss Rex, the Yarnasaur (stomp, and a roar that sends the herd rushing)
 - ✅ Drivable vehicles: Toy Safari Jeep (fast, rams) and Wind-up Tank (slow, turret cannon), predicted like walking, parked on five maps
-- ✅ Maps at toy scale: The Bedroom, The Back Garden, The Garage, The Bathroom, The Toy Store Aisle, The City Park, The Dino Den
+- ✅ Maps at toy scale: The Bedroom, The Back Garden, The Garage, The Bathroom, The Toy Store Aisle, The City Park, The Dino Den, The Frosty Living Room
 - ✅ The cosy stop-motion look: amigurumi toys, chunky knit, golden light and a film grade, autumn set dressing, a knitted city outside every window
 - ✅ Verticality: climbable fabric and bark, jump pads, book and crate steps, shelves and roofs, ledge mantle, the yarn-swing grapple
 - ✅ Collectibles: 8 secrets per map (golden thimbles, weapon parts, credit stashes)
@@ -96,18 +96,21 @@ The checklist tracks what is in the game (✅) and what is still ahead (⬜).
 - ✅ First and third person: over-the-shoulder camera with wall collision, shoulder swap, aim convergence, held weapons on every toy, per-player views in split-screen
 - ✅ Spectating teammates while unravelled; photo mode
 - ✅ HUD radar, damage numbers, kill streaks, emotes (wave, cheer, dance, bow)
+- ✅ Traps 8 and 9: Healing Sewing Kit, Desk Fan; invaders: Paper Plane squadrons, Yo-Yo Slinger
+- ✅ Daily challenges (three a day, credits and XP); gamepad aim assist
+- ✅ Stuck-invader safety net (a wave can never stall)
 
 **Still ahead**
 - ⬜ Steam, the rest (needs your App ID): lobbies and invites, relay networking, cloud saves
-- ⬜ More maps: kitchen counter, sewing room, attic, a seasonal Christmas living room
+- ⬜ More maps: kitchen counter, sewing room, attic
 - ⬜ A boss per map (The Unraveller and Rex exist)
-- ⬜ Mission variety: escort, salvage and daily challenges
+- ⬜ Mission variety: escort and salvage
 - ⬜ PvP variety: vehicle-only modes, a race around the Dino Den
 - ⬜ Weapon parts with stat-free variants per weapon (charms and wraps exist; per-weapon skins do not yet)
-- ⬜ Gamepad aim assist; gamepad button remapping
+- ⬜ Gamepad button remapping
 - ⬜ More weapons: Stuffing Blaster, Safety-Pin Crossbow; gadgets
-- ⬜ More invaders: Yo-Yo Slinger, Paper-Plane squadron, Moth Queen
-- ⬜ More traps: Fan, Marble Chute, Sewing-Machine Turret, Hot-Water-Bottle Mortar, Healing Sewing Kit
+- ⬜ More invaders: Moth Queen
+- ⬜ More traps: Marble Chute, Sewing-Machine Turret, Hot-Water-Bottle Mortar
 - ⬜ Performance: LOD for player figures, per-room occlusion culling, baked lighting, meshing in a Web Worker
 - ⬜ Presentation: a commissioned rock soundtrack and voice acting, a trailer, store capsules, code signing
 - ⬜ Accessibility: toggle vs hold options, UI scale, a one-handed control preset

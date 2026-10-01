@@ -1,12 +1,14 @@
 # STITCHSTRIKE
 
-**Soft toys. Hard fights.** An indie first- and third-person shooter that blends wave-based tower defence with intense action, and a love letter to 90s childhoods. You are a little amigurumi toy in a giant, cosy, hand-knitted world. Everything is wool: the toys, Baron von Ravel's Mass-Knit Army, every room, the trees, the water and the city outside the window, all in the warm look of a stop-motion knit film. Defend the glowing **Heartspools** in a messy **bedroom**, the **back garden**, the **garage**, the **bathroom**, a **toy store aisle**, an autumn **city park** or the prehistoric **Dino Den**, against Baron von Ravel's toy army or a stampede of knitted dinosaurs: alone with bots, online with up to 4 friends, or up to four to a couch in split-screen. PvP Free-for-All, Team Deathmatch, King of the Spool and Capture the Yarn are in too, and you can drive a toy safari jeep or a wind-up tank. Play in first person or over the shoulder in third person. It's built with Three.js and TypeScript, with server-authoritative netcode, and ships as a desktop app ready for Steam.
+**Soft toys. Hard fights.** An indie first- and third-person shooter that blends wave-based tower defence with intense action, and a love letter to 90s childhoods. You are a little amigurumi toy in a giant, cosy, hand-knitted world. Everything is wool: the toys, Baron von Ravel's Mass-Knit Army, every room, the trees, the water and the city outside the window, all in the warm look of a stop-motion knit film. Defend the glowing **Heartspools** in a messy **bedroom**, the **back garden**, the **garage**, the **bathroom**, a **toy store aisle**, an autumn **city park**, the prehistoric **Dino Den** or a snowy **Frosty Living Room**, against Baron von Ravel's toy army or a stampede of knitted dinosaurs: alone with bots, online with up to 4 friends, or up to four to a couch in split-screen. PvP Free-for-All, Team Deathmatch, King of the Spool and Capture the Yarn are in too, and you can drive a toy safari jeep or a wind-up tank. Play in first person or over the shoulder in third person. It's built with Three.js and TypeScript, with server-authoritative netcode, and ships as a desktop app ready for Steam.
 
 ![Main menu over the live in-engine cinematic](docs/screenshots/menu.jpg)
 
 | The Dino Stampede herd | The Dino Den | Rex arrives at the park gate |
 |---|---|---|
 | ![](docs/screenshots/dinos.jpg) | ![](docs/screenshots/dinoden.jpg) | ![](docs/screenshots/stampede.jpg) |
+| **The Frosty Living Room** | **New traps: Desk Fan and Sewing Kit** | **Paper Planes and the Yo-Yo Slinger** |
+| ![](docs/screenshots/livingroom.jpg) | ![](docs/screenshots/new-traps.jpg) | ![](docs/screenshots/paper-invaders.jpg) |
 | **Third person, over the shoulder** | **Third person in co-op, with the radar** | **Emotes: bow, dance, cheer, wave** |
 | ![](docs/screenshots/third-person.jpg) | ![](docs/screenshots/third-person-coop.jpg) | ![](docs/screenshots/emotes.jpg) |
 | **Driving the toy safari jeep** | **The wind-up tank** | **Capture the Yarn** |
@@ -98,6 +100,8 @@ Every keyboard action can be rebound in Settings → Key bindings.
   - **Battery Zapper:** chains a shock through up to 4 invaders.
   - **Mousetrap:** one huge snap, then it re-arms.
   - **Spring Pad:** launches toys up to high ground.
+  - **Healing Sewing Kit:** re-stitches toys standing near it.
+  - **Desk Fan:** every few seconds a gust blows invaders back and knocks flyers down (it delays a push, it can't stop one).
 - **Mazing:** blockades re-bake the invaders' flow fields, so they walk the long way round. They only chew through when there is no way round.
 - **The Mass-Knit Army:**
   - **Knit Grunts**
@@ -111,6 +115,8 @@ Every keyboard action can be rebound in Settings → Key bindings.
   - **Scissor Snips**, which cut traps apart
   - **Tin Drummers**, whose drumming speeds up every invader nearby
   - **Jack-in-the-Boxes**, which spring their clowns at toys who get close
+  - **Paper Planes**, fast fragile squadrons that swoop down and crumple into whatever they hit
+  - **Yo-Yo Slingers**, which stand off at range and yank toys towards them
   - **The Unraveller**, the boss: a giant felted bear in a top hat that stomps
 - **Dino Stampede**, the second campaign (pick it under Campaign in the Play menu): a herd of knitted dinosaurs breaks out of the toy box.
   - **Knitted Raptors** hunt in packs and leap at toys a few steps away
@@ -130,6 +136,7 @@ Every keyboard action can be rebound in Settings → Key bindings.
   - **The Garage:** a car you crawl under and climb onto, steel shelving, a workbench and pegboard, and a roll-up door stuck half open.
   - **The Bathroom:** a bubble-bath tub, a climbable shower curtain, the toilet tank as a sniper perch, a toilet-roll staircase.
   - **The Toy Store Aisle:** towering shelves of boxed 90s toys, SALE banners to climb, a ball pit, a trolley and the checkout.
+  - **The Frosty Living Room:** a snowy evening with a Christmas tree you climb tier by tier to the star, a fireplace mantel perch (the invaders come down the chimney), a sofa, presents as steps, a gingerbread house, a toy train round the tree and snow past the window.
   - **The Dino Den:** a knitted prehistoric playset with a four-tier volcano you climb ledge by ledge to a smoking crater, a palm jungle, a river with a fallen log, a fossil skeleton whose spine is a sniper perch, a lookout tower and torch-lit gaps in the cliffs. A long-neck grazes outside and pteros wheel overhead.
   - **The City Park:** an autumn park of pom-pom trees, a knitted pond under a humped footbridge, a bandstand perch, hills, benches and lamp posts, ringed by a knitted city, with a giant turkey parade balloon overhead.
 - **Modes:** co-op defence (solo with bots, online up to 4, split-screen for 2–4), Free-for-All, Team Deathmatch **King of the Spool** (two teams fight to stand on a Golden Spool that hops around the map; first to 100) and **Capture the Yarn** (steal the other team's giant yarn ball and run it home while yours is safe; first to 3).
@@ -139,6 +146,8 @@ Every keyboard action can be rebound in Settings → Key bindings.
   - Every toy holds the weapon it has equipped, and third-person tracers come from your toy's own gun.
   - Split-screen players each pick their own view.
   - While unravelled you watch a teammate over the shoulder (click to switch). Photo mode (P) hides the HUD and lets the camera fly free.
+- **Daily challenges:** three a day (the same for everyone), shown on the main menu with progress bars and paid out in credits and XP the moment one's done.
+- **Gamepad:** aim assist for thumbsticks (a slowdown near targets and a gentle pull while you look; never for the mouse; toggle in Settings). Outside co-op the D-pad waves, cheers and swaps shoulders.
 - **HUD and feel:** a knitted radar that turns with you (teammates, invaders, rivals close by, Heartspools, the spool, yarn balls, vehicles), floating damage numbers (gold for headshots), kill streaks and multi-unravels, and a gentle FOV kick at a sprint.
 - **Emotes:** tap T to wave, or hold T and press 1–4 to wave, cheer, dance or bow. Everyone sees them, and idle bots join in.
 - **Accessibility:** colour-blind palettes, subtitles and sound captions, reduced camera shake, full key rebinding.
@@ -149,7 +158,7 @@ Balance check (full simulated matches, bots only, 2-second build phases): 4 bots
 
 ### URL options
 
-`?mode=coop|pvp|tdm|koth|cty` · `?map=bedroom|garden|garage|bathroom|toystore|park|dinoden` · `?mission=1` (Dino Stampede) · `?waves=5|10|0` · `?difficulty=0..3` · `?wave=N` (solo practice start) · `?room=ABCD` · `?solo=1` · `?bots=0..7` · `?lag=150` · `?name=Pip` · `?quality=low|medium|high` · `?server=ws://host:8787` · `?cam=overview|core|…` (fixed spectator camera) · `?autopilot=1` (headless smoke tests) · `?drive=1&vehicle=1|2` (autopilot drives) · `?view=first|third` · `?lod=0` (full-detail invaders at any distance). Split-screen: `split.html?players=2|3|4`.
+`?mode=coop|pvp|tdm|koth|cty` · `?map=bedroom|garden|garage|bathroom|toystore|park|dinoden` · `?mission=1` (Dino Stampede) · `?waves=5|10|0` · `?difficulty=0..3` · `?wave=N` (solo practice start) · `?room=ABCD` · `?solo=1` · `?bots=0..7` · `?lag=150` · `?name=Pip` · `?quality=low|medium|high` · `?server=ws://host:8787` · `?cam=overview|core|…` (fixed spectator camera) · `?autopilot=1` (headless smoke tests) · `?drive=1&vehicle=1|2` (autopilot drives) · `?view=first|third` · `?showcase=1` (solo co-op: every trap pre-built) · `?lod=0` (full-detail invaders at any distance). Split-screen: `split.html?players=2|3|4`.
 
 Server env: `PORT` (8787), `FILL_BOTS` (4), `FAKE_LAG_MS` (one-way per direction), `STATIC_DIR` (also serve the built client).
 
