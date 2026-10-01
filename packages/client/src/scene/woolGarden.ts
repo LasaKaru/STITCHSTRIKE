@@ -188,7 +188,7 @@ function tree(group: THREE.Group, b: Box, seed: number): THREE.Group {
     for (let k = 0; k < clumps; k++) {
       const rad = 2.0 + r() * 1.8;
       const a = r() * Math.PI * 2, d = r() * 6;
-      const geo = lumpy(rad, 0.12, seed * 100 + i * 20 + k, 3);
+      const geo = lumpy(rad, 0.3, seed * 100 + i * 20 + k, 3);
       geo.scale(1, 0.72 + r() * 0.2, 1).rotateY(r() * 6);
       geo.translate(end[0] + Math.cos(a) * d, end[1] + 1.5 + (r() - 0.3) * 4.5, end[2] + Math.sin(a) * d);
       byShade[(i + k) % greens.length].push(geo);
@@ -200,7 +200,7 @@ function tree(group: THREE.Group, b: Box, seed: number): THREE.Group {
     merged.computeBoundingSphere();
     const centre = merged.boundingSphere!.center.clone();
     merged.translate(-centre.x, -centre.y, -centre.z);
-    const canopy = mesh(merged, wool('felt', greens[k], 1.4));
+    const canopy = mesh(merged, wool('wound', greens[k], 2.4));
     canopy.position.copy(centre);
     addShellFuzz(canopy);
     g.add(canopy);

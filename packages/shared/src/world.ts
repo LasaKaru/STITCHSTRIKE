@@ -14,13 +14,14 @@ export interface Box {
   climb?: boolean;
 }
 
-export type MapId = 'bedroom' | 'garden' | 'garage' | 'bathroom' | 'toystore';
+export type MapId = 'bedroom' | 'garden' | 'garage' | 'bathroom' | 'toystore' | 'park';
 export const MAPS: { id: MapId; name: string; blurb: string }[] = [
   { id: 'bedroom', name: 'Sunbeam Bedroom', blurb: 'A messy knitted bedroom lit by one sunbeam.' },
   { id: 'garden', name: 'Back Garden', blurb: 'Lawn, trees, a house, a shed and a treehouse, all wool.' },
   { id: 'garage', name: 'The Garage', blurb: 'A family car, steel shelving, a workbench and a half-open door.' },
   { id: 'bathroom', name: 'The Bathroom', blurb: 'A bathtub to jump into, a climbable shower curtain and a toilet-tank perch.' },
   { id: 'toystore', name: 'The Toy Store Aisle', blurb: 'Towering shelves of boxed toys, a ball pit, a trolley and the checkout.' },
+  { id: 'park', name: 'The City Park', blurb: 'An autumn park: pom-pom trees, a knitted pond and bridge, a bandstand and the city all around.' },
 ];
 
 export interface World {
@@ -217,6 +218,7 @@ export function createWorld(map: MapId = 'bedroom'): World {
     case 'garage': return createGarage();
     case 'bathroom': return createBathroom();
     case 'toystore': return createToyStore();
+    case 'park': return createPark();
     default: return createBedroom();
   }
 }
@@ -224,4 +226,5 @@ export function createWorld(map: MapId = 'bedroom'): World {
 import { createBathroom } from './bathroom.ts';
 import { createGarage } from './garage.ts';
 import { createToyStore } from './toystore.ts';
+import { createPark } from './park.ts';
 import { createGarden } from './garden.ts';

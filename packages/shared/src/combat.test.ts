@@ -477,7 +477,7 @@ describe('traversal', () => {
   });
 
   it('map jump pads launch toys high', () => {
-    for (const map of ['bedroom', 'garden', 'garage', 'bathroom', 'toystore'] as const) {
+    for (const map of ['bedroom', 'garden', 'garage', 'bathroom', 'toystore', 'park'] as const) {
       const world = createWorld(map);
       for (const j of world.jumpPads) {
         const s = createPlayerState([j.x, j.y + 0.5, j.z]);
@@ -489,7 +489,7 @@ describe('traversal', () => {
   });
 
   it('every map hides collectibles', () => {
-    for (const map of ['bedroom', 'garden', 'garage', 'bathroom', 'toystore'] as const) {
+    for (const map of ['bedroom', 'garden', 'garage', 'bathroom', 'toystore', 'park'] as const) {
       const world = createWorld(map);
       expect(world.collectibles.length).toBeGreaterThanOrEqual(8);
       expect(new Set(world.collectibles.map((c) => c.id)).size).toBe(world.collectibles.length);

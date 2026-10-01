@@ -118,7 +118,7 @@ export function skyCard(w: number, h: number, top = 0x7aa6d8, bottom = 0xf6d6a8)
 
 let leafGeo: THREE.BufferGeometry | null = null;
 /** A felt maple-ish leaf, hanging point-down from the cord at its stem. */
-function leafGeometry(): THREE.BufferGeometry {
+export function leafGeometry(): THREE.BufferGeometry {
   if (leafGeo) return leafGeo;
   const s = new THREE.Shape();
   const pts: [number, number][] = [[0, 0], [0.18, -0.2], [0.45, -0.15], [0.35, -0.42], [0.55, -0.6], [0.2, -0.62], [0.12, -0.95], [0, -0.8], [-0.12, -0.95], [-0.2, -0.62], [-0.55, -0.6], [-0.35, -0.42], [-0.45, -0.15], [-0.18, -0.2]];
@@ -201,7 +201,7 @@ export function pomTree(height: number, seed: number, palette = [0xb5452a, 0xd97
   const crownY = height * 0.68;
   const crownR = height * 0.36;
   const byColor: THREE.BufferGeometry[][] = palette.map(() => []);
-  const count = 26 + Math.floor(r() * 10);
+  const count = 44 + Math.floor(r() * 14);
   for (let i = 0; i < count; i++) {
     // Pom-poms on and inside a squashed dome.
     const u = r(), w = r();
@@ -211,8 +211,9 @@ export function pomTree(height: number, seed: number, palette = [0xb5452a, 0xd97
     const px = Math.sin(phi) * Math.cos(theta) * d;
     const pz = Math.sin(phi) * Math.sin(theta) * d;
     const py = Math.cos(phi) * d * 0.75;
-    const rad = height * (0.08 + r() * 0.06);
-    const ball = lumpy(rad, 0.12, seed * 97 + i, 2);
+    const rad = height * (0.06 + r() * 0.045);
+    // Shaggy wound-yarn pom-poms, not smooth balls.
+    const ball = lumpy(rad, 0.3, seed * 97 + i, 3);
     ball.translate(px, crownY + py, pz);
     byColor[Math.floor(r() * palette.length)].push(ball);
   }
@@ -229,7 +230,7 @@ export function pomTree(height: number, seed: number, palette = [0xb5452a, 0xd97
     merged.computeBoundingSphere();
     const c = merged.boundingSphere!.center.clone();
     merged.translate(-c.x, -c.y, -c.z);
-    const m = mesh(merged, wool('felt', palette[k], 1.6));
+    const m = mesh(merged, wool('wound', palette[k], 2.4));
     m.position.copy(c);
     addShellFuzz(m);
     g.add(m);

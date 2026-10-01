@@ -22,6 +22,7 @@ import { SpoolHill } from './scene/spoolHill.ts';
 import { createPost, type Post } from './scene/post.ts';
 import { ViewModel } from './scene/viewModel.ts';
 import { buildWoolGarden } from './scene/woolGarden.ts';
+import { buildWoolPark } from './scene/woolPark.ts';
 import { buildWoolRoom } from './scene/woolRoom.ts';
 import { buildWoolGarage } from './scene/woolGarage.ts';
 import { buildWoolBathroom } from './scene/woolBathroom.ts';
@@ -106,7 +107,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(world.outdoor ? 0xf2d9b0 : 0x3a2a22);
 scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environmentIntensity = world.outdoor ? 0.5 : 0.22;
-const room = world.outdoor ? buildWoolGarden(scene, world, quality) : world.id === 'garage' ? buildWoolGarage(scene, world) : world.id === 'bathroom' ? buildWoolBathroom(scene, world) : world.id === 'toystore' ? buildWoolToyStore(scene, world) : buildWoolRoom(scene, world);
+const room = world.id === 'park' ? buildWoolPark(scene, world, quality) : world.outdoor ? buildWoolGarden(scene, world, quality) : world.id === 'garage' ? buildWoolGarage(scene, world) : world.id === 'bathroom' ? buildWoolBathroom(scene, world) : world.id === 'toystore' ? buildWoolToyStore(scene, world) : buildWoolRoom(scene, world);
 (window as unknown as { __stitchstrike: unknown }).__stitchstrike = { net, scene, renderer, get enemyRenderer() { return enemyRenderer; } };
 
 const camera = new THREE.PerspectiveCamera(settings.fov, window.innerWidth / window.innerHeight, 0.03, world.outdoor ? 900 : 200);
@@ -979,6 +980,12 @@ function frame(): void {
       core: [-8, 4, 10, -16, 1, 2],
       tub: [-6, 16, -2, -24, 2, -22],
       toilet: [8, 12, 0, 25, 10, -26],
+    } : world.id === 'park' ? {
+      overview: [46, 40, 52, 0, 4, 2],
+      core: [8, 5, -4, 0, 1, -12],
+      pond: [-26, 10, 30, 2, 2, 6],
+      bandstand: [18, 9, -6, 0, 9, -28],
+      balloon: [0, 6, 20, 0, 40, 60],
     } : world.id === 'toystore' ? {
       overview: [0, 26, 48, 0, 4, -20],
       core: [6, 4, -4, 0, 1, -12],

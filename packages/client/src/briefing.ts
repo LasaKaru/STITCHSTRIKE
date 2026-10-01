@@ -32,6 +32,11 @@ export const BRIEFINGS: Record<MapId, string[]> = {
     'Climb the shower curtain or the towel on the vanity for height. The toilet tank is the best perch in the house.',
     'Hop into the tub for cover, and do NOT fall in the loo!',
   ],
+  park: [
+    "The city park, soldiers. Leaves on the paths, ducks on the pond, and the Baron's toys at every gate.",
+    'The bandstand roof is the best perch in town: the spring by the steps will get you up there. The trees are climbable too.',
+    'Keep them off the bridge and away from the Heartspools. And nobody pops the parade balloon!',
+  ],
   toystore: [
     'The toy store, soldiers. The Baron is opening his factory-made recruits straight off the shelves!',
     'Climb the SALE banners to the top shelves and rain yarn down the aisle.',
