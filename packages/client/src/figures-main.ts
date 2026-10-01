@@ -6,6 +6,7 @@ import { bruteOptions, figureTemplate, grumbleOptions, gruntOptions, heldBlaster
 import { createScuttler, createMoth, poseMoth, poseScuttler, type CreatureInstance } from './figures/creatures.ts';
 import { beatDrum, createBoss, createDrone, createDrummer, createJack, createSnip, createTeeth, createTop, poseDrone, poseJack, poseSnip, poseTeeth, poseTop, soldierOptions } from './figures/invaders.ts';
 import { createPtero, createRaptor, createRex, createTrike, posePtero, poseTheropod, poseTrike, REX_SCALE } from './figures/dinos.ts';
+import { poseEmote } from './figures/emotes.ts';
 import { poseHumanoid } from './figures/humanoid.ts';
 import { addSkinnedShells, type FigureInstance } from './figures/rig.ts';
 import { createPost } from './scene/post.ts';
@@ -53,7 +54,7 @@ const camera = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.05, 1
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
-interface Entry { kind: 'human' | 'drummer' | 'jack' | 'scuttler' | 'moth' | 'teeth' | 'top' | 'drone' | 'snip' | 'raptor' | 'rex' | 'trike' | 'ptero'; inst: FigureInstance | CreatureInstance; gun?: THREE.Object3D; scale: number; x: number; hunch?: number }
+interface Entry { emote?: number; kind: 'human' | 'drummer' | 'jack' | 'scuttler' | 'moth' | 'teeth' | 'top' | 'drone' | 'snip' | 'raptor' | 'rex' | 'trike' | 'ptero'; inst: FigureInstance | CreatureInstance; gun?: THREE.Object3D; scale: number; x: number; hunch?: number }
 const cast: Entry[] = [];
 
 function addHuman(o: Parameters<typeof spawnFigure>[0], x: number, gunColor?: number, rifle = false, hunch = 0): FigureInstance {
@@ -99,6 +100,12 @@ if (focus === 'grumble') {
   cast[cast.length - 1].inst.root.scale.setScalar(1.3);
   put('drummer', createDrummer(), -2.7, 0, 0.3);
   put('jack', createJack(), 0.9, 0, -1.3);
+} else if (focus === 'emotes') {
+  // Wave, cheer, dance and bow.
+  [-2.1, -0.7, 0.7, 2.1].forEach((x, k) => {
+    addHuman(heroOptions([0x3a5da8, 0x8bcb3a, 0xd8262e, 0xe8742a][k], k), x);
+    cast[cast.length - 1].emote = k;
+  });
 } else if (focus === 'dinos') {
   // The Dino Stampede herd, Rex at the back.
   const put = (kind: Entry['kind'], inst: FigureInstance, x: number, y = 0, z = 0, scale = 1) => { inst.root.position.set(x, y, z); scene.add(inst.root); cast.push({ kind, inst, scale, x }); };
@@ -126,6 +133,7 @@ const CAM: Record<string, [number, number, number, number, number, number]> = {
   creatures: [-0.4, 1.0, -3.2, 0, 0.4, 0],
   army: [0.4, 3.4, -11.5, 0.2, 2.5, 1],
   dinos: [-1.5, 3.6, -11, 0.3, 2.2, 1.5],
+  emotes: [0, 1.3, -5.2, 0, 0.8, 0],
   recruits: [-0.9, 1.3, -3.2, 0, 0.7, 0],
 };
 const camParam = params.get('cam')?.split(',').map(Number);
@@ -160,6 +168,7 @@ function frame(): void {
         hunch: e.hunch, downed: state.pose === 'downed' ? 1 : 0,
       }, e.scale, e.gun);
       if (e.gun) e.gun.visible = state.pose !== 'idle' && state.pose !== 'downed';
+      if (e.emote !== undefined) poseEmote(e.inst as FigureInstance, e.emote, 0.6 + (t % 1.2));
     } else if (e.kind === 'drummer') {
       poseHumanoid(e.inst as FigureInstance, { t, speed: 0.45, phase: t * 6.5, pitch: 0, crouch: 0, airborne: false, aiming: false }, 0.95);
       beatDrum(e.inst as FigureInstance, t);
@@ -184,7 +193,7 @@ function frame(): void {
     } else {
       poseMoth(e.inst as CreatureInstance, t);
     }
-    if (state.turntable && focus !== 'army' && focus !== 'dinos') e.inst.root.rotation.y = Math.sin(t * 0.4) * 0.9;
+    if (state.turntable && focus !== 'army' && focus !== 'dinos' && focus !== 'emotes') e.inst.root.rotation.y = Math.sin(t * 0.4) * 0.9;
   }
   controls.update();
   post.render(t);

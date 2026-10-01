@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { TICK_RATE } from './constants.ts';
 import { Phase, ShotKind } from './coop.ts';
 import { ENEMIES, EnemyType, type Enemy } from './enemies.ts';
-import { Buttons, clonePlayerState, createPlayerState, fitsAt, stepPlayer, type InputCmd } from './movement.ts';
+import { Action, Buttons, clonePlayerState, createPlayerState, fitsAt, stepPlayer, type InputCmd } from './movement.ts';
 import { decodeSnapshot, encodeSnapshot } from './protocol.ts';
 import { Room } from './room.ts';
 import { VehicleKind, VEHICLES } from './vehicles.ts';
@@ -148,5 +148,22 @@ describe('vehicles', () => {
     expect(snap.players[0].car).toBe(VehicleKind.Jeep);
     expect(snap.vehicles).toHaveLength(1);
     expect(snap.vehicles![0].kind).toBe(VehicleKind.Tank);
+  });
+});
+
+describe('emotes', () => {
+  it('an emote action tells everyone, with a cooldown, and never builds anything', () => {
+    const room = new Room(createBedroom(), 'coop');
+    const p = room.addPlayer('Waver')!;
+    const buttons0 = room.coop!.buttons;
+    const send = (seq: number, action: number) => { room.queueInputs(p.id, [{ ...cmd(seq, 0), action }]); room.update(); };
+    send(1, Action.Emote + 2);
+    expect(room.drainEvents().filter((e) => e.type === 'emote')).toEqual([{ type: 'emote', id: p.id, kind: 2 }]);
+    send(2, Action.Emote);
+    expect(room.drainEvents().some((e) => e.type === 'emote')).toBe(false);
+    for (let i = 0; i < TICK_RATE * 2; i++) room.update();
+    send(3, Action.Emote + 3);
+    expect(room.drainEvents().some((e) => e.type === 'emote' && e.kind === 3)).toBe(true);
+    expect(room.coop!.buttons).toBe(buttons0);
   });
 });

@@ -4,7 +4,7 @@ import {
   BUILD_RANGE, Buildable, BUILDABLES, Buttons, createWorld, ENEMIES, ENEMY_INTERP_DELAY_MS, eyePosition, lookDirection, MAX_PITCH,
   pelletDirections, Phase, PLAYER, ENTER_RANGE, VEHICLES, VehicleKind, rayBox, rayPlayer, rayWorld, TURRET, TURRET_SHOT_BASE, WEAPONS,
   GRAPPLE, KOTH, MAPS, TEAM_COLORS, TEAM_NAMES, type GameMode, type MapId, type PlayerState, type Vec3,
-  Action, CTY, ctyBases, YarnState, DECK, DIFFICULTIES, Mission, MISSIONS, ENEMY_SHOT_ID, EnemyType, launchProjectile, LAUNCHER, MAX_TIER, PICKUPS, PickupKind, ShotKind, upgradeCost, WEAPON_COUNT,
+  Action, EMOTES, CTY, ctyBases, YarnState, DECK, DIFFICULTIES, Mission, MISSIONS, ENEMY_SHOT_ID, EnemyType, launchProjectile, LAUNCHER, MAX_TIER, PICKUPS, PickupKind, ShotKind, upgradeCost, WEAPON_COUNT,
 } from '@stitchstrike/shared';
 import { CombatMusic, type Intensity } from './audio/combatMusic.ts';
 import { PickupsView } from './scene/pickupsView.ts';
@@ -21,7 +21,10 @@ import { Fx } from './scene/fx.ts';
 import { YarnRopes, type RopeSpec } from './scene/yarnRopes.ts';
 import { SpoolHill } from './scene/spoolHill.ts';
 import { ShoulderCam } from './scene/shoulderCam.ts';
+import { EMOTE_SECONDS } from './figures/emotes.ts';
 import { Radar, type Blip } from './radar.ts';
+import { DamageNumbers } from './damageNumbers.ts';
+import { Streaks } from './streaks.ts';
 import { YarnBalls } from './scene/yarnBalls.ts';
 import { createPost, type Post } from './scene/post.ts';
 import { ViewModel } from './scene/viewModel.ts';
@@ -266,7 +269,14 @@ net.onShot = (s) => {
   }
   if (s.id === net.id) {
     // Our own shots were drawn at fire time by prediction; the server's verdict drives hit markers.
-    if (s.hit || s.enemy) hitMarker(s.head);
+    if (s.hit || s.enemy) {
+      hitMarker(s.head);
+      if (settings.damageNumbers) {
+        const w = WEAPONS[net.predicted?.weapon ?? 0];
+        const powered = net.me()?.powered ? 1.5 : 1;
+        damageNumbers.add(to, w.damage * (s.head ? w.headshotMultiplier : 1) * powered, s.head);
+      }
+    }
     return;
   }
   let from: THREE.Vector3;
@@ -354,13 +364,18 @@ net.onEvent = (e) => {
       const v = net.roster.get(e.victim)?.name ?? '?';
       const a = e.attacker ? net.roster.get(e.attacker)?.name ?? '?' : `a ${ENEMIES[e.enemyType ?? 0]?.name ?? 'toy'}`;
       feed(`${escapeHtml(a)} <span>unravelled</span> ${escapeHtml(v)}`, e.attacker === net.id || e.victim === net.id);
-      if (e.victim === net.id) sfx.play('hurt');
+      if (e.victim === net.id) {
+        sfx.play('hurt');
+        const lost = streaks.died();
+        if (lost >= (mode === 'coop' ? 25 : 5)) popup(`Streak ended at ${lost}`);
+      }
+      if (e.attacker === net.id && mode !== 'coop') announceStreak(streaks.kill(performance.now() / 1000));
       if (e.attacker === net.id && mode !== 'coop') { session.kills++; progress(XP.pvpKo, 5, { kills: 1 }, { medals: session.kills >= 25 ? ['duelist'] : [] }); }
       renderScoreboard();
       break;
     }
     case 'kill':
-      if (e.by === net.id) { sfx.play('kill'); popup(`+${e.reward} buttons`); session.kills++; progress(XP.kill, e.enemyType === EnemyType.Boss ? 100 : 1, { kills: 1 }); }
+      if (e.by === net.id) { sfx.play('kill'); popup(`+${e.reward} buttons`); announceStreak(streaks.kill(performance.now() / 1000)); session.kills++; progress(XP.kill, e.enemyType === EnemyType.Boss ? 100 : 1, { kills: 1 }); }
       break;
     case 'phase':
       if (e.phase === Phase.Wave) { banner(`WAVE ${e.wave} INCOMING!`); sfx.play('wave'); resultsCard(null); if (e.wave % 2 === 1 || e.wave === 1) briefing.say('baron', mission === Mission.Stampede ? nextDinoTaunt() : nextTaunt()); }
@@ -421,6 +436,12 @@ net.onEvent = (e) => {
       if (e.id === net.id) { banner('RE-STITCHED!', 'good'); sfx.play('revived'); }
       else if (e.by === net.id) { popup('Teammate re-stitched!'); sfx.play('revived'); session.revives++; progress(XP.revive, 10, { revives: 1 }); }
       if (e.by) feed(`${escapeHtml(net.roster.get(e.by)?.name ?? '?')} <span>re-stitched</span> ${escapeHtml(net.roster.get(e.id)?.name ?? '?')}`, e.by === net.id || e.id === net.id);
+      break;
+    }
+    case 'emote': {
+      const a = e.id === net.id ? ownAvatar : avatars.get(e.id);
+      a?.emote(e.kind);
+      if (e.id === net.id) emoteCam = EMOTE_SECONDS;
       break;
     }
     case 'vehicle':
@@ -632,9 +653,21 @@ function deckOpen(): boolean {
   return deckToggled || (onPad && net.coop?.phase === Phase.Build);
 }
 
+// Emotes: tap the emote key to wave, or hold it and press 1-4.
+let emoteHeld = false;
+let emotePicked = false;
+/** Seconds left of the brief third-person look at your own emote. */
+let emoteCam = 0;
+document.addEventListener('keyup', (e) => {
+  if (e.code !== K.emote || !emoteHeld) return;
+  if (!emotePicked) pendingAction = Action.Emote;
+  emoteHeld = false;
+});
 document.addEventListener('keydown', (e) => {
   if (document.pointerLockElement !== renderer.domElement || e.repeat) return;
   const digit = e.code.startsWith('Digit') ? Number(e.code.slice(5)) : 0;
+  if (e.code === K.emote) { emoteHeld = true; emotePicked = false; return; }
+  if (emoteHeld && digit >= 1 && digit <= EMOTES.length) { pendingAction = Action.Emote + digit - 1; emotePicked = true; return; }
   if (digit >= 1 && deckOpen() && digit <= DECK.length) {
     lastBuild = DECK[digit - 1];
     pendingAction = lastBuild;
@@ -752,6 +785,13 @@ if (mode === 'coop') {
 }
 
 let hitTimer = 0;
+const damageNumbers = new DamageNumbers(document.body);
+const streaks = new Streaks(mode === 'coop');
+function announceStreak(callout: string | null): void {
+  if (!callout) return;
+  banner(callout, 'good', 1800);
+  sfx.play('collect', 0.8);
+}
 function hitMarker(head: boolean): void {
   hud.hit.classList.toggle('head', head);
   hud.hit.style.opacity = '1';
@@ -1256,7 +1296,9 @@ function frame(): void {
     camera.lookAt(eye.x + back[0] * 6, eye.y + back[1] * 6 + 0.6, eye.z + back[2] * 6);
   } else if (p && !fixedCam) {
     // First person, third person over the shoulder, or easing between them.
-    camera.position.copy(shoulderCam.update(dt, thirdPerson, p.weapon === 2, eye, yaw, pitch, world.boxes));
+    // Emoting in first person swings the camera round for a look at yourself.
+    emoteCam = ownAvatar?.emoting ? Math.max(0, emoteCam - dt) : 0;
+    camera.position.copy(shoulderCam.update(dt, thirdPerson || emoteCam > 0, p.weapon === 2, eye, yaw, pitch, world.boxes));
     // Bend the real aim so the shot lands under the crosshair (one frame behind, which is invisible).
     const a = shoulderCam.aim(eye, yaw, pitch, (o, d, range) => predictedHit(o, d, range).to.distanceTo(new THREE.Vector3(...o)));
     aimFix.yaw = wrapAngle(a.yaw - yaw);
@@ -1267,6 +1309,12 @@ function frame(): void {
     camera.position.copy(eye);
   }
   if (photo.on) flyPhoto(dt);
+  else {
+    // A gentle FOV kick at a sprint (and in a speeding jeep) sells the speed.
+    const fast = p ? Math.max(0, Math.min(1, ((p.car ? Math.abs(p.carSpeed) / 3 : Math.hypot(p.vx, p.vz)) - PLAYER.runSpeed) / (PLAYER.sprintSpeed - PLAYER.runSpeed))) : 0;
+    const want = settings.fov + fast * (settings.reduceShake ? 2 : 6);
+    if (Math.abs(camera.fov - want) > 0.05) { camera.fov += (want - camera.fov) * Math.min(1, dt * 6); camera.updateProjectionMatrix(); }
+  }
   if (!p || driving || fixedCam || !shoulderCam.third) { aimFix.yaw = 0; aimFix.pitch = 0; }
   const seeSelf = shoulderCam.blend > 0.35 || photo.on;
   viewModel.group.visible = !!p && !p.downed && !seeSelf && !fixedCam && !driving;
@@ -1354,6 +1402,7 @@ function frame(): void {
 
   radarTimer -= dt;
   if (radarTimer <= 0 && settings.radar && !photo.on) { radarTimer = 1 / 15; updateRadar(); }
+  damageNumbers.update(dt, camera, innerWidth, innerHeight);
   hudTimer -= dt;
   if (hudTimer <= 0) {
     hudTimer = 0.1;

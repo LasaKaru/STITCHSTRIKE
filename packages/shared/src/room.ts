@@ -1,7 +1,7 @@
 import { HISTORY_MS, INPUT_DT, MAX_PLAYERS, MAX_REWIND_MS, PLAYER, TICK_DT, TICK_RATE } from './constants.ts';
 import { BUILDABLES, CORE, CoopDirector, Phase, ShotKind, type CoopHost, type CoopOptions } from './coop.ts';
 import { ENEMIES, NavGrid, type Enemy } from './enemies.ts';
-import { Action, Buttons, createPlayerState, eyePosition, fitsAt, lookDirection, stepPlayer, type InputCmd, type PlayerState } from './movement.ts';
+import { Action, Buttons, createPlayerState, EMOTE_COOLDOWN, EMOTES, eyePosition, fitsAt, lookDirection, stepPlayer, type InputCmd, type PlayerState } from './movement.ts';
 import { ENTER_RANGE, RAM_COOLDOWN, RAM_MIN_SPEED, VEHICLES, type NetVehicle } from './vehicles.ts';
 import { DROP_CHANCE, DROP_SECONDS, MAX_DROPS, PICKUP_RADIUS, PickupKind, PICKUPS, POWER_MULTIPLIER, type Drop } from './pickups.ts';
 import { isTeamMode, type CoopState, type GameEvent, type GameMode, type Look, type NetDrop, type NetPlayer, type NetProjectile, type RosterEntry, type Shot, type Snapshot } from './protocol.ts';
@@ -18,6 +18,8 @@ export interface RoomPlayer {
   bot: boolean;
   /** Team Deathmatch side. */
   team: number;
+  /** Seconds until this toy may emote again. */
+  emoteCd: number;
   look?: Look;
   state: PlayerState;
   health: number;
@@ -155,7 +157,7 @@ export class Room {
       id, name: name.slice(0, 16) || `Toy ${id}`, color, bot, team, look,
       state: createPlayerState([0, 0, 0]),
       health: PLAYER.maxHealth, armor: 0, alive: true, respawnTimer: 0, sinceHurt: 0, protect: 0, bleed: 0, revive: 0, power: 0,
-      kos: 0, deaths: 0, revives: 0, queue: [], lastSeq: 0, budget: 0,
+      kos: 0, deaths: 0, revives: 0, queue: [], lastSeq: 0, budget: 0, emoteCd: 0,
     };
     this.players.set(id, player);
     this.spawn(player);
@@ -200,6 +202,7 @@ export class Room {
 
   update(): void {
     this.tick += 1;
+    for (const p of this.players.values()) p.emoteCd = Math.max(0, p.emoteCd - TICK_DT);
     const coopWasOver = this.coop && (this.coop.phase === Phase.Won || this.coop.phase === Phase.Lost);
     for (const p of this.players.values()) {
       p.budget = Math.min(MAX_BUDGET, p.budget + TICK_DT);
@@ -217,7 +220,12 @@ export class Room {
         }
         const { fired, weapon } = stepPlayer(p.state, cmd, this.world);
         if (fired) this.fire(p, cmd, weapon);
-        if (this.coop && cmd.action && !p.state.downed) this.coopAction(p, cmd.action);
+        if (cmd.action >= Action.Emote && cmd.action < Action.Emote + EMOTES.length) {
+          if (p.emoteCd <= 0 && !p.state.downed && !p.state.car) {
+            this.events.push({ type: 'emote', id: p.id, kind: cmd.action - Action.Emote });
+            p.emoteCd = EMOTE_COOLDOWN;
+          }
+        } else if (this.coop && cmd.action && !p.state.downed) this.coopAction(p, cmd.action);
       }
       if (!p.alive) {
         p.respawnTimer -= TICK_DT;

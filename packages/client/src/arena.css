@@ -222,3 +222,12 @@ body.photo #photo-hint {
 body.coop #radar { bottom: 140px; }
 body.no-radar #radar { display: none; }
 @media (max-height: 640px) { #radar { width: 120px; height: 120px; } }
+
+/* Floating damage numbers. */
+.dmgnum {
+  position: fixed; left: 0; top: 0; pointer-events: none; z-index: 6;
+  font: 900 18px/1 "Trebuchet MS", system-ui, sans-serif; color: #fff6e0;
+  text-shadow: 0 2px 0 #5a3a22, 0 0 6px rgba(0,0,0,.45); -webkit-text-stroke: 1px #5a3a22;
+}
+.dmgnum.head { color: #ffd24a; font-size: 22px; }
+body.photo .dmgnum { display: none; }

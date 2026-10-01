@@ -8,6 +8,7 @@ import { createGlueGun, createHook, createLance, createLauncher, createStaticSoc
 import { dressGun, swingCharm } from './charms.ts';
 import { poseHumanoid } from '../figures/humanoid.ts';
 import type { FigureInstance } from '../figures/rig.ts';
+import { EMOTE_SECONDS, poseEmote } from '../figures/emotes.ts';
 
 /**
  * A networked player: a sculpted, rigged knitted action figure in the player's
@@ -20,6 +21,10 @@ export interface Avatar {
   update(dt: number, t: number, speed: number, pitch: number, crouch: boolean, airborne: boolean, downed: boolean): void;
   /** Show the weapon this toy has equipped (0..6). */
   setWeapon(i: number): void;
+  /** Play an emote (EMOTES index); walking, jumping or going down cancels it. */
+  emote(kind: number): void;
+  /** True while an emote is playing. */
+  readonly emoting: boolean;
   /** World position of the held weapon's muzzle (third-person tracers and flashes). */
   muzzle(out?: THREE.Vector3): THREE.Vector3;
 }
@@ -70,20 +75,27 @@ export function createAvatar(color: number, variant = 0, look?: Look): Avatar {
   let phase = Math.random() * 6;
   let down = 0;
   let crouchBlend = 0;
+  let emoteKind = 0;
+  let emoteT = EMOTE_SECONDS;
   return {
     root,
     update(dt, t, speed, pitch, crouch, airborne, downed) {
       phase += dt * speed * 22;
       down += ((downed ? 1 : 0) - down) * Math.min(1, dt * 6);
       crouchBlend += ((crouch ? 1 : 0) - crouchBlend) * Math.min(1, dt * 10);
-      poseHumanoid(figure, { t, speed, phase, pitch, crouch: crouchBlend * 0.6, airborne, aiming: down < 0.5, downed: down }, 1, gun);
-      gun.visible = down < 0.5;
+      if (emoteT < EMOTE_SECONDS && (speed > 0.35 || airborne || downed)) emoteT = EMOTE_SECONDS;
+      const emoting = emoteT < EMOTE_SECONDS;
+      poseHumanoid(figure, { t, speed, phase, pitch: emoting ? 0 : pitch, crouch: crouchBlend * 0.6, airborne, aiming: down < 0.5 && !emoting, downed: down }, 1, gun);
+      if (emoting) { poseEmote(figure, emoteKind, emoteT); emoteT += dt; }
+      gun.visible = down < 0.5 && !emoting;
       swingCharm(holderFor(weapon).children[0], t, Math.min(1, speed));
       // Unravelled: topple onto the back.
       tip.rotation.x = -down * 1.45;
       tip.position.y = down * 0.12;
     },
     setWeapon,
+    emote(kind: number) { emoteKind = kind; emoteT = 0; },
+    get emoting() { return emoteT < EMOTE_SECONDS; },
     muzzle(out = new THREE.Vector3()) {
       const h = holderFor(weapon);
       root.updateWorldMatrix(true, true);

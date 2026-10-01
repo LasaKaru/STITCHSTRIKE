@@ -91,6 +91,8 @@ export type GameEvent =
   | { type: 'ctyWin'; team: number }
   /** A toy climbed into (enter) or out of a vehicle. */
   | { type: 'vehicle'; id: number; kind: number; enter: boolean }
+  /** A toy emoted (EMOTES index). */
+  | { type: 'emote'; id: number; kind: number }
   | { type: 'snap'; pad: number };
 
 export type ClientText =

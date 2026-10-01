@@ -2,7 +2,7 @@ import { isTeamMode } from './protocol.ts';
 import { INPUT_RATE, TICK_RATE } from './constants.ts';
 import { Buildable, BUILDABLES, DECK, MAX_TIER, Phase, upgradeCost } from './coop.ts';
 import { ENEMIES } from './enemies.ts';
-import { Buttons, eyePosition, type InputCmd } from './movement.ts';
+import { Action, Buttons, EMOTES, eyePosition, type InputCmd } from './movement.ts';
 import { PickupKind } from './pickups.ts';
 import { CTY, YarnState } from './cty.ts';
 import { PLAYER } from './constants.ts';
@@ -246,6 +246,8 @@ export class Bot {
     if (this.reviving(me)) { buttons |= Buttons.Use; buttons &= ~(Buttons.Forward | Buttons.Left | Buttons.Right | Buttons.Back | Buttons.Fire); }
 
     this.seq += 1;
+    // Now and then an idle bot waves, cheers, dances or bows.
+    if (!target && !this.action && sub === 0 && Math.random() < 0.0012) this.action = Action.Emote + Math.floor(Math.random() * EMOTES.length);
     const action = this.action;
     this.action = 0;
     return {

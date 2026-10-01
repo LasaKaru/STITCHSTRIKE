@@ -11,7 +11,7 @@ export const BIND_ACTIONS = {
   forward: 'Move forward', back: 'Move back', left: 'Strafe left', right: 'Strafe right',
   jump: 'Jump', sprint: 'Sprint', crouch: 'Crouch', reload: 'Reload', use: 'Re-stitch (hold)', grapple: 'Yarn-swing (hold)',
   deck: 'Build deck', rebuild: 'Build last trap', recycle: 'Recycle trap', ready: 'Ready up', camera: 'Camera view',
-  shoulder: 'Swap shoulder (3rd person)', photo: 'Photo mode',
+  shoulder: 'Swap shoulder (3rd person)', photo: 'Photo mode', emote: 'Emote (tap: wave, hold + 1-4: pick)',
 } as const;
 export type BindAction = keyof typeof BIND_ACTIONS;
 
@@ -19,7 +19,7 @@ export const DEFAULT_KEYS: Record<BindAction, string> = {
   forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD',
   jump: 'Space', sprint: 'ShiftLeft', crouch: 'KeyC', reload: 'KeyR', use: 'KeyE', grapple: 'KeyX',
   deck: 'KeyB', rebuild: 'KeyQ', recycle: 'KeyG', ready: 'Enter', camera: 'KeyV',
-  shoulder: 'KeyH', photo: 'KeyP',
+  shoulder: 'KeyH', photo: 'KeyP', emote: 'KeyT',
 };
 
 /** "KeyW" -> "W", "ShiftLeft" -> "Left Shift", for menus and hints. */

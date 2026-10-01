@@ -32,7 +32,14 @@ export const Action = {
   Sell: 20,
   /** Co-op: vote to skip the rest of the build phase. */
   Ready: 21,
+  /** Emotes: Emote + EMOTES index (any mode). */
+  Emote: 30,
 } as const;
+
+/** Emotes everyone sees: a wave, a cheer, a little dance and a bow. */
+export const EMOTES = ['Wave', 'Cheer', 'Dance', 'Bow'] as const;
+/** Seconds between emotes (no spamming). */
+export const EMOTE_COOLDOWN = 1.5;
 
 export interface InputCmd {
   seq: number;
