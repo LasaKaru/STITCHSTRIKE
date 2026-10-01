@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import {
-  BUILDABLES, Buttons, createWorld, DIFFICULTIES, ENEMIES, eyePosition, lookDirection, MAPS, MAX_PITCH, pelletDirections, Phase, PLAYER,
+  BUILDABLES, Buttons, createWorld, DIFFICULTIES, ENEMIES, eyePosition, lookDirection, MAPS, VEHICLES, MAX_PITCH, pelletDirections, Phase, PLAYER,
   randomLook, rayWorld, ShotKind, TURRET, TURRET_SHOT_BASE, WEAPONS, ENEMY_SHOT_ID, RoomHost, DECK,
   KOTH, type GameMode, type MapId, type PlayerState,
 } from '@stitchstrike/shared';
@@ -19,6 +19,7 @@ import { CoopProps } from './scene/coopProps.ts';
 import { EnemyRenderer, type EnemyView } from './scene/enemyRenderer.ts';
 import { Fx } from './scene/fx.ts';
 import { PickupsView } from './scene/pickupsView.ts';
+import { VehicleView, type DrivenVehicle } from './scene/vehicleView.ts';
 import { ViewModel } from './scene/viewModel.ts';
 import { buildWoolGarage } from './scene/woolGarage.ts';
 import { buildWoolBathroom } from './scene/woolBathroom.ts';
@@ -72,6 +73,7 @@ const coopProps = mode === 'coop' ? new CoopProps(scene, world) : null;
 const enemyRenderer = mode === 'coop' ? new EnemyRenderer(scene, [palette(settings.colorblind).healthLow, palette(settings.colorblind).healthHigh]) : null;
 const fx = new Fx(scene);
 const pickups = new PickupsView(scene, world);
+const vehicles = new VehicleView(scene);
 const sfx = new Sfx();
 sfx.volume = settings.sfxVolume;
 const music = new CombatMusic();
@@ -376,9 +378,17 @@ function frame(): void {
       l.camera.position.set(e[0] + l.net.correction.x, e[1] + l.net.correction.y, e[2] + l.net.correction.z);
       if (fx.shake > 0.01) l.camera.position.x += (Math.random() - 0.5) * fx.shake * (settings.reduceShake ? 0.03 : 0.2);
       l.camera.rotation.set(l.pitch, l.yaw, 0);
+      if (p.car) {
+        // Driving: a chase camera behind the aim.
+        const back = lookDirection(l.yaw, Math.min(l.pitch, 0.2) - 0.25);
+        const c = l.camera.position.clone();
+        const dist = Math.min(7, rayWorld([c.x, c.y, c.z], [-back[0], -back[1], -back[2]], world.boxes, 9) - 0.4);
+        l.camera.position.set(c.x - back[0] * dist, c.y - back[1] * dist + 0.8, c.z - back[2] * dist);
+        l.camera.lookAt(c.x + back[0] * 6, c.y + back[1] * 6 + 0.6, c.z + back[2] * 6);
+      }
       if (p.weapon !== l.lastWeapon) { l.viewModel.setWeapon(p.weapon); l.lastWeapon = p.weapon; }
       l.viewModel.update(dt, Math.hypot(p.vx, p.vz), p.onGround);
-      l.viewModel.group.visible = !p.downed;
+      l.viewModel.group.visible = !p.downed && !p.car;
     } else if (main.latest) {
       l.camera.position.set(Math.sin(t * 0.2 + l.index * 3) * 20, 18, Math.cos(t * 0.2 + l.index * 3) * 20);
       l.camera.lookAt(0, 1, 0);
@@ -388,12 +398,19 @@ function frame(): void {
 
   // Everyone's avatars, from player 1's view (local toys use their exact predicted state).
   ropeSpecs.length = 0;
+  const driven: DrivenVehicle[] = [];
   for (const [id, a] of avatars) {
     const l = locals.find((x) => x.net.id === id);
     if (l) {
       const p = l.net.predicted;
       a.root.visible = !!p;
-      if (p) {
+      if (p?.car) {
+        const v = VEHICLES[p.car];
+        driven.push({ key: id, kind: p.car, x: p.x, y: p.y, z: p.z, yaw: p.carYaw, aimYaw: l.yaw, speed: Math.abs(p.carSpeed) });
+        a.root.position.set(p.x, p.y + v.seatHeight - PLAYER.eyeHeight + 0.1, p.z);
+        a.root.rotation.y = l.yaw;
+        a.update(dt, t, 0, l.pitch, true, false, false);
+      } else if (p) {
         a.root.position.set(p.x, p.y, p.z);
         a.root.rotation.y = l.yaw;
         a.update(dt, t, Math.hypot(p.vx, p.vz) / PLAYER.runSpeed, l.pitch, false, !p.onGround, p.downed);
@@ -403,7 +420,13 @@ function frame(): void {
     }
     const r = main.remotes(now).find((x) => x.id === id);
     a.root.visible = !!r;
-    if (r) {
+    if (r?.car && r.alive) {
+      const v = VEHICLES[r.car];
+      driven.push({ key: id, kind: r.car, x: r.x, y: r.y, z: r.z, yaw: r.carYaw, aimYaw: r.yaw, speed: 8 });
+      a.root.position.set(r.x, r.y + v.seatHeight - PLAYER.eyeHeight + 0.1, r.z);
+      a.root.rotation.y = r.yaw;
+      a.update(dt, t, 0, r.pitch, true, false, false);
+    } else if (r) {
       a.root.position.set(r.x, r.y, r.z);
       a.root.rotation.y = r.yaw;
       a.update(dt, t, 0.6, r.pitch, r.crouch, false, !r.alive || r.downed);
@@ -411,6 +434,7 @@ function frame(): void {
     }
   }
   yarnRopes.update(ropeSpecs, dt);
+  vehicles.update(main.vehicles(), driven, dt);
   spoolHill?.update(main.koth, t, dt);
 
   if (enemyRenderer) {

@@ -2,12 +2,13 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import {
   BUILD_RANGE, Buildable, BUILDABLES, Buttons, createWorld, ENEMIES, ENEMY_INTERP_DELAY_MS, eyePosition, lookDirection, MAX_PITCH,
-  pelletDirections, Phase, PLAYER, rayBox, rayPlayer, rayWorld, TURRET, TURRET_SHOT_BASE, WEAPONS,
+  pelletDirections, Phase, PLAYER, ENTER_RANGE, VEHICLES, VehicleKind, rayBox, rayPlayer, rayWorld, TURRET, TURRET_SHOT_BASE, WEAPONS,
   GRAPPLE, KOTH, MAPS, TEAM_COLORS, TEAM_NAMES, type GameMode, type MapId, type PlayerState, type Vec3,
   Action, DECK, DIFFICULTIES, ENEMY_SHOT_ID, EnemyType, launchProjectile, LAUNCHER, MAX_TIER, PICKUPS, PickupKind, ShotKind, upgradeCost, WEAPON_COUNT,
 } from '@stitchstrike/shared';
 import { CombatMusic, type Intensity } from './audio/combatMusic.ts';
 import { PickupsView } from './scene/pickupsView.ts';
+import { VehicleView, type DrivenVehicle } from './scene/vehicleView.ts';
 import { Sfx } from './audio/sfx.ts';
 import { keyLabel, loadSettings, palette } from './settings.ts';
 import { setPresence, syncAchievements, unlockAchievement } from './platform.ts';
@@ -39,7 +40,7 @@ import { QUALITY_LAYERS, setWoolLayers, updateShellLod } from './wool/woolMateri
  * STITCHSTRIKE: wool toys defending the Heartspools (co-op) or fighting each
  * other (PvP) in a fully knitted bedroom. Server-authoritative multiplayer.
  *
- * URL params: ?mode=coop|pvp  ?solo=1 (server in a Web Worker)  ?room=CODE  ?bots=N  ?lag=RTT_MS
+ * URL params: ?mode=coop|pvp  ?solo=1 (server in a Web Worker)  ?room=CODE  ?bots=N  ?lag=RTT_MS  ?drive=1[&vehicle=K] (autopilot drives)
  *             ?name=Pip  ?server=ws://host:port  ?quality=low|medium|high  ?autopilot=1 (headless tests)
  */
 
@@ -395,6 +396,10 @@ net.onEvent = (e) => {
       if (e.by) feed(`${escapeHtml(net.roster.get(e.by)?.name ?? '?')} <span>re-stitched</span> ${escapeHtml(net.roster.get(e.id)?.name ?? '?')}`, e.by === net.id || e.id === net.id);
       break;
     }
+    case 'vehicle':
+      sfx.play(e.enter ? 'engine' : 'mantle', 0.9);
+      if (e.id === net.id && e.enter) popup(`${VEHICLES[e.kind].name}! ${VEHICLES[e.kind].cannonRate ? 'Click to fire yarn shells' : 'Floor it into the invaders'}`);
+      break;
     case 'pickup':
       if (e.id === net.id) {
         sfx.play('pickup');
@@ -569,6 +574,20 @@ function sampleButtons(): number {
 
 /** Headless test driver: aims at the nearest enemy (co-op) or spins (PvP), readies up and fires. */
 function autopilotButtons(now: number, p: PlayerState | null): number {
+  // ?drive=1: walk to the nearest parked vehicle, climb in and take it for a spin.
+  if (params.get('drive') === '1' && p) {
+    if (p.car) return Buttons.Forward | (Math.sin(now / 2500) > 0.3 ? Buttons.Left : 0) | (now % 1500 < 100 ? Buttons.Fire : 0);
+    const want = Number(params.get('vehicle') ?? 0);
+    const v = VehicleView.nearest(net.vehicles().filter((q) => !want || q.kind === want), p.x, p.y, p.z, 200);
+    if (v) {
+      yaw = Math.atan2(-(v.x - p.x), -(v.z - p.z));
+      pitch = -0.1;
+      if (Math.hypot(v.x - p.x, v.z - p.z) < ENTER_RANGE - 0.5) return now % 400 < 200 ? Buttons.Use : 0;
+      // Blocked: hop (a mantle catches ledges) and sidestep around it.
+      const stuck = Math.hypot(p.vx, p.vz) < 1;
+      return Buttons.Forward | (stuck ? Buttons.Jump | (now % 3000 < 1500 ? Buttons.Right : Buttons.Left) : 0);
+    }
+  }
   let b = Buttons.Fire;
   if (Math.sin(now / 900) > 0.9) pendingAction = Action.Ready;
   // Cycle the arsenal so every weapon gets exercised.
@@ -687,7 +706,7 @@ function updateHud(): void {
   const s = net.predicted;
   const w = WEAPONS[s?.weapon ?? 0];
   const mag = s ? s.mags[s.weapon] ?? 0 : 0;
-  hud.ammo.textContent = s ? (s.reload > 0 ? 'Rewinding yarn…' : `${mag} / ${w.magazine}`) : '';
+  hud.ammo.textContent = s?.car ? (VEHICLES[s.car].cannonRate ? 'Cannon ∞' : `${Math.round(Math.abs(s.carSpeed) * 3.6)} km/h`) : s ? (s.reload > 0 ? 'Rewinding yarn…' : `${mag} / ${w.magazine}`) : '';
   hud.slots.innerHTML = WEAPONS.map((x, i) => `<span class="${i === (s?.weapon ?? 0) ? 'on' : ''}">${i + 1}<span class="n"> ${x.name}</span></span>`).join('');
 
   // Down and re-stitch.
@@ -705,6 +724,16 @@ function updateHud(): void {
       if (Math.hypot(p.x - s.x, p.z - s.z) < PLAYER.reviveRange + 2) {
         reviveHtml = `Hold <b>${KL.use}</b> to re-stitch ${escapeHtml(net.roster.get(p.id)?.name ?? 'teammate')} · ${Math.round(p.revive * 100)}%`;
       }
+    }
+  }
+  // Vehicles: the climb-in prompt near a parked one, controls while driving.
+  if (!reviveHtml && s && !downed) {
+    if (s.car) {
+      const v = VEHICLES[s.car];
+      reviveHtml = `<b>${escapeHtml(v.name)}</b> · WASD drive · ${v.cannonRate ? 'click to fire the cannon · ' : 'ram the invaders · '}<b>${KL.use}</b> hop out`;
+    } else {
+      const v = VehicleView.nearest(net.vehicles(), s.x, s.y, s.z, ENTER_RANGE);
+      if (v) reviveHtml = `Press <b>${KL.use}</b> to drive the ${escapeHtml(VEHICLES[v.kind].name)}`;
     }
   }
   hud.revive.innerHTML = reviveHtml;
@@ -835,6 +864,8 @@ function teamScoreText(): string {
 }
 
 const pickupsView = new PickupsView(scene, world);
+const vehicleView = new VehicleView(scene);
+const driven: DrivenVehicle[] = [];
 const spoolHill = mode === 'koth' ? new SpoolHill(scene, world, PAL.team) : null;
 const traversal = new TraversalView(scene, world, new Set(profile.collected));
 const music = new CombatMusic();
@@ -878,9 +909,21 @@ function frame(): void {
   // Remote players, interpolated in the past.
   remoteNow.clear();
   ropeSpecs.length = 0;
+  driven.length = 0;
   for (const r of net.remotes(now)) {
     const a = avatars.get(r.id);
     if (!a) continue;
+    if (r.car && r.alive) {
+      // Seated: the vehicle rides under them, the toy sits on top with its head at the seat height.
+      const v = VEHICLES[r.car];
+      driven.push({ key: r.id, kind: r.car, x: r.x, y: r.y, z: r.z, yaw: r.carYaw, aimYaw: r.yaw, speed: Math.hypot(r.x - (lastPos.get(r.id)?.x ?? r.x), r.z - (lastPos.get(r.id)?.z ?? r.z)) / Math.max(dt, 1e-3) });
+      lastPos.set(r.id, new THREE.Vector3(r.x, r.y, r.z));
+      a.root.position.set(r.x, r.y + v.seatHeight - PLAYER.eyeHeight + 0.1, r.z);
+      a.root.rotation.y = r.yaw;
+      a.update(dt, t, 0, r.pitch, true, false, false);
+      remoteNow.set(r.id, new THREE.Vector3(r.x, r.y + v.seatHeight - PLAYER.eyeHeight, r.z));
+      continue;
+    }
     if (r.hook && r.alive) ropeSpecs.push({ key: r.id, from: new THREE.Vector3(r.x, r.y + 0.9, r.z), to: new THREE.Vector3(...r.hook) });
     const prev = lastPos.get(r.id) ?? new THREE.Vector3(r.x, r.y, r.z);
     const speed = Math.hypot(r.x - prev.x, r.z - prev.z) / Math.max(dt, 1e-3);
@@ -986,6 +1029,8 @@ function frame(): void {
       pond: [-26, 10, 30, 2, 2, 6],
       bandstand: [18, 9, -6, 0, 9, -28],
       balloon: [0, 6, 20, 0, 40, 60],
+      jeep: [-3, 4.5, 33, -10, 1, 40],
+      tank: [-33, 4.5, -2, -40, 1, -8],
     } : world.id === 'toystore' ? {
       overview: [0, 26, 48, 0, 4, -20],
       core: [6, 4, -4, 0, 1, -12],
@@ -1017,17 +1062,34 @@ function frame(): void {
     const k = fx.shake * fx.shake * 0.25 * (settings.reduceShake ? 0.15 : 1);
     eye.x += (Math.random() - 0.5) * k; eye.y += (Math.random() - 0.5) * k; eye.z += (Math.random() - 0.5) * k;
   }
-  if (p && thirdPerson) {
+  const driving = p?.car ?? 0;
+  if (p && driving && !fixedCam) {
+    // Chase camera: orbit behind the aim, high enough to see over the bonnet; never through a wall.
+    const back: Vec3 = lookDirection(yaw, Math.min(pitch, 0.2) - 0.25);
+    const dist = Math.min(driving === VehicleKind.Tank ? 8 : 7, rayWorld([eye.x, eye.y, eye.z], [-back[0], -back[1], -back[2]], world.boxes, 9) - 0.4);
+    tmp.set(eye.x - back[0] * dist, eye.y - back[1] * dist + 0.8, eye.z - back[2] * dist);
+    camera.position.copy(tmp);
+    camera.lookAt(eye.x + back[0] * 6, eye.y + back[1] * 6 + 0.6, eye.z + back[2] * 6);
+  } else if (p && thirdPerson) {
     const back: Vec3 = lookDirection(yaw, pitch);
     tmp.set(eye.x - back[0] * 3, eye.y - back[1] * 3 + 0.4, eye.z - back[2] * 3);
     camera.position.copy(tmp);
   } else if (!fixedCam) {
     camera.position.copy(eye);
   }
-  viewModel.group.visible = !!p && !p.downed && !thirdPerson && !fixedCam;
+  viewModel.group.visible = !!p && !p.downed && !thirdPerson && !fixedCam && !driving;
+  if (p && driving) {
+    const speed = Math.abs(p.carSpeed);
+    driven.push({ key: -1, kind: driving, x: eye.x, y: eye.y - VEHICLES[driving].seatHeight, z: eye.z, yaw: p.carYaw, aimYaw: yaw, speed });
+  }
+  vehicleView.update(net.vehicles(), driven, dt);
   if (ownAvatar) {
-    ownAvatar.root.visible = !!p && (thirdPerson || !!fixedCam);
-    if (p) {
+    ownAvatar.root.visible = !!p && (thirdPerson || !!fixedCam || !!driving);
+    if (p && driving) {
+      ownAvatar.root.position.set(eye.x, eye.y - PLAYER.eyeHeight + 0.1, eye.z);
+      ownAvatar.root.rotation.y = yaw;
+      ownAvatar.update(dt, t, 0, pitch, true, false, false);
+    } else if (p) {
       ownAvatar.root.position.set(eye.x, eye.y - (crouching ? PLAYER.eyeHeight * 0.7 : PLAYER.eyeHeight), eye.z);
       ownAvatar.root.rotation.y = yaw;
       ownAvatar.update(dt, t, Math.min(1.3, Math.hypot(p.vx, p.vz) / PLAYER.runSpeed), pitch, crouching, !p.onGround, p.downed);

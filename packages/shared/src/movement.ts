@@ -1,5 +1,7 @@
 import { GRAPPLE, INPUT_DT, JUMP_VELOCITY, PLAYER } from './constants.ts';
 import { rayWorld } from './raycast.ts';
+import { LAUNCHER } from './weapons.ts';
+import { VEHICLES } from './vehicles.ts';
 import { SWITCH_SECONDS, WEAPON_COUNT, WEAPONS } from './weapons.ts';
 import type { Box, Vec3, World } from './world.ts';
 
@@ -76,6 +78,10 @@ export interface PlayerState {
   rope: number;
   /** Seconds until another strand can be fired. */
   hookCd: number;
+  /** Driving: vehicle kind (0 = on foot), its heading and its speed along that heading. */
+  car: number;
+  carYaw: number;
+  carSpeed: number;
 }
 
 export function createPlayerState(spawn: Vec3, yaw = 0): PlayerState {
@@ -92,6 +98,7 @@ export function createPlayerState(spawn: Vec3, yaw = 0): PlayerState {
     reload: 0,
     downed: false,
     hooked: false, hx: 0, hy: 0, hz: 0, rope: 0, hookCd: 0,
+    car: 0, carYaw: 0, carSpeed: 0,
   };
 }
 
@@ -103,8 +110,11 @@ export const MAX_PITCH = Math.PI / 2 - 0.01;
 const TERMINAL_VELOCITY = 25;
 const EPS = 1e-6;
 
+/** Collision radius for the current step (bigger while driving). */
+let bodyRadius: number = PLAYER.radius;
+
 function overlapsAny(boxes: Box[], x: number, y: number, z: number): Box | null {
-  const r = PLAYER.radius;
+  const r = bodyRadius;
   const h = PLAYER.height;
   for (const b of boxes) {
     if (
@@ -122,7 +132,7 @@ let lastBlock: Box | null = null;
 /** Moves along one axis and pushes back out of any box hit. Returns true if blocked. */
 function moveAxis(s: PlayerState, axis: 0 | 1 | 2, delta: number, boxes: Box[]): boolean {
   if (delta === 0) return false;
-  const r = PLAYER.radius;
+  const r = bodyRadius;
   const h = PLAYER.height;
   if (axis === 0) s.x += delta;
   else if (axis === 1) s.y += delta;
@@ -233,7 +243,16 @@ function applyRope(s: PlayerState, dt: number): void {
  * Advances one player by one input command (INPUT_DT). Pure and deterministic:
  * the server runs it as truth and the client runs it for prediction.
  */
+/** True if a toy standing at (x, y, z) would not overlap the world. */
+export function fitsAt(world: World, x: number, y: number, z: number, radius: number = PLAYER.radius): boolean {
+  bodyRadius = radius;
+  const ok = overlapsAny(world.boxes, x, y, z) === null;
+  bodyRadius = PLAYER.radius;
+  return ok;
+}
+
 export function stepPlayer(s: PlayerState, cmd: InputCmd, world: World): StepResult {
+  if (s.car) return stepVehicle(s, cmd, world);
   const dt = INPUT_DT;
   const b = cmd.buttons;
   const pressed = b & ~s.buttons;
@@ -348,6 +367,67 @@ export function stepPlayer(s: PlayerState, cmd: InputCmd, world: World): StepRes
   return { fired, weapon, mantled, hook };
 }
 
+/**
+ * Driving: W/S throttle, A/D steer (reversing flips the steering, like a real
+ * car), the mouse looks around. Tanks fire their cannon where you aim.
+ */
+function stepVehicle(s: PlayerState, cmd: InputCmd, world: World): StepResult {
+  const dt = INPUT_DT;
+  const def = VEHICLES[s.car] ?? VEHICLES[1];
+  const b = cmd.buttons;
+  s.yaw = cmd.yaw;
+  s.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, cmd.pitch));
+  s.hooked = false;
+  let throttle = 0, steer = 0;
+  if (b & Buttons.Forward) throttle += 1;
+  if (b & Buttons.Back) throttle -= 1;
+  if (b & Buttons.Left) steer += 1;
+  if (b & Buttons.Right) steer -= 1;
+  const top = throttle >= 0 ? def.maxSpeed : def.maxSpeed * 0.5;
+  const target = throttle * top;
+  // Accelerate toward the target speed; coast down gently with no throttle.
+  const rate = throttle === 0 ? def.accel * 0.45 : Math.sign(target - s.carSpeed) !== Math.sign(s.carSpeed) && s.carSpeed !== 0 ? def.accel * 1.6 : def.accel;
+  const diff = target - s.carSpeed;
+  s.carSpeed += Math.sign(diff) * Math.min(Math.abs(diff), rate * dt);
+  const grip = Math.min(1, Math.abs(s.carSpeed) / 3);
+  s.carYaw += steer * def.turnRate * grip * Math.sign(s.carSpeed || 1) * dt;
+  s.carYaw = Math.atan2(Math.sin(s.carYaw), Math.cos(s.carYaw));
+  s.vx = -Math.sin(s.carYaw) * s.carSpeed;
+  s.vz = -Math.cos(s.carYaw) * s.carSpeed;
+  s.vy = Math.max(-TERMINAL_VELOCITY, s.vy - PLAYER.gravity * dt);
+
+  bodyRadius = def.radius;
+  lastBlock = null;
+  const hit = moveHorizontal(s, s.vx * dt, s.vz * dt, world.boxes, s.onGround);
+  // Bump into something: bounce back a little.
+  if (hit.bx || hit.bz) s.carSpeed *= -0.25;
+  const dy = s.vy * dt;
+  if (moveAxis(s, 1, dy, world.boxes)) {
+    if (dy < 0) s.onGround = true;
+    s.vy = 0;
+  } else {
+    s.onGround = s.vy <= 0 && overlapsAny(world.boxes, s.x, s.y - 0.02, s.z) !== null;
+  }
+  bodyRadius = PLAYER.radius;
+  // Jump pads launch vehicles too.
+  if (s.onGround) {
+    for (const j of world.jumpPads) {
+      if (Math.abs(s.y - j.y) < 0.3 && Math.hypot(s.x - j.x, s.z - j.z) < j.r + 0.8) { s.vy = j.launch * 0.8; s.onGround = false; }
+    }
+  }
+  if (s.y < -3) { s.y = 0; s.vy = 0; }
+
+  // The tank's cannon: a yarn-ball shell where the driver aims, no magazine.
+  s.cooldown = Math.max(0, s.cooldown - dt);
+  let fired = false;
+  if (def.cannonRate && (b & Buttons.Fire) && s.cooldown <= 1e-9) {
+    s.cooldown = 1 / def.cannonRate;
+    fired = true;
+  }
+  s.buttons = b;
+  return { fired, weapon: LAUNCHER, mantled: false, hook: 0 };
+}
+
 function magazine(s: PlayerState): number {
   return s.mags[s.weapon] ?? 0;
 }
@@ -388,6 +468,7 @@ function stepWeapon(s: PlayerState, b: number, pressed: number, wanted: number, 
 }
 
 export function eyePosition(s: PlayerState, crouching: boolean): Vec3 {
+  if (s.car) return [s.x, s.y + VEHICLES[s.car].seatHeight, s.z];
   const h = s.downed ? PLAYER.eyeHeight * 0.3 : crouching ? PLAYER.eyeHeight * 0.7 : PLAYER.eyeHeight;
   return [s.x, s.y + h, s.z];
 }

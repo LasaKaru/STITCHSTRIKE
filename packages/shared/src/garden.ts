@@ -99,6 +99,7 @@ export function createGarden(): World {
       { x: 21.5, y: 0, z: -30, r: 1.1, launch: 33 },
       { x: -20, y: 0, z: 36.5, r: 1.1, launch: 20 },
     ],
+    vehicles: [{ kind: 1, pos: [36, 0, 10], yaw: 0 }],
     collectibles: [
       { id: 'gar-shed-roof', pos: [32, 19, -30], kind: CollectibleKind.Thimble },
       { id: 'gar-treehouse', pos: [-39, 12.8, -1], kind: CollectibleKind.Thimble },

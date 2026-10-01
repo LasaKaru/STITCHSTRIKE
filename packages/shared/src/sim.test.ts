@@ -114,7 +114,7 @@ describe('protocol', () => {
     Object.assign(self, { hooked: true, hx: 3.25, hy: 20.125, hz: -7.5, rope: 11.0625, hookCd: 0.1 });
     const snap = {
       tick: 999, ack: 42, respawn: 0, self,
-      players: [{ id: 3, x: 1.2345, y: 2.5, z: -3.75, yaw: 1, pitch: -0.3, health: 73, armor: 40, alive: true, crouch: false, downed: true, powered: true, revive: 0.5, hook: [4, 20, -6] as [number, number, number], weapon: 1, kos: 4, deaths: 2 }],
+      players: [{ id: 3, x: 1.2345, y: 2.5, z: -3.75, yaw: 1, pitch: -0.3, health: 73, armor: 40, alive: true, crouch: false, downed: true, powered: true, revive: 0.5, hook: [4, 20, -6] as [number, number, number], car: 2, carYaw: 1.5, weapon: 1, kos: 4, deaths: 2 }],
       shots: [
         { id: 3, hit: 5, head: true, enemy: false, kind: 0, to: [4, 1.3, -2] as [number, number, number] },
         { id: 255, hit: 3, head: false, enemy: false, kind: 3, from: [1, 1, 1] as [number, number, number], to: [2, 1, 2] as [number, number, number] },

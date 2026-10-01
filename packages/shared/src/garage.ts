@@ -71,6 +71,7 @@ export function createGarage(): World {
       { x: 28.5, y: 0, z: -15, r: 1.1, launch: 22 },
       { x: -20, y: 0, z: 0, r: 1.1, launch: 28 },
     ],
+    vehicles: [{ kind: 1, pos: [-20, 0, 14], yaw: Math.PI }],
     collectibles: [
       { id: 'gar2-top-shelf', pos: [36, 24, -27], kind: T },
       { id: 'gar2-pegboard', pos: [17, 30, -33.7], kind: T },

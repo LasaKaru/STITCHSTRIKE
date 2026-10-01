@@ -1,6 +1,7 @@
 import { WORLD_BOUNDS } from './constants.ts';
 import type { InputCmd, PlayerState } from './movement.ts';
 import type { KothState } from './koth.ts';
+import type { NetVehicle } from './vehicles.ts';
 import type { MapId, Vec3 } from './world.ts';
 
 /**
@@ -82,6 +83,8 @@ export type GameEvent =
   /** King of the Spool: the spool hopped to another spot / a team won the round. */
   | { type: 'hillMove'; hill: number }
   | { type: 'kothWin'; team: number }
+  /** A toy climbed into (enter) or out of a vehicle. */
+  | { type: 'vehicle'; id: number; kind: number; enter: boolean }
   | { type: 'snap'; pad: number };
 
 export type ClientText =
@@ -187,6 +190,9 @@ export interface NetPlayer {
   revive: number;
   /** Yarn-swing anchor while swinging. */
   hook: Vec3 | null;
+  /** Driving: vehicle kind (0 on foot) and its heading. */
+  car: number;
+  carYaw: number;
   weapon: number;
   kos: number;
   deaths: number;
@@ -269,6 +275,8 @@ export interface Snapshot {
   coop: CoopState | null;
   /** King of the Spool round state. */
   koth?: KothState | null;
+  /** Vehicles parked on the map (driven ones travel with their drivers). */
+  vehicles?: NetVehicle[];
 }
 
 /** Bytes per record, for bandwidth maths: player 21, shot 9 (15 with a start point), enemy 8, projectile 7. */
@@ -322,7 +330,7 @@ export function encodeSnapshot(s: Snapshot): Uint8Array {
   if (s.self) {
     const p = s.self;
     for (const n of [p.x, p.y, p.z, p.vx, p.vy, p.vz]) w.f64(n);
-    w.u8((p.onGround ? 1 : 0) | (p.downed ? 2 : 0) | (p.hooked ? 4 : 0));
+    w.u8((p.onGround ? 1 : 0) | (p.downed ? 2 : 0) | (p.hooked ? 4 : 0) | (p.car ? 8 : 0));
     w.u8(p.airJumps);
     w.u16(p.buttons);
     w.f64(p.cooldown);
@@ -334,6 +342,7 @@ export function encodeSnapshot(s: Snapshot): Uint8Array {
     w.f32(p.pitch);
     w.f64(p.hookCd);
     if (p.hooked) for (const n of [p.hx, p.hy, p.hz, p.rope]) w.f64(n);
+    if (p.car) { w.u8(p.car); w.f64(p.carYaw); w.f64(p.carSpeed); }
   }
   w.u8(s.players.length);
   for (const p of s.players) {
@@ -343,8 +352,9 @@ export function encodeSnapshot(s: Snapshot): Uint8Array {
     w.i16(Math.round((p.pitch / (Math.PI / 2)) * 32767));
     w.u8(Math.max(0, Math.min(255, Math.ceil(p.health))));
     w.u8(Math.max(0, Math.min(255, Math.ceil(p.armor))));
-    w.u8((p.alive ? 1 : 0) | (p.crouch ? 2 : 0) | (p.downed ? 4 : 0) | (p.powered ? 8 : 0) | (p.hook ? 16 : 0));
+    w.u8((p.alive ? 1 : 0) | (p.crouch ? 2 : 0) | (p.downed ? 4 : 0) | (p.powered ? 8 : 0) | (p.hook ? 16 : 0) | (p.car ? 32 : 0));
     if (p.hook) { w.u16(quantPos(p.hook[0], 0)); w.u16(quantPos(p.hook[1], 1)); w.u16(quantPos(p.hook[2], 2)); }
+    if (p.car) { w.u8(p.car); w.u16(quantAngle(p.carYaw)); }
     w.u8(pct(p.revive));
     w.u8(p.weapon);
     w.u16(p.kos);
@@ -400,6 +410,14 @@ export function encodeSnapshot(s: Snapshot): Uint8Array {
       w.u8(Math.max(0, Math.min(255, Math.round(e.y * 20))));
     }
   }
+  // Parked vehicles ride before the King of the Spool block (both optional).
+  const vehicles = s.vehicles ?? [];
+  w.u8(vehicles.length);
+  for (const v of vehicles) {
+    w.u8(v.kind);
+    w.u16(quantPos(v.x, 0)); w.u16(quantPos(v.y, 1)); w.u16(quantPos(v.z, 2));
+    w.u16(quantAngle(v.yaw));
+  }
   w.u8(s.koth ? 1 : 0);
   if (s.koth) {
     const k = s.koth;
@@ -436,10 +454,13 @@ export function decodeSnapshot(buf: Uint8Array): Snapshot | null {
       const hookCd = r.f64();
       const hooked = (flags & 4) !== 0;
       const h = hooked ? [r.f64(), r.f64(), r.f64(), r.f64()] : [0, 0, 0, 0];
+      const car = flags & 8 ? r.u8() : 0;
+      const carYaw = car ? r.f64() : 0;
+      const carSpeed = car ? r.f64() : 0;
       self = {
         x: f[0], y: f[1], z: f[2], vx: f[3], vy: f[4], vz: f[5], onGround: (flags & 1) !== 0, downed: (flags & 2) !== 0,
         airJumps, buttons, cooldown, weapon, mags, reload, yaw, pitch,
-        hooked, hx: h[0], hy: h[1], hz: h[2], rope: h[3], hookCd,
+        hooked, hx: h[0], hy: h[1], hz: h[2], rope: h[3], hookCd, car, carYaw, carSpeed,
       };
     }
     const players: NetPlayer[] = [];
@@ -452,11 +473,13 @@ export function decodeSnapshot(buf: Uint8Array): Snapshot | null {
       const armor = r.u8();
       const flags = r.u8();
       const hook: Vec3 | null = flags & 16 ? [dequantPos(r.u16(), 0), dequantPos(r.u16(), 1), dequantPos(r.u16(), 2)] : null;
+      const car = flags & 32 ? r.u8() : 0;
+      const carYaw = car ? dequantAngle(r.u16()) : 0;
       const revive = r.u8() / 255;
       const weapon = r.u8();
       players.push({
         id, x, y, z, yaw, pitch, health, armor, alive: (flags & 1) !== 0, crouch: (flags & 2) !== 0, downed: (flags & 4) !== 0,
-        powered: (flags & 8) !== 0, hook, revive, weapon, kos: r.u16(), deaths: r.u16(),
+        powered: (flags & 8) !== 0, hook, car, carYaw, revive, weapon, kos: r.u16(), deaths: r.u16(),
       });
     }
     const shots: Shot[] = [];
@@ -500,13 +523,17 @@ export function decodeSnapshot(buf: Uint8Array): Snapshot | null {
       }
       coop = { phase, wave, totalWaves, timer, buttons, ready, cores, pads, difficulty, boss, enemies };
     }
+    const vehicles: NetVehicle[] = [];
+    for (let i = 0, n = r.left > 0 ? r.u8() : 0; i < n; i++) {
+      vehicles.push({ kind: r.u8(), x: dequantPos(r.u16(), 0), y: dequantPos(r.u16(), 1), z: dequantPos(r.u16(), 2), yaw: dequantAngle(r.u16()) });
+    }
     let koth: KothState | null = null;
     if (r.left > 0 && r.u8() === 1) {
       const hill = r.u8(), holder = r.u8() - 1;
       const a = r.u16() / 10, b = r.u16() / 10;
       koth = { hill, holder, scores: [a, b], timer: r.u8() };
     }
-    return { tick, ack, self, respawn, players, shots, projectiles, pickups, drops, coop, koth };
+    return { tick, ack, self, respawn, players, shots, projectiles, pickups, drops, coop, koth, vehicles };
   } catch {
     return null;
   }

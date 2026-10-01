@@ -3,7 +3,7 @@ import {
   stepPlayer, TICK_RATE,
   Buildable, SPRING,
   type CoopState, type GameEvent, type GameMode, type InputCmd, type Look, type NetEnemy, type NetPlayer, type PlayerState, type RosterEntry,
-  type ServerText, type Shot, type Snapshot, type World, type KothState } from '@stitchstrike/shared';
+  type ServerText, type Shot, type Snapshot, type World, type KothState, type NetVehicle } from '@stitchstrike/shared';
 import type { Frame, Transport } from './transport.ts';
 
 /**
@@ -31,6 +31,8 @@ export interface RemoteView {
   downed: boolean; powered: boolean; revive: number;
   /** Yarn-swing anchor while swinging. */
   hook: [number, number, number] | null;
+  /** Vehicle being driven (VehicleKind) and its heading. */
+  car: number; carYaw: number;
 }
 
 export interface NetStats {
@@ -368,9 +370,16 @@ export class NetClient {
         powered: pc.powered,
         revive: pc.revive,
         hook: g < 0.5 ? pa.hook : pc.hook,
+        car: g < 0.5 ? pa.car : pc.car,
+        carYaw: pa.carYaw + angleDelta(pa.carYaw, pc.carYaw) * g,
       });
     }
     return out;
+  }
+
+  /** Parked vehicles from the newest snapshot. */
+  vehicles(): NetVehicle[] {
+    return this.latest?.vehicles ?? [];
   }
 
   me(): NetPlayer | undefined {
@@ -392,4 +401,11 @@ export class NetClient {
   /** Milliseconds per server tick, exposed for HUD maths. */
   static readonly tickMs = TICK_MS;
   static readonly inputDt = INPUT_DT;
+}
+
+function angleDelta(a: number, b: number): number {
+  let d = b - a;
+  if (d > Math.PI) d -= Math.PI * 2;
+  if (d < -Math.PI) d += Math.PI * 2;
+  return d;
 }

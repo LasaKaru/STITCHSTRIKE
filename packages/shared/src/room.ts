@@ -1,7 +1,8 @@
 import { HISTORY_MS, INPUT_DT, MAX_PLAYERS, MAX_REWIND_MS, PLAYER, TICK_DT, TICK_RATE } from './constants.ts';
 import { BUILDABLES, CORE, CoopDirector, Phase, ShotKind, type CoopHost, type CoopOptions } from './coop.ts';
 import { ENEMIES, type Enemy } from './enemies.ts';
-import { Action, Buttons, createPlayerState, eyePosition, lookDirection, stepPlayer, type InputCmd, type PlayerState } from './movement.ts';
+import { Action, Buttons, createPlayerState, eyePosition, fitsAt, lookDirection, stepPlayer, type InputCmd, type PlayerState } from './movement.ts';
+import { ENTER_RANGE, RAM_COOLDOWN, RAM_MIN_SPEED, VEHICLES, type NetVehicle } from './vehicles.ts';
 import { DROP_CHANCE, DROP_SECONDS, MAX_DROPS, PICKUP_RADIUS, PickupKind, PICKUPS, POWER_MULTIPLIER, type Drop } from './pickups.ts';
 import { isTeamMode, type CoopState, type GameEvent, type GameMode, type Look, type NetDrop, type NetPlayer, type NetProjectile, type RosterEntry, type Shot, type Snapshot } from './protocol.ts';
 import { KothDirector, type KothState } from './koth.ts';
@@ -60,6 +61,7 @@ export interface SharedSnapshot {
   drops: NetDrop[];
   coop: CoopState | null;
   koth: KothState | null;
+  vehicles: NetVehicle[];
 }
 
 const MAX_QUEUE = 24;
@@ -98,6 +100,10 @@ export class Room {
   private drops: Drop[] = [];
   private nextDrop = 1;
   private lastPhase: number = Phase.Build;
+  /** Vehicles on the map; driver 0 means parked. */
+  readonly vehicles: { kind: number; x: number; y: number; z: number; yaw: number; driver: number }[];
+  /** Ram cooldowns, keyed "driver:target". */
+  private ramCd = new Map<string, number>();
 
   constructor(world: World, mode: GameMode = 'pvp', coopOptions: CoopOptions = {}) {
     this.world = world;
@@ -108,6 +114,7 @@ export class Room {
     // Built spring pads launch toys exactly like the map's own jump pads.
     world.springs = this.coop ? this.coop.springs : [];
     this.pickupTimers = world.pickups.map(() => 0);
+    this.vehicles = (world.vehicles ?? []).map((v) => ({ kind: v.kind, x: v.pos[0], y: v.pos[1], z: v.pos[2], yaw: v.yaw, driver: 0 }));
     this.coopHost = {
       livePlayers: () => [...this.players.values()].filter((p) => p.alive && p.bleed <= 0).map((p) => ({ id: p.id, x: p.state.x, y: p.state.y, z: p.state.z })),
       damagePlayer: (id, dmg, enemyType, push) => {
@@ -149,6 +156,8 @@ export class Room {
   }
 
   removePlayer(id: number): void {
+    const p = this.players.get(id);
+    if (p) this.leaveVehicle(p);
     this.players.delete(id);
     this.coop?.ready.delete(id);
   }
@@ -195,6 +204,10 @@ export class Room {
           p.state.buttons = cmd.buttons;
           continue;
         }
+        // Use, newly pressed: climb in or out (re-stitching a downed teammate comes first).
+        if ((cmd.buttons & Buttons.Use) && !(p.state.buttons & Buttons.Use) && !p.state.downed && !this.reviveTarget(p)) {
+          if (p.state.car) this.leaveVehicle(p); else this.enterVehicle(p);
+        }
         const { fired, weapon } = stepPlayer(p.state, cmd, this.world);
         if (fired) this.fire(p, cmd, weapon);
         if (this.coop && cmd.action && !p.state.downed) this.coopAction(p, cmd.action);
@@ -213,6 +226,7 @@ export class Room {
       }
     }
     if (this.coop) this.stepDowned();
+    this.stepRams();
     if (this.koth) {
       const toys = [...this.players.values()].filter((p) => p.alive).map((p) => ({ team: p.team, x: p.state.x, y: p.state.y, z: p.state.z }));
       // A round won: everyone back to their side of the room, full stitches.
@@ -334,7 +348,96 @@ export class Room {
 
   // ------------------------------------------------------------ spawning and history
 
+  // ------------------------------------------------------------ vehicles
+
+  /** A downed teammate close enough to re-stitch (Use goes to them first). */
+  private reviveTarget(p: RoomPlayer): boolean {
+    if (!this.coop) return false;
+    for (const q of this.players.values()) {
+      if (q !== p && q.alive && q.bleed > 0 && Math.hypot(q.state.x - p.state.x, q.state.z - p.state.z) < PLAYER.reviveRange) return true;
+    }
+    return false;
+  }
+
+  private enterVehicle(p: RoomPlayer): void {
+    let best: (typeof this.vehicles)[number] | null = null;
+    let bestD = ENTER_RANGE;
+    for (const v of this.vehicles) {
+      const d = Math.hypot(v.x - p.state.x, v.z - p.state.z);
+      if (!v.driver && d < bestD && Math.abs(v.y - p.state.y) < 3) { bestD = d; best = v; }
+    }
+    if (!best) return;
+    best.driver = p.id;
+    const s = p.state;
+    s.car = best.kind;
+    s.carYaw = best.yaw;
+    s.carSpeed = 0;
+    s.x = best.x; s.y = best.y; s.z = best.z;
+    s.vx = s.vy = s.vz = 0;
+    s.hooked = false;
+    s.reload = 0;
+    this.events.push({ type: 'vehicle', id: p.id, kind: best.kind, enter: true });
+  }
+
+  /** Park the vehicle where it is and step out beside it (somewhere the toy fits). */
+  private leaveVehicle(p: RoomPlayer): void {
+    const s = p.state;
+    if (!s.car) return;
+    const v = this.vehicles.find((q) => q.driver === p.id);
+    if (v) { v.driver = 0; v.x = s.x; v.y = s.y; v.z = s.z; v.yaw = s.carYaw; }
+    const kind = s.car;
+    const side = VEHICLES[kind].radius + 0.9;
+    const right: [number, number] = [Math.cos(s.carYaw), -Math.sin(s.carYaw)];
+    const spots: [number, number][] = [[right[0] * side, right[1] * side], [-right[0] * side, -right[1] * side], [Math.sin(s.carYaw) * side, Math.cos(s.carYaw) * side], [0, 0]];
+    let out: [number, number] = [0, 0];
+    for (const o of spots) if (fitsAt(this.world, s.x + o[0], s.y + 0.05, s.z + o[1])) { out = o; break; }
+    s.car = 0;
+    s.carSpeed = 0;
+    s.x += out[0]; s.z += out[1]; s.y += 0.05;
+    s.vx = s.vz = 0;
+    s.onGround = false;
+    this.events.push({ type: 'vehicle', id: p.id, kind, enter: false });
+  }
+
+  /** Drivers flatten what they hit: invaders in co-op, rival toys in PvP. */
+  private stepRams(): void {
+    for (const [k, t] of this.ramCd) { if (t - TICK_DT <= 0) this.ramCd.delete(k); else this.ramCd.set(k, t - TICK_DT); }
+    for (const p of this.players.values()) {
+      const s = p.state;
+      if (!p.alive || !s.car || Math.abs(s.carSpeed) < RAM_MIN_SPEED) continue;
+      const def = VEHICLES[s.car];
+      const power = Math.min(1, Math.abs(s.carSpeed) / def.maxSpeed);
+      const fwd: Vec3 = [-Math.sin(s.carYaw) * Math.sign(s.carSpeed), 0, -Math.cos(s.carYaw) * Math.sign(s.carSpeed)];
+      if (this.coop) {
+        for (const e of this.coop.enemies) {
+          const ed = ENEMIES[e.type];
+          if (e.hp <= 0 || ed.flying || Math.hypot(e.x - s.x, e.z - s.z) > def.radius + ed.radius + 0.3) continue;
+          const key = `${p.id}:e${e.id}`;
+          if (this.ramCd.has(key)) continue;
+          this.ramCd.set(key, RAM_COOLDOWN);
+          this.shots.push({ id: p.id, hit: 0, head: false, enemy: true, kind: ShotKind.Hitscan, to: [e.x, e.y + ed.height * 0.5, e.z] });
+          this.creditKill(p, e, this.coop.damageEnemy(e, def.ram * (0.4 + 0.6 * power), fwd, 4 * power));
+        }
+      } else {
+        for (const q of this.players.values()) {
+          if (!q.alive || !this.hostile(p, q) || Math.hypot(q.state.x - s.x, q.state.z - s.z) > def.radius + PLAYER.radius + 0.3 || Math.abs(q.state.y - s.y) > 2) continue;
+          const key = `${p.id}:p${q.id}`;
+          if (this.ramCd.has(key)) continue;
+          this.ramCd.set(key, RAM_COOLDOWN);
+          this.shots.push({ id: p.id, hit: q.id, head: false, enemy: false, kind: ShotKind.Hitscan, to: [q.state.x, q.state.y + 0.9, q.state.z] });
+          this.damage(p, q, def.ram * (0.4 + 0.6 * power));
+          if (q.alive && !q.state.car) { q.state.vx += fwd[0] * 9 * power; q.state.vz += fwd[2] * 9 * power; q.state.vy = Math.max(q.state.vy, 6); q.state.onGround = false; }
+        }
+      }
+    }
+  }
+
+  netVehicles(): NetVehicle[] {
+    return this.vehicles.filter((v) => !v.driver).map((v) => ({ kind: v.kind, x: v.x, y: v.y, z: v.z, yaw: v.yaw }));
+  }
+
   private spawn(p: RoomPlayer): void {
+    this.leaveVehicle(p);
     const points = this.coop ? this.world.coop.playerSpawns : this.world.spawns;
     // PvP: farthest from any living opponent. Co-op: any point near the Heartspools.
     let best: Vec3 = points[0];
@@ -570,6 +673,7 @@ export class Room {
   // ------------------------------------------------------------ damage
 
   private knockOut(victim: RoomPlayer, attacker: RoomPlayer | null, enemyType = -1): void {
+    this.leaveVehicle(victim);
     victim.health = 0;
     victim.alive = false;
     victim.bleed = 0;
@@ -597,6 +701,7 @@ export class Room {
       victim.health = 0;
       victim.bleed = PLAYER.bleedSeconds;
       victim.revive = 0;
+      this.leaveVehicle(victim);
       victim.state.downed = true;
       victim.deaths += 1;
       this.events.push({ type: 'downed', id: victim.id });
@@ -613,6 +718,7 @@ export class Room {
       health: p.health, armor: p.armor, alive: p.alive, crouch: (p.state.buttons & Buttons.Crouch) !== 0,
       downed: p.bleed > 0, powered: p.power > 0, revive: p.revive,
       hook: p.state.hooked ? [p.state.hx, p.state.hy, p.state.hz] : null,
+      car: p.alive ? p.state.car : 0, carYaw: p.state.carYaw,
       weapon: p.state.weapon, kos: p.kos, deaths: p.deaths,
     }));
   }
@@ -653,6 +759,7 @@ export class Room {
       drops: this.netDrops(),
       coop: this.coopState(withEnemies),
       koth: this.koth ? this.koth.state() : null,
+      vehicles: this.netVehicles(),
     };
   }
 

@@ -83,6 +83,11 @@ export function createPark(): World {
       { x: -13, y: 0, z: -27, r: 1.1, launch: 30 },
       { x: 26, y: 0, z: 16, r: 1.1, launch: 24 },
     ],
+    vehicles: [
+      { kind: 1, pos: [-10, 0, 40], yaw: 0 },
+      { kind: 1, pos: [20, 0, -24], yaw: Math.PI / 2 },
+      { kind: 2, pos: [-40, 0, -8], yaw: -Math.PI / 2 },
+    ],
     collectibles: [
       { id: 'park-bandstand', pos: [0, 14, -28], kind: T },
       { id: 'park-bridge', pos: [0, 3.6, 8], kind: C },

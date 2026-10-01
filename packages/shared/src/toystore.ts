@@ -69,6 +69,7 @@ export function createToyStore(): World {
       { x: -17, y: 0, z: 20, r: 1.1, launch: 22 },
       { x: 17, y: 0, z: -20, r: 1.1, launch: 32 },
     ],
+    vehicles: [{ kind: 1, pos: [-8, 0, 0], yaw: Math.PI / 2 }],
     collectibles: [
       { id: 'toy-top-left', pos: [-25, 40, 40], kind: T },
       { id: 'toy-top-right', pos: [25, 40, -40], kind: T },

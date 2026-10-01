@@ -1,4 +1,5 @@
 import type { PickupSpot } from './pickups.ts';
+import type { VehicleSpot } from './vehicles.ts';
 
 export type Vec3 = [number, number, number];
 
@@ -43,6 +44,8 @@ export interface World {
   springs?: { x: number; z: number; r: number; launch: number }[];
   /** Hidden golden thimbles and weapon parts; collected per player profile (client-side). */
   collectibles: Collectible[];
+  /** Drivable vehicles parked on the map. */
+  vehicles?: VehicleSpot[];
 }
 
 export const CollectibleKind = { Thimble: 0, Part: 1, Credits: 2 } as const;
