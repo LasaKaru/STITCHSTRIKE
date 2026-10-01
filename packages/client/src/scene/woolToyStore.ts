@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { World } from '@stitchstrike/shared';
+import { bunting, pumpkin, skyCard, skylineStrip } from './cozyDressing.ts';
 import { metal } from './materials.ts';
 import { mesh, rbox, rng, wool } from './woolKit.ts';
 
@@ -90,9 +91,17 @@ export function buildWoolToyStore(scene: THREE.Scene, world: World): WoolToyStor
       case 'slidingDoor': {
         const glass = new THREE.Mesh(new THREE.BoxGeometry(size[0], size[1], 0.3), new THREE.MeshPhysicalMaterial({ color: 0xcfe8f0, roughness: 0.05, transparent: true, opacity: 0.35 }));
         at(glass, c.x, c.y, c.z);
-        const day = new THREE.Mesh(new THREE.PlaneGeometry(size[0], size[1] + 3), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xfff6e0).multiplyScalar(1.9) }));
-        day.rotation.y = Math.PI;
-        at(day, c.x, (size[1] + 3) / 2, b.max[2] + 1);
+        // Out of the doors: the street and the knitted city at golden hour.
+        const sky = skyCard(300, 140, 0x6a96d0, 0xf8d4a0);
+        sky.rotation.y = Math.PI;
+        at(sky, c.x, 50, b.max[2] + 120);
+        for (const [dist, scale, seed] of [[90, 1, 61], [45, 0.7, 62]] as const) {
+          const city = skylineStrip(220, seed, { height: 70, lit: 0.45, spire: seed === 61 });
+          city.rotation.y = Math.PI;
+          city.scale.setScalar(scale);
+          at(city, c.x, 0, b.max[2] + dist);
+        }
+        at(mesh(new THREE.PlaneGeometry(260, 140).rotateX(-Math.PI / 2), wool('garter', 0x7a7068, 0.4), false), c.x, -0.05, b.max[2] + 70);
         break;
       }
       case 'storeShelf': {
@@ -206,6 +215,14 @@ export function buildWoolToyStore(scene: THREE.Scene, world: World): WoolToyStor
     const l = new THREE.PointLight(0xffe0b8, 260, 110, 1.6);
     l.position.set(0, 54, z);
     group.add(l);
+  }
+  // Autumn display: bunting strung between the shelf units, pumpkins piled by the pyramid.
+  group.add(bunting(new THREE.Vector3(-20, 46, -2), new THREE.Vector3(20, 46, -2), { sag: 3, size: 1.6, seed: 71 }));
+  group.add(bunting(new THREE.Vector3(-20, 46, 28), new THREE.Vector3(20, 46, 28), { sag: 3, size: 1.6, seed: 72 }));
+  for (const [x, z, rad, col] of [[-10, -36, 1.8, 0xd9772e], [-12.5, -33.5, 1.2, 0xe8b04a], [9.5, -35.5, 1.5, 0xd9772e], [11.5, -38, 1.1, 0xc8642a], [-9, -39, 1, 0xefe3c8]] as const) {
+    const pk = pumpkin(rad, Math.floor(x * 7 + z), col);
+    pk.position.set(x, 0, z);
+    group.add(pk);
   }
   scene.add(group);
 

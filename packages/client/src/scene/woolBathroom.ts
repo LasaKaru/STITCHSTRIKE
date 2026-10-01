@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { Box, World } from '@stitchstrike/shared';
+import { bunting, pumpkin, skyCard, skylineStrip } from './cozyDressing.ts';
 import { metal } from './materials.ts';
 import { scatterMess } from './mess.ts';
 import { lumpy, mesh, rbox, rng, wool, yarnTube } from './woolKit.ts';
@@ -22,16 +23,16 @@ function renderBox(group: THREE.Group, b: Box): void {
   switch (b.shape) {
     case 'tileFloor': {
       at(mesh(new THREE.BoxGeometry(size[0], 1, size[2]), wool('garter', 0xe8eef0, 0.45), false), c.x, -0.5, c.z);
-      const mat = mesh(new THREE.PlaneGeometry(16, 10).rotateX(-Math.PI / 2), wool('crochet', 0x8bcb3a, 0.9), false);
+      const mat = mesh(new THREE.PlaneGeometry(16, 10).rotateX(-Math.PI / 2), wool('crochet', 0xd9772e, 0.9), false);
       at(mat, -16, 0.03, -4);
       return;
     }
     case 'tileWall': {
       // Aqua tiles below, cream knit above, with a crocheted border between.
       const lower = Math.min(size[1], 22);
-      at(mesh(new THREE.BoxGeometry(size[0], lower, size[2]), wool('garter', 0x9ad0d8, 0.5)), c.x, lower / 2, c.z);
+      at(mesh(new THREE.BoxGeometry(size[0], lower, size[2]), wool('garter', 0xa8b88a, 0.5)), c.x, lower / 2, c.z);
       at(mesh(new THREE.BoxGeometry(size[0], size[1] - lower, size[2]), wool('stocking', 0xf2ece0, 0.5)), c.x, lower + (size[1] - lower) / 2, c.z);
-      at(mesh(new THREE.BoxGeometry(size[0] + 0.2, 1.2, size[2] + 0.2), wool('crochet', 0x3a5da8, 1.2)), c.x, lower, c.z);
+      at(mesh(new THREE.BoxGeometry(size[0] + 0.2, 1.2, size[2] + 0.2), wool('crochet', 0x8a5a3a, 1.2)), c.x, lower, c.z);
       return;
     }
     case 'door': {
@@ -177,10 +178,29 @@ export function buildWoolBathroom(scene: THREE.Scene, world: World): WoolBathroo
     group.add(d);
   }
   // A frosted window on the left wall, a ceiling lamp, a toilet-roll holder and a bath mat.
-  const pane = new THREE.Mesh(new THREE.PlaneGeometry(14, 12), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xfff4dc).multiplyScalar(1.7) }));
-  pane.rotation.y = Math.PI / 2;
-  pane.position.set(-39.9, 32, 4);
-  group.add(pane);
+  // The window looks out on the knitted city: a shallow diorama behind the glass.
+  const view = new THREE.Group();
+  const card = skyCard(14, 12, 0x6a96d0, 0xf8d4a0);
+  view.add(card);
+  const city = skylineStrip(170, 31, { height: 70, lit: 0.5 });
+  city.scale.set(0.085, 0.085, 0.004);
+  city.position.set(0, -6, 0.05);
+  view.add(city);
+  view.rotation.y = Math.PI / 2;
+  view.position.set(-39.9, 32, 4);
+  group.add(view);
+  const sash = wool('felt', 0xefe3c8, 1.4);
+  for (const [w, h, y, z] of [[15, 0.7, 38.2, 4], [15, 0.9, 25.8, 4], [0.7, 12.6, 32, -3.2], [0.7, 12.6, 32, 11.2], [0.4, 12, 32, 4], [14, 0.4, 32, 4]] as const) {
+    const bar = mesh(new THREE.BoxGeometry(0.6, h, w), sash);
+    bar.position.set(-39.5, y, z);
+    group.add(bar);
+  }
+  group.add(bunting(new THREE.Vector3(-39.2, 40.2, -4), new THREE.Vector3(-39.2, 40.2, 12), { sag: 1, size: 0.9, seed: 5 }));
+  for (const [x, z, r] of [[-37, 26, 1.2], [37, 14, 0.9]] as const) {
+    const pk = pumpkin(r, Math.floor(x + z));
+    pk.position.set(x, x < 0 ? 12 : 16, z);
+    group.add(pk);
+  }
   const lamp = new THREE.Mesh(new THREE.SphereGeometry(3, 20, 14), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xfff6e4).multiplyScalar(1.6) }));
   lamp.position.set(0, 48, 0);
   group.add(lamp);

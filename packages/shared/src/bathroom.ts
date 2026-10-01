@@ -27,7 +27,7 @@ export function createBathroom(): World {
     s(box(-38, 1, -28.5, -36.5, 11, -13.5, 'furniture', 0xf6f4ee), 'tubRim'),
     s(box(0.5, 1, -28.5, 2, 11, -13.5, 'furniture', 0xf6f4ee), 'tubRim'),
     // The knitted shower curtain hangs from its rail to the floor in front of the tub: climb it.
-    s(box(-38, 0, -11.4, -22, 40, -10.8, 'furniture', 0xb46fd6), 'showerCurtain', true),
+    s(box(-38, 0, -11.4, -22, 40, -10.8, 'furniture', 0xc8642a), 'showerCurtain', true),
 
     // Toilet: bowl and seat, then the tank (a high perch).
     s(box(21, 0, -27, 29, 8, -19, 'furniture', 0xf6f4ee), 'toiletBowl'),
@@ -43,7 +43,7 @@ export function createBathroom(): World {
 
     // Laundry basket (woven wool: climbable), a towel pile, a bathroom scale and a giant rubber duck.
     s(box(-37, 0, 16, -27, 12, 27, 'prop', 0xc8a070), 'laundry', true),
-    s(box(12, 0, 19, 20, 3, 26, 'prop', 0x6fd6ff), 'towelPile'),
+    s(box(12, 0, 19, 20, 3, 26, 'prop', 0xe8b04a), 'towelPile'),
     s(box(14, 0, 3, 21, 1.4, 10, 'prop', 0xdfe4ea), 'scale'),
     s(box(-6, 0, 8, -1, 5, 13, 'prop', 0xffd24a), 'duck'),
   ];

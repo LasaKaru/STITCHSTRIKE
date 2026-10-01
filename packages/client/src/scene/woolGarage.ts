@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { Box, World } from '@stitchstrike/shared';
+import { bunting, pumpkin } from './cozyDressing.ts';
 import { metal } from './materials.ts';
 import { scatterMess } from './mess.ts';
 import { lumpy, mesh, rbox, rng, wool, yarnTube } from './woolKit.ts';
@@ -236,6 +237,13 @@ export function buildWoolGarage(scene: THREE.Scene, world: World): WoolGarage {
   group.add(yarnTube(cord, 0.25, wool('rib', 0xffc94a, 3), 160));
 
   scatterMess(group, world, { count: 90, seed: 23, outdoor: false });
+  // Autumn in the garage: leaf bunting over the pegboard, pumpkins on the shelves and bench.
+  group.add(bunting(new THREE.Vector3(-36, 33, -33.2), new THREE.Vector3(36, 33, -33.2), { sag: 2.5, size: 1.4, seed: 81 }));
+  for (const [x, y, z, rad, col] of [[34, 8, -24, 1.4, 0xd9772e], [36.5, 8, -20, 1, 0xe8b04a], [34.5, 16, -8, 1.2, 0xc8642a], [26, 9, -31.5, 1, 0xd9772e], [-34, 0, -28, 2.2, 0xd9772e], [-30.5, 0, -30, 1.4, 0xe8b04a]] as const) {
+    const pk = pumpkin(rad, Math.floor(x * 5 + z), col);
+    pk.position.set(x, y, z);
+    group.add(pk);
+  }
   scene.add(group);
 
   // Daylight through the door gap and the side door.
