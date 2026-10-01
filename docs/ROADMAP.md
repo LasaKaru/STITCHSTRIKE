@@ -93,6 +93,9 @@ The checklist tracks what is in the game (✅) and what is still ahead (⬜).
 - ✅ Steamworks scaffold: medals unlock achievements and rich presence shows mode, map and wave (optional steamworks.js; no-op without it)
 - ✅ Key rebinding; accessibility: colour-blind palettes, subtitles and sound captions, reduced camera shake
 - ✅ Performance: distance LOD for invaders (proxies and no posing when far)
+- ✅ First and third person: over-the-shoulder camera with wall collision, shoulder swap, aim convergence, held weapons on every toy, per-player views in split-screen
+- ✅ Spectating teammates while unravelled; photo mode
+- ✅ HUD radar, damage numbers, kill streaks, emotes (wave, cheer, dance, bow)
 
 **Still ahead**
 - ⬜ Steam, the rest (needs your App ID): lobbies and invites, relay networking, cloud saves
