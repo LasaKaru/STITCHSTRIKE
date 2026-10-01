@@ -53,12 +53,12 @@ export function startGameServer(o: GameServerOptions): Promise<GameServer> {
   const rooms = new Map<string, RoomHost>();
   const root = o.staticDir ? resolve(o.staticDir) : null;
 
-  function getRoom(code: string, fillTo: number, mode: GameMode, map: MapId, waves: number, difficulty: number): RoomHost {
+  function getRoom(code: string, fillTo: number, mode: GameMode, map: MapId, waves: number, difficulty: number, mission: number): RoomHost {
     // Rooms are keyed by mode, map and mission settings too, so each combination is its own match.
-    const key = `${mode}:${map}:${waves}:${difficulty}:${code}`;
+    const key = `${mode}:${map}:${waves}:${difficulty}:${mission}:${code}`;
     let host = rooms.get(key);
     if (!host) {
-      host = new RoomHost({ code, fillTo, mode, map, waves, difficulty });
+      host = new RoomHost({ code, fillTo, mode, map, waves, difficulty, mission });
       host.start();
       rooms.set(key, host);
       log(`[room ${key}] opened (bots fill to ${fillTo})`);
@@ -110,8 +110,9 @@ export function startGameServer(o: GameServerOptions): Promise<GameServer> {
     const difficulty = Math.max(0, Math.min(3, Math.floor(Number(url.searchParams.get('difficulty') ?? 1)) || 0));
     const mapParam = url.searchParams.get('map');
     const map: MapId = MAPS.some((m) => m.id === mapParam) ? (mapParam as MapId) : 'bedroom';
-    const host = getRoom(code, fill, mode, map, waves, difficulty);
-    const key = `${mode}:${map}:${waves}:${difficulty}:${code}`;
+    const mission = url.searchParams.get('mission') === '1' ? 1 : 0;
+    const host = getRoom(code, fill, mode, map, waves, difficulty, mission);
+    const key = `${mode}:${map}:${waves}:${difficulty}:${mission}:${code}`;
 
     const delay = (fn: () => void) => (fakeLag > 0 ? setTimeout(fn, fakeLag) : fn());
     const conn: Connection = {

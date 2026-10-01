@@ -6,7 +6,7 @@
 
 export type Sound = 'popper' | 'buster' | 'hit' | 'kill' | 'build' | 'sell' | 'hurt' | 'wave' | 'alarm' | 'win' | 'lose' | 'switch' | 'turret'
   | 'lance' | 'hook' | 'launch' | 'blast' | 'zap' | 'snap' | 'pickup' | 'downed' | 'revived' | 'stomp' | 'boss' | 'enemyShot' | 'upgrade' | 'spring' | 'collect'
-  | 'yarnShot' | 'yarnMiss' | 'mantle' | 'glue' | 'sock' | 'splat' | 'drum' | 'pop' | 'engine';
+  | 'yarnShot' | 'yarnMiss' | 'mantle' | 'glue' | 'sock' | 'splat' | 'drum' | 'pop' | 'engine' | 'roar' | 'chirp';
 
 export class Sfx {
   private ctx: AudioContext | null = null;
@@ -88,6 +88,9 @@ export class Sfx {
       case 'yarnMiss': this.hiss(0.14, 0.18 * v, 2600, 3); this.tone(500, 0.12, 'triangle', 0.08 * v, 0.5); break;
       // A wind-up toy motor: a ratchet of clicks, then a buzzy rev.
       case 'engine': [0, 0.05, 0.1, 0.15].forEach((d) => this.tone(1800, 0.02, 'square', 0.04 * v, 1, d)); this.tone(70, 0.5, 'sawtooth', 0.12 * v, 2.4, 0.2); this.tone(140, 0.4, 'square', 0.05 * v, 2, 0.22); break;
+      // Rex: a long, falling growl over a rumble. Raptors: a quick two-note chirp.
+      case 'roar': this.tone(120, 1.4, 'sawtooth', 0.22 * v, 0.45); this.tone(84, 1.5, 'square', 0.1 * v, 0.5, 0.05); this.hiss(1.2, 0.35 * v, 380, 0.6); this.hiss(0.6, 0.2 * v, 1400, 1.2, 0.1); break;
+      case 'chirp': this.tone(1100, 0.07, 'triangle', 0.12 * v, 1.5); this.tone(1500, 0.08, 'triangle', 0.1 * v, 0.7, 0.08); this.hiss(0.08, 0.1 * v, 3000, 2); break;
       case 'mantle': this.hiss(0.12, 0.22 * v, 700, 1.2); this.tone(140, 0.1, 'sine', 0.2 * v, 1.4); break;
       case 'hurt': this.tone(90, 0.18, 'sine', 0.45 * v, 0.6); this.hiss(0.12, 0.2 * v, 300, 1); break;
       case 'switch': this.hiss(0.06, 0.15 * v, 4000, 3); this.tone(1200, 0.03, 'square', 0.03 * v); break;

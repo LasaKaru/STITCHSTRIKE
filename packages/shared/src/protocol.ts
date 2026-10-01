@@ -80,6 +80,8 @@ export type GameEvent =
   | { type: 'drum'; x: number; z: number }
   /** A Jack-in-the-Box springs out at a toy. */
   | { type: 'pop'; x: number; z: number }
+  /** Dino Stampede set pieces: a raptor leaps, a trike charges, Rex roars. */
+  | { type: 'dino'; act: 'leap' | 'charge' | 'roar'; x: number; z: number }
   /** King of the Spool: the spool hopped to another spot / a team won the round. */
   | { type: 'hillMove'; hill: number }
   | { type: 'kothWin'; team: number }

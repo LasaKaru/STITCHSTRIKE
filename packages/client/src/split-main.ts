@@ -49,7 +49,8 @@ const profile = loadProfile();
 const PLAYERS = Math.max(2, Math.min(4, Number(params.get('players') ?? 2) || 2));
 document.body.classList.add(`players-${PLAYERS}`);
 
-const host = new RoomHost({ code: 'COUCH', fillTo: 4, mode, map, waves, difficulty });
+const mission = params.get('mission') === '1' ? 1 : 0;
+const host = new RoomHost({ code: 'COUCH', fillTo: 4, mode, map, waves, difficulty, mission });
 host.start();
 
 // ---------------------------------------------------------------- scene
@@ -211,7 +212,13 @@ main.onEvent = (e) => {
     else if (e.phase === Phase.Build && e.wave > 0) banner(`WAVE ${e.wave} CLEARED!`, 'good');
     else if (e.phase === Phase.Won) { banner('THE HEARTSPOOLS ARE SAFE!', 'good'); sfx.play('win'); }
     else if (e.phase === Phase.Lost) { banner('THE HEARTSPOOLS UNRAVELLED', 'bad'); sfx.play('lose'); }
-  } else if (e.type === 'boss') banner(e.state === 'arrive' ? 'THE UNRAVELLER APPROACHES!' : 'THE UNRAVELLER IS UNPICKED!', e.state === 'arrive' ? 'bad' : 'good');
+  } else if (e.type === 'boss') {
+    const boss = mission === 1 ? 'REX, THE YARNASAUR,' : 'THE UNRAVELLER';
+    banner(e.state === 'arrive' ? `${boss} APPROACHES!` : `${boss} IS UNPICKED!`, e.state === 'arrive' ? 'bad' : 'good');
+  } else if (e.type === 'dino') {
+    enemyRenderer?.dinoNear(e.act === 'roar' ? 15 : e.act === 'charge' ? 13 : 12, e.x, e.z);
+    if (e.act === 'roar') { sfx.play('roar', 0.7); fx.shake = Math.max(fx.shake, 0.6); }
+  }
   else if (e.type === 'drum') sfx.play('drum', 0.4);
   else if (e.type === 'pop') { enemyRenderer?.popNear(e.x, e.z); sfx.play('pop', 0.6); }
   else if (e.type === 'stomp') { fx.stomp(new THREE.Vector3(e.x, 0, e.z)); fx.shake = 1; sfx.play('stomp'); }

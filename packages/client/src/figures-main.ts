@@ -5,6 +5,7 @@ import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import { bruteOptions, figureTemplate, grumbleOptions, gruntOptions, heldBlaster, heroOptions, spawnFigure } from './figures/cast.ts';
 import { createScuttler, createMoth, poseMoth, poseScuttler, type CreatureInstance } from './figures/creatures.ts';
 import { beatDrum, createBoss, createDrone, createDrummer, createJack, createSnip, createTeeth, createTop, poseDrone, poseJack, poseSnip, poseTeeth, poseTop, soldierOptions } from './figures/invaders.ts';
+import { createPtero, createRaptor, createRex, createTrike, posePtero, poseTheropod, poseTrike, REX_SCALE } from './figures/dinos.ts';
 import { poseHumanoid } from './figures/humanoid.ts';
 import { addSkinnedShells, type FigureInstance } from './figures/rig.ts';
 import { createPost } from './scene/post.ts';
@@ -52,7 +53,7 @@ const camera = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.05, 1
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
-interface Entry { kind: 'human' | 'drummer' | 'jack' | 'scuttler' | 'moth' | 'teeth' | 'top' | 'drone' | 'snip'; inst: FigureInstance | CreatureInstance; gun?: THREE.Object3D; scale: number; x: number; hunch?: number }
+interface Entry { kind: 'human' | 'drummer' | 'jack' | 'scuttler' | 'moth' | 'teeth' | 'top' | 'drone' | 'snip' | 'raptor' | 'rex' | 'trike' | 'ptero'; inst: FigureInstance | CreatureInstance; gun?: THREE.Object3D; scale: number; x: number; hunch?: number }
 const cast: Entry[] = [];
 
 function addHuman(o: Parameters<typeof spawnFigure>[0], x: number, gunColor?: number, rifle = false, hunch = 0): FigureInstance {
@@ -98,6 +99,14 @@ if (focus === 'grumble') {
   cast[cast.length - 1].inst.root.scale.setScalar(1.3);
   put('drummer', createDrummer(), -2.7, 0, 0.3);
   put('jack', createJack(), 0.9, 0, -1.3);
+} else if (focus === 'dinos') {
+  // The Dino Stampede herd, Rex at the back.
+  const put = (kind: Entry['kind'], inst: FigureInstance, x: number, y = 0, z = 0, scale = 1) => { inst.root.position.set(x, y, z); scene.add(inst.root); cast.push({ kind, inst, scale, x }); };
+  put('rex', createRex(), 0.5, 0, 4.5, REX_SCALE);
+  put('trike', createTrike(), 3.2, 0, 0.8);
+  put('raptor', createRaptor(), -1.2, 0, -0.6);
+  put('raptor', createRaptor(), -2.8, 0, 0.6);
+  put('ptero', createPtero(), 1.0, 3.2, 0);
 } else {
   addHuman(grumbleOptions('game'), -2.1, 0x8bcb3a);
   addHuman(heroOptions(0x3a5da8, 1), -1.05, 0xe8742a);
@@ -116,9 +125,11 @@ const CAM: Record<string, [number, number, number, number, number, number]> = {
   brute: [-1.8, 2.2, -4.8, 0, 1.4, 0],
   creatures: [-0.4, 1.0, -3.2, 0, 0.4, 0],
   army: [0.4, 3.4, -11.5, 0.2, 2.5, 1],
+  dinos: [-1.5, 3.6, -11, 0.3, 2.2, 1.5],
   recruits: [-0.9, 1.3, -3.2, 0, 0.7, 0],
 };
-const c = CAM[focus] ?? CAM.all;
+const camParam = params.get('cam')?.split(',').map(Number);
+const c = camParam?.length === 6 ? camParam as [number, number, number, number, number, number] : CAM[focus] ?? CAM.all;
 camera.position.set(c[0], c[1], c[2]);
 controls.target.set(c[3], c[4], c[5]);
 controls.update();
@@ -162,12 +173,18 @@ function frame(): void {
       poseDrone(e.inst as FigureInstance, t, 1, 0);
     } else if (e.kind === 'snip') {
       poseSnip(e.inst as FigureInstance, t, t * 4, 0.6, true);
+    } else if (e.kind === 'raptor' || e.kind === 'rex') {
+      poseTheropod(e.inst as FigureInstance, t + e.x, phase * (e.kind === 'rex' ? 0.5 : 1.3), speed > 0 ? speed : 0.15, e.kind === 'rex' ? Math.max(0, Math.sin(t * 0.8)) : 0, e.scale);
+    } else if (e.kind === 'trike') {
+      poseTrike(e.inst as FigureInstance, t, phase * 0.9, speed > 0 ? speed : 0.15, 0);
+    } else if (e.kind === 'ptero') {
+      posePtero(e.inst as FigureInstance, t, 0, 0);
     } else if (e.kind === 'scuttler') {
       poseScuttler(e.inst as CreatureInstance, t, speed > 0 ? phase * 1.4 : t * 2, speed > 0 ? 1 : 0.2);
     } else {
       poseMoth(e.inst as CreatureInstance, t);
     }
-    if (state.turntable && focus !== 'army') e.inst.root.rotation.y = Math.sin(t * 0.4) * 0.9;
+    if (state.turntable && focus !== 'army' && focus !== 'dinos') e.inst.root.rotation.y = Math.sin(t * 0.4) * 0.9;
   }
   controls.update();
   post.render(t);

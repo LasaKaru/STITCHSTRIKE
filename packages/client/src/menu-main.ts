@@ -147,7 +147,7 @@ document.addEventListener('click', (e) => {
 });
 
 const customise = new CustomiseScreen(() => settings.name, (k) => music.blip(k, settings.sfxVolume));
-const play = { mode: 'coop', map: 'garden', where: 'solo', waves: '10', difficulty: '1' };
+const play = { mode: 'coop', map: 'garden', where: 'solo', waves: '10', difficulty: '1', mission: '0' };
 function choose(el: HTMLElement): void {
   const group = el.parentElement!.dataset.group as keyof typeof play;
   for (const c of el.parentElement!.querySelectorAll('.choice')) c.classList.toggle('selected', c === el);
@@ -160,9 +160,9 @@ function choose(el: HTMLElement): void {
 const bots = $<HTMLInputElement>('#bots');
 bots.addEventListener('input', () => { $('#bots-out').textContent = bots.value; });
 
-function arenaUrl(p: { mode: string; map: string; where: string; waves?: string; difficulty?: string }): string {
+function arenaUrl(p: { mode: string; map: string; where: string; waves?: string; difficulty?: string; mission?: string }): string {
   const q = new URLSearchParams({ mode: p.mode, map: p.map });
-  if (p.mode === 'coop') { q.set('waves', p.waves ?? '10'); q.set('difficulty', p.difficulty ?? '1'); }
+  if (p.mode === 'coop') { q.set('waves', p.waves ?? '10'); q.set('difficulty', p.difficulty ?? '1'); if (p.mission === '1') q.set('mission', '1'); }
   if (p.where === 'split') return `/split.html?${q}`;
   if (p.where === 'split4') return `/split.html?${q}&players=4`;
   if (p.where === 'solo') q.set('solo', '1');

@@ -4,7 +4,7 @@ import {
   BUILD_RANGE, Buildable, BUILDABLES, Buttons, createWorld, ENEMIES, ENEMY_INTERP_DELAY_MS, eyePosition, lookDirection, MAX_PITCH,
   pelletDirections, Phase, PLAYER, ENTER_RANGE, VEHICLES, VehicleKind, rayBox, rayPlayer, rayWorld, TURRET, TURRET_SHOT_BASE, WEAPONS,
   GRAPPLE, KOTH, MAPS, TEAM_COLORS, TEAM_NAMES, type GameMode, type MapId, type PlayerState, type Vec3,
-  Action, DECK, DIFFICULTIES, ENEMY_SHOT_ID, EnemyType, launchProjectile, LAUNCHER, MAX_TIER, PICKUPS, PickupKind, ShotKind, upgradeCost, WEAPON_COUNT,
+  Action, DECK, DIFFICULTIES, Mission, MISSIONS, ENEMY_SHOT_ID, EnemyType, launchProjectile, LAUNCHER, MAX_TIER, PICKUPS, PickupKind, ShotKind, upgradeCost, WEAPON_COUNT,
 } from '@stitchstrike/shared';
 import { CombatMusic, type Intensity } from './audio/combatMusic.ts';
 import { PickupsView } from './scene/pickupsView.ts';
@@ -33,7 +33,7 @@ import { levelOf, loadProfile } from './profile.ts';
 import { award, wearable, XP, type Award } from './progression.ts';
 import { jacketColor } from './figures/looks.ts';
 import { cycleCard, cycleWeapon, PadReader } from './input/gamepad.ts';
-import { Briefing, BOSS_LINE, BRIEFINGS, LOSE_LINE, nextTaunt, nextTip, WIN_LINE } from './briefing.ts';
+import { Briefing, BOSS_LINE, BRIEFINGS, LOSE_LINE, nextDinoTaunt, nextTaunt, nextTip, REX_LINE, STAMPEDE_INTRO, WIN_LINE } from './briefing.ts';
 import { QUALITY_LAYERS, setWoolLayers, updateShellLod } from './wool/woolMaterial.ts';
 
 /**
@@ -52,6 +52,13 @@ const mode: GameMode = modeParam === 'pvp' || modeParam === 'tdm' || modeParam =
 const wavesParam = Number(params.get('waves') ?? 10);
 const waves = [0, 5, 10].includes(wavesParam) ? wavesParam : 10;
 const difficulty = Math.max(0, Math.min(3, Math.floor(Number(params.get('difficulty') ?? 1)) || 0));
+/** Co-op campaign: 0 The Unraveller, 1 Dino Stampede. */
+const mission = params.get('mission') === '1' ? Mission.Stampede : Mission.Unraveller;
+const BOSS_NAME = mission === Mission.Stampede ? 'REX, THE YARNASAUR,' : 'THE UNRAVELLER';
+if (mission === Mission.Stampede) document.querySelector('#bossbar span')!.textContent = 'REX, THE YARNASAUR';
+function missionBriefing(): string[] {
+  return mission === Mission.Stampede ? STAMPEDE_INTRO : BRIEFINGS[world.id];
+}
 const solo = params.get('solo') === '1';
 const lag = Math.max(0, Number(params.get('lag') ?? 0) || 0);
 const bots = params.get('bots');
@@ -69,7 +76,7 @@ const fixedCam = params.get('cam');
 const name = (params.get('name') ?? settings.name).slice(0, 16);
 document.body.classList.add(mode);
 document.getElementById('modeline')!.textContent = mode === 'coop'
-  ? `Co-op defence · ${waves === 0 ? 'Endless' : `${waves} waves`} · ${DIFFICULTIES[difficulty].name}`
+  ? `${MISSIONS[mission].name} · ${waves === 0 ? 'Endless' : `${waves} waves`} · ${DIFFICULTIES[difficulty].name}`
   : mode === 'tdm' ? 'Team Deathmatch · Team Cotton vs Team Wool'
   : mode === 'koth' ? `King of the Spool · hold the Golden Spool · first to ${KOTH.target}` : 'PvP free-for-all · first to unravel the most toys';
 if (mode === 'tdm' || mode === 'koth') document.body.classList.add('pvp');
@@ -77,13 +84,14 @@ if (mode === 'tdm' || mode === 'koth') document.body.classList.add('pvp');
 // ---------------------------------------------------------------- transport
 
 function connect(): Transport {
-  if (solo) return withFakeLag(workerTransport(bots === null ? 4 : Number(bots), mode, map, waves, difficulty, Number(params.get('wave') ?? 1) || 1), lag);
+  if (solo) return withFakeLag(workerTransport(bots === null ? 4 : Number(bots), mode, map, waves, difficulty, Number(params.get('wave') ?? 1) || 1, mission), lag);
   const q = new URLSearchParams();
   q.set('room', params.get('room') ?? 'LOBBY');
   q.set('mode', mode);
   q.set('map', map);
   q.set('waves', String(waves));
   q.set('difficulty', String(difficulty));
+  if (mission) q.set('mission', String(mission));
   if (bots !== null) q.set('bots', bots);
   const base = params.get('server') ?? (settings.server || `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
   return withFakeLag(wsTransport(`${base}/?${q}`), lag);
@@ -348,13 +356,13 @@ net.onEvent = (e) => {
       if (e.by === net.id) { sfx.play('kill'); popup(`+${e.reward} buttons`); session.kills++; progress(XP.kill, e.enemyType === EnemyType.Boss ? 100 : 1, { kills: 1 }); }
       break;
     case 'phase':
-      if (e.phase === Phase.Wave) { banner(`WAVE ${e.wave} INCOMING!`); sfx.play('wave'); resultsCard(null); if (e.wave % 2 === 1 || e.wave === 1) briefing.say('baron', nextTaunt()); }
+      if (e.phase === Phase.Wave) { banner(`WAVE ${e.wave} INCOMING!`); sfx.play('wave'); resultsCard(null); if (e.wave % 2 === 1 || e.wave === 1) briefing.say('baron', mission === Mission.Stampede ? nextDinoTaunt() : nextTaunt()); }
       else if (e.phase === Phase.Build && e.wave > 0) {
         banner(`WAVE ${e.wave} CLEARED!`, 'good');
         if (e.wave % 2 === 0) briefing.say('sarge', nextTip());
         session.waves++;
         progress(XP.wave, 25, { waves: 1, ...(net.waves === 0 ? { bestEndless: e.wave } : {}) });
-      } else if (e.phase === Phase.Build) { banner('NEW MATCH · BUILD YOUR DEFENCE'); resultsCard(null); briefing.clear(); for (const l of BRIEFINGS[world.id]) briefing.say('sarge', l); Object.assign(session, { kills: 0, revives: 0, waves: 0, xp: 0, credits: 0 }); }
+      } else if (e.phase === Phase.Build) { banner('NEW MATCH · BUILD YOUR DEFENCE'); resultsCard(null); briefing.clear(); for (const l of missionBriefing()) briefing.say('sarge', l); Object.assign(session, { kills: 0, revives: 0, waves: 0, xp: 0, credits: 0 }); }
       else if (e.phase === Phase.Won) {
         banner('THE HEARTSPOOLS ARE SAFE!', 'good', 6000); sfx.play('win'); briefing.say('sarge', WIN_LINE);
         progress(Math.round(XP.win * (1 + 0.25 * net.difficulty)), 300, { wins: 1, matches: 1 }, { medals: net.difficulty >= 2 ? ['survivor'] : [] });
@@ -407,8 +415,8 @@ net.onEvent = (e) => {
       }
       break;
     case 'boss':
-      if (e.state === 'arrive') { banner('THE UNRAVELLER APPROACHES!', 'bad', 4000); sfx.play('boss'); briefing.say('baron', BOSS_LINE); }
-      else { banner('THE UNRAVELLER IS UNPICKED!', 'good', 4000); sfx.play('win'); progress(XP.boss, 200, { bossKills: 1 }); }
+      if (e.state === 'arrive') { banner(`${BOSS_NAME} APPROACHES!`, 'bad', 4000); sfx.play('boss'); briefing.say('baron', mission === Mission.Stampede ? REX_LINE : BOSS_LINE); }
+      else { banner(`${BOSS_NAME} IS UNPICKED!`, 'good', 4000); sfx.play('win'); progress(XP.boss, 200, { bossKills: 1 }); }
       break;
     case 'stomp': {
       const at = new THREE.Vector3(e.x, 0, e.z);
@@ -422,6 +430,24 @@ net.onEvent = (e) => {
       const at = new THREE.Vector3(e.x, 1, e.z);
       sfx.play('drum', attenuation(at) * 0.8);
       if (attenuation(at) > 0.1) caption('Drums beating: invaders speed up', at);
+      break;
+    }
+    case 'dino': {
+      const at = new THREE.Vector3(e.x, 1, e.z);
+      const type = e.act === 'roar' ? EnemyType.Rex : e.act === 'charge' ? EnemyType.Trike : EnemyType.Raptor;
+      enemyRenderer?.dinoNear(type, e.x, e.z);
+      const near = attenuation(at);
+      if (e.act === 'roar') {
+        sfx.play('roar', Math.max(0.5, near));
+        fx.shake = Math.max(fx.shake, 0.8 * near);
+        caption('Rex roars: the herd stampedes!', at);
+      } else if (e.act === 'charge') {
+        sfx.play('stomp', near * 0.7);
+        if (near > 0.1) caption('Trike charging', at);
+        fx.puff(new THREE.Vector3(e.x, 0.3, e.z), 0xb8a58a, 1.4);
+      } else {
+        sfx.play('chirp', near);
+      }
       break;
     }
     case 'pop': {
@@ -459,7 +485,7 @@ const lock = () => {
   music.start(settings.musicVolume);
   briefing.unlock();
   // The opening briefing plays once the player is in (audio is unlocked by the click).
-  if (!briefed && mode === 'coop') { briefed = true; for (const l of BRIEFINGS[world.id]) briefing.say('sarge', l); }
+  if (!briefed && mode === 'coop') { briefed = true; for (const l of missionBriefing()) briefing.say('sarge', l); }
   renderer.domElement.requestPointerLock();
 };
 renderer.domElement.addEventListener('click', lock);
@@ -1031,6 +1057,7 @@ function frame(): void {
       balloon: [0, 6, 20, 0, 40, 60],
       jeep: [-3, 4.5, 33, -10, 1, 40],
       tank: [-33, 4.5, -2, -40, 1, -8],
+      gate: [9, 7, 24, 0, 3, 40],
     } : world.id === 'toystore' ? {
       overview: [0, 26, 48, 0, 4, -20],
       core: [6, 4, -4, 0, 1, -12],

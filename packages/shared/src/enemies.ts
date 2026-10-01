@@ -23,6 +23,14 @@ export const EnemyType = {
   Drummer: 10,
   /** Jack-in-the-Box: waddles up in its box, then springs out at toys nearby. */
   Jack: 11,
+  /** Knitted raptor: a fast pack hunter that leaps at toys. */
+  Raptor: 12,
+  /** Woolly triceratops: lowers its frill and charges, flattening buildables. */
+  Trike: 13,
+  /** Felt pterodactyl: circles high and swoops down on toys. */
+  Ptero: 14,
+  /** Boss: Rex, the Yarnasaur. Stomps, and roars the herd into a rush. */
+  Rex: 15,
 } as const;
 
 export interface EnemyDef {
@@ -46,6 +54,8 @@ export interface EnemyDef {
   boss?: boolean;
   /** Knocks toys back on hit (spinning tops, the boss). */
   knockback?: number;
+  /** One of the Dino Stampede herd (a Rex roar sends these rushing). */
+  dino?: boolean;
 }
 
 export const ENEMIES: EnemyDef[] = [
@@ -61,6 +71,10 @@ export const ENEMIES: EnemyDef[] = [
   { name: 'The Unraveller', hp: 4200, speed: 1.2, radius: 1.6, height: 4.6, damage: 50, attackRate: 0.5, reward: 300, flying: false, breaksBuildables: true, boss: true, knockback: 9 },
   { name: 'Tin Drummer', hp: 150, speed: 1.9, radius: 0.5, height: 1.45, damage: 8, attackRate: 0.8, reward: 18, flying: false, breaksBuildables: false },
   { name: 'Jack-in-the-Box', hp: 90, speed: 2.8, radius: 0.55, height: 1.1, damage: 26, attackRate: 0.5, reward: 15, flying: false, breaksBuildables: false, knockback: 8 },
+  { name: 'Knitted Raptor', hp: 65, speed: 4.6, radius: 0.5, height: 1.4, damage: 12, attackRate: 1.4, reward: 10, flying: false, breaksBuildables: false, dino: true },
+  { name: 'Woolly Trike', hp: 650, speed: 1.7, radius: 1.2, height: 2, damage: 38, attackRate: 0.6, reward: 50, flying: false, breaksBuildables: true, knockback: 10, dino: true },
+  { name: 'Felt Ptero', hp: 60, speed: 4.6, radius: 0.7, height: 0.8, damage: 11, attackRate: 1.1, reward: 11, flying: true, breaksBuildables: false, altitude: 7, knockback: 5, dino: true },
+  { name: 'Rex, the Yarnasaur', hp: 5200, speed: 1.4, radius: 2, height: 5.2, damage: 60, attackRate: 0.5, reward: 400, flying: false, breaksBuildables: true, boss: true, knockback: 11, dino: true },
 ];
 
 /** Damage scissor snips do to buildables per cut. */
@@ -73,6 +87,15 @@ export const BOSS_STOMP = { every: 6, damage: 30, radius: 5 };
 export const DRUM = { radius: 7, boost: 1.35, every: 2 };
 /** Jack-in-the-Box: springs when a toy is within range, hurting toys within radius and lunging at them. */
 export const JACK_POP = { range: 4, radius: 3, damage: 26, every: 5, lunge: 9 };
+/** Raptors leap at a toy within range (but not too close), every few seconds. */
+export const RAPTOR_LEAP = { range: 9, min: 2.5, every: 4, lunge: 15 };
+/** Trikes charge a toy within range: a burst of speed for a moment. */
+export const TRIKE_CHARGE = { range: 16, every: 8, duration: 1.8, boost: 3.2 };
+/** Pteros spot toys from this far off and swoop down at them. */
+export const PTERO_SWOOP = { range: 14 };
+/** Rex roars this often: every dino within radius rushes (faster) for a while. */
+export const REX_ROAR = { every: 11, radius: 26, rush: 4, boost: 1.6 };
+
 /** Tin soldiers' chance to hit a toy per shot (they are toys, after all). */
 export const SOLDIER_ACCURACY = 0.55;
 
@@ -97,8 +120,12 @@ export interface Enemy {
   kz: number;
   /** Seconds left tangled by a yarn ball (half speed). */
   slow: number;
-  /** Type-specific timer: drone drops, boss stomps. */
+  /** Type-specific timer: drone drops, boss stomps, raptor leaps, trike charges. */
   special: number;
+  /** Seconds left charging (trikes) or rushing after a Rex roar. */
+  rush?: number;
+  /** Seconds until Rex roars again. */
+  roar?: number;
 }
 
 // ---------------------------------------------------------------- navigation

@@ -1,4 +1,4 @@
-import { BOSS_STOMP, DRONE_DROP, DRUM, ENEMIES, JACK_POP, EnemyType, NavGrid, pushOutOfBoxes, SNIP_CUT, SOLDIER_ACCURACY, type Enemy } from './enemies.ts';
+import { BOSS_STOMP, DRONE_DROP, DRUM, ENEMIES, JACK_POP, EnemyType, NavGrid, PTERO_SWOOP, pushOutOfBoxes, RAPTOR_LEAP, REX_ROAR, TRIKE_CHARGE, SNIP_CUT, SOLDIER_ACCURACY, type Enemy } from './enemies.ts';
 import type { GameEvent, Shot } from './protocol.ts';
 import { hasLineOfSight } from './raycast.ts';
 import type { Vec3, World } from './world.ts';
@@ -73,10 +73,19 @@ export const DIFFICULTIES: DifficultyDef[] = [
   { name: 'Unravelled', enemyHp: 1.7, enemyCount: 1.4, damageTaken: 1.5, startButtons: 250 },
 ];
 
+/** Which campaign the waves come from. */
+export const Mission = { Unraveller: 0, Stampede: 1 } as const;
+export const MISSIONS = [
+  { name: 'The Unraveller', blurb: "Baron von Ravel's Mass-Knit Army marches on the Heartspools." },
+  { name: 'Dino Stampede', blurb: 'A herd of knitted dinosaurs breaks out of the toy box. Rex leads the charge.' },
+];
+
 export interface CoopOptions {
   /** Waves to win (5 skirmish, 10 mission with a boss); 0 = endless. */
   waves?: number;
   difficulty?: number;
+  /** Mission.Unraveller (default) or Mission.Stampede. */
+  mission?: number;
 }
 
 interface SpawnGroup { type: number; count: number; spawn: number; delay: number; interval: number }
@@ -84,6 +93,7 @@ interface SpawnGroup { type: number; count: number; spawn: number; delay: number
 const G = EnemyType.Grunt, S = EnemyType.Scuttler, M = EnemyType.Moth, B = EnemyType.Brute;
 const T = EnemyType.Teeth, P = EnemyType.Top, O = EnemyType.Soldier, D = EnemyType.Drone, X = EnemyType.Snip, Z = EnemyType.Boss;
 const R = EnemyType.Drummer, J = EnemyType.Jack;
+const RA = EnemyType.Raptor, TR = EnemyType.Trike, PT = EnemyType.Ptero, RX = EnemyType.Rex;
 const g = (type: number, count: number, delay = 0, interval = 1, spawn = -1): SpawnGroup => ({ type, count, spawn, delay, interval });
 
 /** The ten waves of a full mission: each introduces something new, and the Unraveller closes it. */
@@ -103,10 +113,26 @@ export const WAVES: SpawnGroup[][] = [
 const SKIRMISH: SpawnGroup[][] = [WAVES[0], WAVES[1], WAVES[2], WAVES[3],
   [g(G, 18, 0, 0.7), g(S, 12, 4, 0.4), g(M, 10, 8, 0.6), g(B, 3, 12, 5), g(O, 6, 6, 1.5), g(J, 2, 10, 3)]];
 
+/** Dino Stampede: raptor packs, swooping pteros and charging trikes, then Rex. */
+export const STAMPEDE: SpawnGroup[][] = [
+  [g(RA, 6, 0, 1.4), g(G, 6, 2, 1.2)],
+  [g(RA, 12, 0, 0.8), g(T, 12, 6, 0.3)],
+  [g(PT, 6, 0, 1.4), g(RA, 10, 4, 0.8), g(G, 8, 2, 1)],
+  [g(TR, 1, 4), g(RA, 14, 0, 0.7), g(O, 6, 8, 1.5)],
+  [g(PT, 10, 0, 0.9), g(TR, 2, 6, 8), g(RA, 16, 2, 0.6)],
+  [g(RA, 20, 0, 0.5), g(J, 3, 6, 3), g(PT, 8, 10, 1), g(X, 3, 8, 3)],
+  [g(TR, 3, 0, 6), g(RA, 18, 4, 0.5), g(R, 2, 2, 6), g(PT, 10, 8, 0.8)],
+  [g(RA, 26, 0, 0.4), g(PT, 12, 4, 0.7), g(TR, 3, 10, 6), g(D, 3, 8, 4)],
+  [g(TR, 4, 0, 5), g(RA, 30, 2, 0.35), g(PT, 14, 6, 0.6), g(B, 2, 14, 6)],
+  [g(RX, 1, 4, 1, 0), g(RA, 24, 0, 0.6), g(PT, 12, 8, 0.8), g(TR, 3, 16, 7)],
+];
+const STAMPEDE_SKIRMISH: SpawnGroup[][] = [STAMPEDE[0], STAMPEDE[1], STAMPEDE[2], STAMPEDE[3],
+  [g(TR, 3, 0, 5), g(RA, 24, 2, 0.4), g(PT, 12, 6, 0.6)]];
+
 /** Endless: loop the mission waves, each loop tougher, a boss every tenth wave. */
-function endlessWave(n: number): { groups: SpawnGroup[]; hp: number; count: number } {
-  const loop = Math.floor((n - 1) / WAVES.length);
-  return { groups: WAVES[(n - 1) % WAVES.length], hp: 1 + loop * 0.45, count: 1 + loop * 0.3 };
+function endlessWave(n: number, table: SpawnGroup[][]): { groups: SpawnGroup[]; hp: number; count: number } {
+  const loop = Math.floor((n - 1) / table.length);
+  return { groups: table[(n - 1) % table.length], hp: 1 + loop * 0.45, count: 1 + loop * 0.3 };
 }
 
 export interface CoreState { hp: number; shield: number; alive: boolean }
@@ -129,6 +155,7 @@ export class CoopDirector {
   readonly nav: NavGrid;
   readonly waves: number;
   readonly difficulty: number;
+  readonly mission: number;
   phase: number = Phase.Build;
   /** Wave number shown to players, 1-based; 0 before the first wave. */
   wave = 0;
@@ -151,6 +178,7 @@ export class CoopDirector {
   constructor(readonly world: World, options: CoopOptions = {}) {
     this.waves = options.waves ?? 10;
     this.difficulty = Math.max(0, Math.min(DIFFICULTIES.length - 1, options.difficulty ?? 1));
+    this.mission = options.mission === Mission.Stampede ? Mission.Stampede : Mission.Unraveller;
     this.nav = new NavGrid(world);
     this.reset();
   }
@@ -338,12 +366,13 @@ export class CoopDirector {
     let countScale = (0.6 + 0.4 * n) * 1.25 * this.diff.enemyCount;
     this.waveHp = 1;
     if (this.waves === 0) {
-      const w = endlessWave(this.wave);
+      const w = endlessWave(this.wave, this.mission === Mission.Stampede ? STAMPEDE : WAVES);
       groups = w.groups;
       countScale *= w.count;
       this.waveHp = w.hp;
     } else {
-      groups = (this.waves <= 5 ? SKIRMISH : WAVES)[Math.min(this.wave, this.waves <= 5 ? SKIRMISH.length : WAVES.length) - 1];
+      const table = this.mission === Mission.Stampede ? (this.waves <= 5 ? STAMPEDE_SKIRMISH : STAMPEDE) : this.waves <= 5 ? SKIRMISH : WAVES;
+      groups = table[Math.min(this.wave, table.length) - 1];
     }
     const spawns = this.world.coop.enemySpawns.length;
     this.queue = [];
@@ -380,7 +409,10 @@ export class CoopDirector {
       id: this.nextEnemyId, type, x, y, z, vx: 0, vz: 0, yaw: 0, hp, maxHp: hp,
       core: alive[Math.floor(Math.random() * alive.length)] ?? 0,
       node: -1, cooldown: 0, kx: 0, kz: 0, slow: 0,
-      special: type === EnemyType.Drone ? DRONE_DROP.every * 0.5 : type === EnemyType.Boss ? BOSS_STOMP.every : type === EnemyType.Jack ? 1.5 : 0,
+      special: type === EnemyType.Drone ? DRONE_DROP.every * 0.5 : def.boss ? BOSS_STOMP.every : type === EnemyType.Jack ? 1.5
+        : type === EnemyType.Raptor ? 1 + Math.random() * 2 : type === EnemyType.Trike ? 3 : 0,
+      rush: 0,
+      roar: type === EnemyType.Rex ? 3 : 0,
     };
     this.enemies.push(e);
     this.nextEnemyId = (this.nextEnemyId % 65535) + 1;
@@ -446,8 +478,11 @@ export class CoopDirector {
       e.cooldown = Math.max(0, e.cooldown - dt);
       e.slow = Math.max(0, e.slow - dt);
       e.special -= dt;
+      e.rush = Math.max(0, (e.rush ?? 0) - dt);
 
       let slow = e.slow > 0 ? 0.5 : 1;
+      // Charging trikes and dinos rushing after a Rex roar.
+      if (e.rush > 0) slow *= e.type === EnemyType.Trike ? TRIKE_CHARGE.boost : REX_ROAR.boost;
       // Marching to the drum: faster within earshot of a Tin Drummer.
       if (e.type !== EnemyType.Drummer && drummers.some((d) => Math.hypot(d.x - e.x, d.z - e.z) < DRUM.radius)) slow *= DRUM.boost;
       if (!def.flying) {
@@ -461,12 +496,15 @@ export class CoopDirector {
       let tz = cores[e.core][2];
       let attack: (() => void) | null = null;
       let hold = false;
-      const aggro = def.flying ? 4.5 : 3.5;
+      // Pteros spot toys from high up and swoop; raptors hunt from further off than toys do.
+      const ptero = e.type === EnemyType.Ptero;
+      const aggro = ptero ? PTERO_SWOOP.range : e.type === EnemyType.Raptor ? 7 : def.flying ? 4.5 : 3.5;
+      const reachY = ptero ? 9 : 2.5;
       let nearestPlayer: { id: number; x: number; y: number; z: number } | null = null;
       let nearestD = aggro;
       for (const p of players) {
         const d = Math.hypot(p.x - e.x, p.z - e.z);
-        if (d < nearestD && Math.abs(p.y - e.y) < 2.5) { nearestD = d; nearestPlayer = p; }
+        if (d < nearestD && Math.abs(p.y - e.y) < reachY) { nearestD = d; nearestPlayer = p; }
       }
       const dCore = Math.hypot(tx - e.x, tz - e.z);
       const reach = def.radius + CORE.radius + 0.5;
@@ -526,7 +564,7 @@ export class CoopDirector {
         }
       } else if (!attack && nearestPlayer && nearestD < dCore) {
         tx = nearestPlayer.x; tz = nearestPlayer.z;
-        if (nearestD < def.radius + 0.9) {
+        if (nearestD < def.radius + 0.9 && (!ptero || Math.abs(nearestPlayer.y + 1 - e.y) < 1.6)) {
           const np = nearestPlayer;
           attack = () => host.damagePlayer(np.id, def.damage, e.type, knock(np.x, np.z));
         }
@@ -577,6 +615,45 @@ export class CoopDirector {
           }
         }
       }
+      if (e.type === EnemyType.Raptor && e.special <= 0 && nearestPlayer && nearestD > RAPTOR_LEAP.min && nearestD < RAPTOR_LEAP.range) {
+        e.special = RAPTOR_LEAP.every;
+        e.kx = ((nearestPlayer.x - e.x) / nearestD) * RAPTOR_LEAP.lunge;
+        e.kz = ((nearestPlayer.z - e.z) / nearestD) * RAPTOR_LEAP.lunge;
+        this.emit({ type: 'dino', act: 'leap', x: e.x, z: e.z });
+      }
+      if (e.type === EnemyType.Trike && e.special <= 0 && e.rush <= 0) {
+        // Charge the nearest toy in range; the charge carries it straight through.
+        let prey: (typeof players)[number] | null = null;
+        let best = TRIKE_CHARGE.range;
+        for (const p of players) {
+          const d = Math.hypot(p.x - e.x, p.z - e.z);
+          if (d < best && Math.abs(p.y - e.y) < 2.5) { best = d; prey = p; }
+        }
+        if (prey) {
+          e.special = TRIKE_CHARGE.every;
+          e.rush = TRIKE_CHARGE.duration;
+          this.emit({ type: 'dino', act: 'charge', x: e.x, z: e.z });
+        }
+      }
+      if (e.type === EnemyType.Trike && e.rush > 0) {
+        let prey: (typeof players)[number] | null = null;
+        let best = TRIKE_CHARGE.range;
+        for (const p of players) {
+          const d = Math.hypot(p.x - e.x, p.z - e.z);
+          if (d < best && Math.abs(p.y - e.y) < 2.5) { best = d; prey = p; }
+        }
+        if (prey && !attack) { tx = prey.x; tz = prey.z; }
+      }
+      if (e.type === EnemyType.Rex) {
+        e.roar = (e.roar ?? 0) - dt;
+        if (e.roar <= 0) {
+          e.roar = REX_ROAR.every;
+          this.emit({ type: 'dino', act: 'roar', x: e.x, z: e.z });
+          for (const o of this.enemies) {
+            if (o !== e && o.hp > 0 && ENEMIES[o.type].dino && Math.hypot(o.x - e.x, o.z - e.z) < REX_ROAR.radius) o.rush = Math.max(o.rush ?? 0, REX_ROAR.rush);
+          }
+        }
+      }
       if (def.boss && e.special <= 0) {
         e.special = BOSS_STOMP.every;
         this.emit({ type: 'stomp', x: e.x, z: e.z });
@@ -613,8 +690,10 @@ export class CoopDirector {
 
       if (def.flying) {
         const cruise = def.altitude ?? 3.2;
-        const alt = attack ? Math.min(cruise, 1.2 + (e.type === EnemyType.Drone ? 2 : 0)) : cruise + Math.sin(this.time * 3 + e.id) * 0.4;
-        e.y += (alt - e.y) * Math.min(1, dt * 2);
+        // Pteros swoop: lower the closer they get to their toy.
+        const alt = ptero && nearestPlayer ? Math.max(nearestPlayer.y + 1, Math.min(cruise, nearestPlayer.y + 1 + (nearestD - def.radius) * 0.6))
+          : attack ? Math.min(cruise, 1.2 + (e.type === EnemyType.Drone ? 2 : 0)) : cruise + Math.sin(this.time * 3 + e.id) * 0.4;
+        e.y += (alt - e.y) * Math.min(1, dt * (ptero ? 3.5 : 2));
       } else {
         pushOutOfBoxes(e, def.radius, boxes);
         // Buildables: walls and barricades block; brutes and the boss smash whatever they touch.

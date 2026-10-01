@@ -22,6 +22,8 @@ export interface HostOptions {
   waves?: number;
   /** Co-op difficulty 0..3 (Cosy, Scratchy, Moth-eaten, Unravelled). */
   difficulty?: number;
+  /** Co-op campaign: Mission.Unraveller (0) or Mission.Stampede (1). */
+  mission?: number;
   /** Co-op practice: start at this wave (solo only). */
   startWave?: number;
 }
@@ -41,7 +43,7 @@ export class RoomHost {
   private snapshots = 0;
 
   constructor(readonly options: HostOptions) {
-    this.room = new Room(createWorld(options.map ?? 'bedroom'), options.mode ?? 'coop', { waves: options.waves, difficulty: options.difficulty });
+    this.room = new Room(createWorld(options.map ?? 'bedroom'), options.mode ?? 'coop', { waves: options.waves, difficulty: options.difficulty, mission: options.mission });
     if (this.room.coop && options.startWave && options.startWave > 1) {
       this.room.coop.wave = options.startWave - 1;
       this.room.coop.buttons += 150 * (options.startWave - 1);

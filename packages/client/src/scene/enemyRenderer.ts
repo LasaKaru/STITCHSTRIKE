@@ -4,6 +4,7 @@ import { bruteOptions, gruntOptions, heldBlaster, spawnFigure } from '../figures
 import { createMoth, createScuttler, poseMoth, poseScuttler } from '../figures/creatures.ts';
 import { beatDrum, createBoss, createDrone, createDrummer, createJack, createSnip, createTeeth, createTop, poseDrone, poseJack, poseSnip, poseTeeth, poseTop, soldierOptions } from '../figures/invaders.ts';
 import { poseHumanoid } from '../figures/humanoid.ts';
+import { createPtero, createRaptor, createRex, createTrike, posePtero, poseTheropod, poseTrike, REX_SCALE } from '../figures/dinos.ts';
 import type { FigureInstance } from '../figures/rig.ts';
 
 /**
@@ -46,7 +47,8 @@ interface Pooled {
 export const LOD_FAR = 38;
 const LOD_NEAR = 33;
 /** Stand-in colours per type (body yarn). */
-const PROXY_COLORS = [0x3a4a34, 0x6a3c9a, 0xb8a58a, 0x7a4a2e, 0xf6f1e4, 0x2f7fe0, 0x2f5a9a, 0x2a2a30, 0xe8742a, 0x8a5a3a, 0xb3262c, 0xffc94a];
+const PROXY_COLORS = [0x3a4a34, 0x6a3c9a, 0xb8a58a, 0x7a4a2e, 0xf6f1e4, 0x2f7fe0, 0x2f5a9a, 0x2a2a30, 0xe8742a, 0x8a5a3a, 0xb3262c, 0xffc94a,
+  0x5f9e4a, 0x4a8a9a, 0x7a4a8a, 0x8a5a3a];
 
 const MAX_BARS = 128;
 
@@ -149,12 +151,21 @@ export class EnemyRenderer {
       figure = createDrummer();
     } else if (type === EnemyType.Jack) {
       figure = createJack();
+    } else if (type === EnemyType.Raptor) {
+      figure = createRaptor();
+    } else if (type === EnemyType.Trike) {
+      figure = createTrike();
+    } else if (type === EnemyType.Ptero) {
+      figure = createPtero();
+    } else if (type === EnemyType.Rex) {
+      figure = createRex();
     } else {
       figure = createBoss();
     }
     const body = new THREE.Group();
     body.add(figure.root);
     if (type === EnemyType.Moth) figure.root.position.y = -0.35;
+    if (type === EnemyType.Ptero) figure.root.position.y = -0.4;
     const root = new THREE.Group();
     root.add(body);
     return { root, body, figure, gun, type, popAge: 9, far: false };
@@ -171,6 +182,18 @@ export class EnemyRenderer {
     this.scene.remove(p.root);
     if (!this.free.has(p.type)) this.free.set(p.type, []);
     this.free.get(p.type)!.push(p);
+  }
+
+  /** A dinosaur set piece near here (raptor leap, trike charge, Rex roar): animate the nearest one. */
+  dinoNear(type: number, x: number, z: number): void {
+    let best: Pooled | null = null;
+    let bestD = type === EnemyType.Rex ? 6 : 3;
+    for (const p of this.live.values()) {
+      if (p.type !== type) continue;
+      const d = Math.hypot(p.root.position.x - x, p.root.position.z - z);
+      if (d < bestD) { bestD = d; best = p; }
+    }
+    if (best) best.popAge = 0;
   }
 
   /** A Jack-in-the-Box sprang near here: shoot the nearest one's clown out. */
@@ -204,7 +227,7 @@ export class EnemyRenderer {
         let d = Infinity;
         for (const c of this.lodFrom) d = Math.min(d, c.distanceTo(p.root.position));
         // The boss is always drawn in full: it is the whole point of the wave.
-        p.far = e.type !== EnemyType.Boss && (p.far ? d > LOD_NEAR : d > LOD_FAR);
+        p.far = !ENEMIES[e.type].boss && (p.far ? d > LOD_NEAR : d > LOD_FAR);
       } else {
         p.far = false;
       }
@@ -258,6 +281,24 @@ export class EnemyRenderer {
         case EnemyType.Jack:
           p.popAge += dt;
           poseJack(p.figure, t + e.id, e.phase * 1.2, Math.max(0.2, speed), Math.max(0, 1 - p.popAge / 1.2));
+          break;
+        case EnemyType.Raptor:
+          p.popAge += dt;
+          poseTheropod(p.figure, t + e.id, e.phase * 1.3, Math.max(0.15, speed), Math.max(0, 1 - p.popAge / 0.6));
+          break;
+        case EnemyType.Rex: {
+          p.popAge += dt;
+          // A roar: rear up, jaws wide, hold it, then back down.
+          const roar = p.popAge < 2.2 ? Math.min(1, p.popAge * 4, (2.2 - p.popAge) * 2) : 0;
+          poseTheropod(p.figure, t, e.phase / REX_SCALE * 1.6, Math.max(0.15, speed), roar, REX_SCALE);
+          break;
+        }
+        case EnemyType.Trike:
+          p.popAge += dt;
+          poseTrike(p.figure, t + e.id, e.phase * 0.9, Math.max(0.15, speed), p.popAge < 1.8 ? 1 : 0);
+          break;
+        case EnemyType.Ptero:
+          posePtero(p.figure, t, e.id, Math.max(0, Math.min(1, (5 - e.y) / 3.5)));
           break;
         default:
           poseHumanoid(p.figure, { t: t + e.id, speed: speed * 0.7, phase: e.phase, pitch: 0, crouch: 0, airborne: false, aiming: false, hunch: 0.25 }, 3.05);

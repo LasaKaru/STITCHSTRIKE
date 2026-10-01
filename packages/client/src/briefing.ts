@@ -63,6 +63,23 @@ const TIPS = [
   'Grab stuffing to patch up, thimbles for armour, and Power Poms to hit harder.',
 ];
 
+/** Dino Stampede: the Baron has opened his prehistoric playset. */
+export const STAMPEDE_INTRO = [
+  'Bad news, soldiers. The Baron has knitted himself a whole herd of dinosaurs, and the toy box lid is open!',
+  'Raptors hunt in packs and leap, so keep moving. Trikes charge and smash traps. Watch the sky for pteros.',
+  'If you hear a roar, that is Rex. Every dino near him goes into a rush. Grab a jeep if you need to outrun them!',
+];
+const DINO_TAUNTS = [
+  'Behold, my Cretaceous collection! Hand-knitted? No. Mass-produced. MWAHAHA!',
+  'My raptors hunt in packs. Packs of six. Packs of SIXTY!',
+  'Stampede! Trample their little spools flat!',
+  'My pteros have very sharp beaks and very poor manners.',
+  'Extinct? Nonsense. I simply knitted them back!',
+];
+let dinoIndex = 0;
+export const nextDinoTaunt = () => DINO_TAUNTS[dinoIndex++ % DINO_TAUNTS.length];
+export const REX_LINE = 'And now, the king of the toy box: REX, THE YARNASAUR! Six metres of pure acrylic fury!';
+
 export const BOSS_LINE = 'Behold my masterpiece: THE UNRAVELLER! Felted by hand... by MY hands. The irony is delicious!';
 export const WIN_LINE = "The Heartspools are safe! That's the finest bit of knitting I've seen since the Great Jumper War.";
 export const LOSE_LINE = "We'll get the needles out and knit ourselves back together. Again!";
