@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { TICK_RATE } from './constants.ts';
-import { Mission, Phase, STAMPEDE } from './coop.ts';
+import { PLAYER, TICK_RATE } from './constants.ts';
+import { Mission, Phase, STAMPEDE, WAVES } from './coop.ts';
 import { ENEMIES, EnemyType, REX_ROAR, TRIKE_CHARGE, type Enemy } from './enemies.ts';
 import { RoomHost } from './host.ts';
 import { createPlayerState } from './movement.ts';
@@ -113,5 +113,52 @@ describe('Dino Stampede', () => {
     // Toys from the Baron's army don't answer to Rex.
     expect(toy.rush ?? 0).toBe(0);
     expect(rex.roar).toBeGreaterThan(REX_ROAR.every - 1);
+  });
+});
+
+describe('paper planes and yo-yo slingers', () => {
+  function toyArena(): Room {
+    const room = new Room(flat(), 'coop');
+    room.coop!.phase = Phase.Wave;
+    (room.coop as unknown as { queue: unknown[] }).queue = [{ at: 1e9, type: 0, spawn: 0 }];
+    return room;
+  }
+
+  it('march in the Unraveller campaign', () => {
+    const types = new Set(WAVES.flat().map((g) => g.type));
+    expect(types.has(EnemyType.Plane)).toBe(true);
+    expect(types.has(EnemyType.YoYo)).toBe(true);
+  });
+
+  it('a paper plane swoops on a toy and crumples on impact', () => {
+    const room = toyArena();
+    const p = room.addPlayer('Target')!;
+    p.state = createPlayerState([0, 0, 0]);
+    p.protect = 0;
+    const plane = enemy(1, EnemyType.Plane, 8, 0);
+    room.coop!.enemies.push(plane);
+    let crumpled = false;
+    for (let i = 0; i < TICK_RATE * 6 && !crumpled; i++) {
+      room.update();
+      crumpled = room.drainEvents().some((e) => e.type === 'crumple');
+    }
+    expect(crumpled).toBe(true);
+    expect(room.coop!.enemies.includes(plane)).toBe(false);
+    expect(p.health).toBeLessThan(PLAYER.maxHealth);
+  });
+
+  it('a yo-yo slinger yanks a toy towards it from range', () => {
+    const room = toyArena();
+    const p = room.addPlayer('Yanked')!;
+    p.state = createPlayerState([0, 0, 0]);
+    p.protect = 0;
+    const s = enemy(2, EnemyType.YoYo, 8, 0);
+    room.coop!.enemies.push(s);
+    room.update();
+    expect(p.health).toBeLessThan(PLAYER.maxHealth);
+    expect(p.state.vx).toBeGreaterThan(3);
+    // It holds its ground at range instead of walking up.
+    for (let i = 0; i < TICK_RATE; i++) room.update();
+    expect(Math.abs(s.x - 8)).toBeLessThan(1);
   });
 });

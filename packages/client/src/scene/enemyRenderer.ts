@@ -4,6 +4,7 @@ import { bruteOptions, gruntOptions, heldBlaster, spawnFigure } from '../figures
 import { createMoth, createScuttler, poseMoth, poseScuttler } from '../figures/creatures.ts';
 import { beatDrum, createBoss, createDrone, createDrummer, createJack, createSnip, createTeeth, createTop, poseDrone, poseJack, poseSnip, poseTeeth, poseTop, soldierOptions } from '../figures/invaders.ts';
 import { poseHumanoid } from '../figures/humanoid.ts';
+import { createPlane, createYoYo, posePlane, poseYoYo } from '../figures/paperToys.ts';
 import { createPtero, createRaptor, createRex, createTrike, posePtero, poseTheropod, poseTrike, REX_SCALE } from '../figures/dinos.ts';
 import type { FigureInstance } from '../figures/rig.ts';
 
@@ -48,7 +49,7 @@ export const LOD_FAR = 38;
 const LOD_NEAR = 33;
 /** Stand-in colours per type (body yarn). */
 const PROXY_COLORS = [0x3a4a34, 0x6a3c9a, 0xb8a58a, 0x7a4a2e, 0xf6f1e4, 0x2f7fe0, 0x2f5a9a, 0x2a2a30, 0xe8742a, 0x8a5a3a, 0xb3262c, 0xffc94a,
-  0x5f9e4a, 0x4a8a9a, 0x7a4a8a, 0x8a5a3a];
+  0x5f9e4a, 0x4a8a9a, 0x7a4a8a, 0x8a5a3a, 0xfbf7ec, 0xd8262e];
 
 const MAX_BARS = 128;
 
@@ -159,6 +160,10 @@ export class EnemyRenderer {
       figure = createPtero();
     } else if (type === EnemyType.Rex) {
       figure = createRex();
+    } else if (type === EnemyType.Plane) {
+      figure = createPlane();
+    } else if (type === EnemyType.YoYo) {
+      figure = createYoYo();
     } else {
       figure = createBoss();
     }
@@ -296,6 +301,14 @@ export class EnemyRenderer {
         case EnemyType.Trike:
           p.popAge += dt;
           poseTrike(p.figure, t + e.id, e.phase * 0.9, Math.max(0.15, speed), p.popAge < 1.8 ? 1 : 0);
+          break;
+        case EnemyType.Plane:
+          posePlane(p.figure, t, e.id, Math.max(0, Math.min(1, (3.5 - e.y) / 2.5)));
+          break;
+        case EnemyType.YoYo:
+          p.popAge += dt;
+          poseHumanoid(p.figure, { t: t + e.id, speed, phase: e.phase, pitch: 0, crouch: 0, airborne: false, aiming: false }, 0.95);
+          poseYoYo(p.figure, t + e.id, Math.max(0, 1 - p.popAge / 0.5));
           break;
         case EnemyType.Ptero:
           posePtero(p.figure, t, e.id, Math.max(0, Math.min(1, (5 - e.y) / 3.5)));

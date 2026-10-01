@@ -7,6 +7,7 @@ import { createScuttler, createMoth, poseMoth, poseScuttler, type CreatureInstan
 import { beatDrum, createBoss, createDrone, createDrummer, createJack, createSnip, createTeeth, createTop, poseDrone, poseJack, poseSnip, poseTeeth, poseTop, soldierOptions } from './figures/invaders.ts';
 import { createPtero, createRaptor, createRex, createTrike, posePtero, poseTheropod, poseTrike, REX_SCALE } from './figures/dinos.ts';
 import { poseEmote } from './figures/emotes.ts';
+import { createPlane, createYoYo, posePlane, poseYoYo } from './figures/paperToys.ts';
 import { poseHumanoid } from './figures/humanoid.ts';
 import { addSkinnedShells, type FigureInstance } from './figures/rig.ts';
 import { createPost } from './scene/post.ts';
@@ -54,7 +55,7 @@ const camera = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.05, 1
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
-interface Entry { emote?: number; kind: 'human' | 'drummer' | 'jack' | 'scuttler' | 'moth' | 'teeth' | 'top' | 'drone' | 'snip' | 'raptor' | 'rex' | 'trike' | 'ptero'; inst: FigureInstance | CreatureInstance; gun?: THREE.Object3D; scale: number; x: number; hunch?: number }
+interface Entry { emote?: number; kind: 'human' | 'drummer' | 'jack' | 'scuttler' | 'moth' | 'teeth' | 'top' | 'drone' | 'snip' | 'raptor' | 'rex' | 'trike' | 'ptero' | 'plane' | 'yoyo'; inst: FigureInstance | CreatureInstance; gun?: THREE.Object3D; scale: number; x: number; hunch?: number }
 const cast: Entry[] = [];
 
 function addHuman(o: Parameters<typeof spawnFigure>[0], x: number, gunColor?: number, rifle = false, hunch = 0): FigureInstance {
@@ -100,6 +101,11 @@ if (focus === 'grumble') {
   cast[cast.length - 1].inst.root.scale.setScalar(1.3);
   put('drummer', createDrummer(), -2.7, 0, 0.3);
   put('jack', createJack(), 0.9, 0, -1.3);
+} else if (focus === 'paper') {
+  const put = (kind: Entry['kind'], inst: FigureInstance, x: number, y = 0, z = 0) => { inst.root.position.set(x, y, z); scene.add(inst.root); cast.push({ kind, inst, scale: 1, x }); };
+  put('yoyo', createYoYo(), -0.5);
+  put('plane', createPlane(), 0.9, 1.0, -0.2);
+  put('plane', createPlane(), 1.5, 1.4, 0.6);
 } else if (focus === 'emotes') {
   // Wave, cheer, dance and bow.
   [-2.1, -0.7, 0.7, 2.1].forEach((x, k) => {
@@ -134,6 +140,7 @@ const CAM: Record<string, [number, number, number, number, number, number]> = {
   army: [0.4, 3.4, -11.5, 0.2, 2.5, 1],
   dinos: [-1.5, 3.6, -11, 0.3, 2.2, 1.5],
   emotes: [0, 1.3, -5.2, 0, 0.8, 0],
+  paper: [-1.2, 1.4, -3.4, 0.3, 0.8, 0],
   recruits: [-0.9, 1.3, -3.2, 0, 0.7, 0],
 };
 const camParam = params.get('cam')?.split(',').map(Number);
@@ -186,6 +193,11 @@ function frame(): void {
       poseTheropod(e.inst as FigureInstance, t + e.x, phase * (e.kind === 'rex' ? 0.5 : 1.3), speed > 0 ? speed : 0.15, e.kind === 'rex' ? Math.max(0, Math.sin(t * 0.8)) : 0, e.scale);
     } else if (e.kind === 'trike') {
       poseTrike(e.inst as FigureInstance, t, phase * 0.9, speed > 0 ? speed : 0.15, 0);
+    } else if (e.kind === 'plane') {
+      posePlane(e.inst as FigureInstance, t, e.x, 0);
+    } else if (e.kind === 'yoyo') {
+      poseHumanoid(e.inst as FigureInstance, { t, speed: 0, phase: 0, pitch: 0, crouch: 0, airborne: false, aiming: false }, 0.95);
+      poseYoYo(e.inst as FigureInstance, t, 0);
     } else if (e.kind === 'ptero') {
       posePtero(e.inst as FigureInstance, t, 0, 0);
     } else if (e.kind === 'scuttler') {
@@ -193,7 +205,7 @@ function frame(): void {
     } else {
       poseMoth(e.inst as CreatureInstance, t);
     }
-    if (state.turntable && focus !== 'army' && focus !== 'dinos' && focus !== 'emotes') e.inst.root.rotation.y = Math.sin(t * 0.4) * 0.9;
+    if (state.turntable && focus !== 'army' && focus !== 'dinos' && focus !== 'emotes' && focus !== 'paper') e.inst.root.rotation.y = Math.sin(t * 0.4) * 0.9;
   }
   controls.update();
   post.render(t);

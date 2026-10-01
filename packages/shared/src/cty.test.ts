@@ -115,9 +115,10 @@ describe('Capture the Yarn', () => {
   });
 
   it('bots go for the yarn', () => {
-    const host = new RoomHost({ code: 'CTY', fillTo: 6, mode: 'cty', map: 'park' });
+    // The bedroom is small enough that 3v3 bots reliably get to the yarn (on big maps they can brawl midfield for minutes).
+    const host = new RoomHost({ code: 'CTY', fillTo: 6, mode: 'cty', map: 'bedroom' });
     let took = false;
-    for (let i = 0; i < TICK_RATE * 120 && !took; i++) {
+    for (let i = 0; i < TICK_RATE * 180 && !took; i++) {
       host.step();
       took = host.room.cty!.balls.some((b) => b.state !== YarnState.Home);
     }

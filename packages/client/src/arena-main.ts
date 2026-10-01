@@ -253,6 +253,8 @@ net.onShot = (s) => {
   }
   if (s.kind === ShotKind.Enemy && s.from) {
     const from = new THREE.Vector3(...s.from);
+    // A yo-yo throw: fling the nearest slinger's yo-yo out.
+    enemyRenderer?.dinoNear(EnemyType.YoYo, from.x, from.z);
     fx.projectile(from, to, 0xff5040, true);
     sfx.play('enemyShot', attenuation(from) * 0.6);
     if (s.hit === net.id) { damageFlash(); sfx.play('hurt'); hurtFrom(from); }
@@ -488,6 +490,12 @@ net.onEvent = (e) => {
       } else {
         sfx.play('chirp', near);
       }
+      break;
+    }
+    case 'crumple': {
+      const at = new THREE.Vector3(e.x, e.y, e.z);
+      fx.fluffBurst(at, 0xfbf7ec, 8, 2);
+      sfx.play('pop', attenuation(at) * 0.6);
       break;
     }
     case 'pop': {

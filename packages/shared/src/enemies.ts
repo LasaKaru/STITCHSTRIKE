@@ -31,6 +31,10 @@ export const EnemyType = {
   Ptero: 14,
   /** Boss: Rex, the Yarnasaur. Stomps, and roars the herd into a rush. */
   Rex: 15,
+  /** Paper plane: fast fragile flyers in squadrons that crumple into whatever they hit. */
+  Plane: 16,
+  /** Yo-Yo Slinger: flings its yo-yo from range and yanks toys towards it. */
+  YoYo: 17,
 } as const;
 
 export interface EnemyDef {
@@ -56,6 +60,8 @@ export interface EnemyDef {
   knockback?: number;
   /** One of the Dino Stampede herd (a Rex roar sends these rushing). */
   dino?: boolean;
+  /** Crumples on its first hit (paper planes). */
+  kamikaze?: boolean;
 }
 
 export const ENEMIES: EnemyDef[] = [
@@ -75,6 +81,8 @@ export const ENEMIES: EnemyDef[] = [
   { name: 'Woolly Trike', hp: 650, speed: 1.7, radius: 1.2, height: 2, damage: 38, attackRate: 0.6, reward: 50, flying: false, breaksBuildables: true, knockback: 10, dino: true },
   { name: 'Felt Ptero', hp: 60, speed: 4.6, radius: 0.7, height: 0.8, damage: 11, attackRate: 1.1, reward: 11, flying: true, breaksBuildables: false, altitude: 7, knockback: 5, dino: true },
   { name: 'Rex, the Yarnasaur', hp: 5200, speed: 1.4, radius: 2, height: 5.2, damage: 60, attackRate: 0.5, reward: 400, flying: false, breaksBuildables: true, boss: true, knockback: 11, dino: true },
+  { name: 'Paper Plane', hp: 22, speed: 7.5, radius: 0.4, height: 0.3, damage: 9, attackRate: 2, reward: 4, flying: true, breaksBuildables: false, altitude: 4.5, kamikaze: true },
+  { name: 'Yo-Yo Slinger', hp: 120, speed: 2.2, radius: 0.45, height: 1.25, damage: 10, attackRate: 0.5, reward: 14, flying: false, breaksBuildables: false },
 ];
 
 /** Damage scissor snips do to buildables per cut. */
@@ -87,6 +95,9 @@ export const BOSS_STOMP = { every: 6, damage: 30, radius: 5 };
 export const DRUM = { radius: 7, boost: 1.35, every: 2 };
 /** Jack-in-the-Box: springs when a toy is within range, hurting toys within radius and lunging at them. */
 export const JACK_POP = { range: 4, radius: 3, damage: 26, every: 5, lunge: 9 };
+/** Yo-Yo Slinger: every few seconds, a toy within range it can see gets yanked towards it (and stung). */
+export const YOYO = { range: 10, every: 3.2, damage: 10, pull: 9 };
+
 /** Raptors leap at a toy within range (but not too close), every few seconds. */
 export const RAPTOR_LEAP = { range: 9, min: 2.5, every: 4, lunge: 15 };
 /** Trikes charge a toy within range: a burst of speed for a moment. */

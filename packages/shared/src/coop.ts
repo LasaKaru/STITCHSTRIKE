@@ -1,4 +1,4 @@
-import { STUCK_SECONDS, BOSS_STOMP, DRONE_DROP, DRUM, ENEMIES, JACK_POP, EnemyType, NavGrid, PTERO_SWOOP, pushOutOfBoxes, RAPTOR_LEAP, REX_ROAR, TRIKE_CHARGE, SNIP_CUT, SOLDIER_ACCURACY, type Enemy } from './enemies.ts';
+import { STUCK_SECONDS, YOYO, BOSS_STOMP, DRONE_DROP, DRUM, ENEMIES, JACK_POP, EnemyType, NavGrid, PTERO_SWOOP, pushOutOfBoxes, RAPTOR_LEAP, REX_ROAR, TRIKE_CHARGE, SNIP_CUT, SOLDIER_ACCURACY, type Enemy } from './enemies.ts';
 import type { GameEvent, Shot } from './protocol.ts';
 import { hasLineOfSight } from './raycast.ts';
 import type { Vec3, World } from './world.ts';
@@ -107,6 +107,7 @@ interface SpawnGroup { type: number; count: number; spawn: number; delay: number
 const G = EnemyType.Grunt, S = EnemyType.Scuttler, M = EnemyType.Moth, B = EnemyType.Brute;
 const T = EnemyType.Teeth, P = EnemyType.Top, O = EnemyType.Soldier, D = EnemyType.Drone, X = EnemyType.Snip, Z = EnemyType.Boss;
 const R = EnemyType.Drummer, J = EnemyType.Jack;
+const PL = EnemyType.Plane, YY = EnemyType.YoYo;
 const RA = EnemyType.Raptor, TR = EnemyType.Trike, PT = EnemyType.Ptero, RX = EnemyType.Rex;
 const g = (type: number, count: number, delay = 0, interval = 1, spawn = -1): SpawnGroup => ({ type, count, spawn, delay, interval });
 
@@ -115,17 +116,17 @@ export const WAVES: SpawnGroup[][] = [
   [g(G, 10, 0, 1.4)],
   [g(G, 10, 0, 1.2), g(T, 12, 6, 0.35)],
   [g(G, 12, 0, 1.0), g(S, 8, 6, 0.8), g(M, 6, 4, 1.0)],
-  [g(G, 10, 0, 1.0), g(O, 6, 3, 1.6), g(T, 20, 8, 0.2)],
+  [g(G, 10, 0, 1.0), g(O, 6, 3, 1.6), g(T, 20, 8, 0.2), g(PL, 10, 6, 0.25)],
   [g(G, 14, 0, 0.8), g(P, 6, 4, 1.2), g(M, 8, 8, 0.8), g(B, 1, 15)],
-  [g(O, 8, 0, 1.2), g(X, 3, 6, 3), g(T, 24, 4, 0.2), g(S, 10, 12, 0.5), g(J, 3, 10, 3)],
+  [g(O, 8, 0, 1.2), g(X, 3, 6, 3), g(T, 24, 4, 0.2), g(S, 10, 12, 0.5), g(J, 3, 10, 3), g(YY, 3, 8, 3)],
   [g(G, 16, 0, 0.8), g(R, 1, 4), g(D, 3, 6, 4), g(M, 10, 10, 0.7), g(P, 8, 14, 0.9)],
-  [g(B, 2, 0, 8), g(X, 4, 4, 3), g(O, 10, 6, 1), g(T, 30, 10, 0.15), g(J, 4, 8, 2)],
+  [g(B, 2, 0, 8), g(X, 4, 4, 3), g(O, 10, 6, 1), g(T, 30, 10, 0.15), g(J, 4, 8, 2), g(PL, 14, 3, 0.2), g(YY, 3, 12, 4)],
   [g(G, 20, 0, 0.7), g(R, 2, 3, 8), g(D, 4, 5, 4), g(P, 10, 8, 0.8), g(M, 12, 12, 0.6), g(B, 2, 18, 6)],
-  [g(Z, 1, 4, 1, 0), g(G, 14, 0, 1), g(T, 30, 10, 0.2), g(O, 8, 16, 1.4), g(X, 3, 24, 4), g(R, 2, 12, 6), g(J, 3, 20, 3)],
+  [g(Z, 1, 4, 1, 0), g(G, 14, 0, 1), g(T, 30, 10, 0.2), g(O, 8, 16, 1.4), g(X, 3, 24, 4), g(R, 2, 12, 6), g(J, 3, 20, 3), g(PL, 12, 14, 0.25), g(YY, 2, 18, 5)],
 ];
 /** A skirmish is five waves; its last wave brings a Brute pack instead of the boss. */
 const SKIRMISH: SpawnGroup[][] = [WAVES[0], WAVES[1], WAVES[2], WAVES[3],
-  [g(G, 18, 0, 0.7), g(S, 12, 4, 0.4), g(M, 10, 8, 0.6), g(B, 3, 12, 5), g(O, 6, 6, 1.5), g(J, 2, 10, 3)]];
+  [g(G, 18, 0, 0.7), g(S, 12, 4, 0.4), g(M, 10, 8, 0.6), g(B, 3, 12, 5), g(O, 6, 6, 1.5), g(J, 2, 10, 3), g(PL, 8, 6, 0.3)]];
 
 /** Dino Stampede: raptor packs, swooping pteros and charging trikes, then Rex. */
 export const STAMPEDE: SpawnGroup[][] = [
@@ -514,7 +515,8 @@ export class CoopDirector {
       let attack: (() => void) | null = null;
       let hold = false;
       // Pteros spot toys from high up and swoop; raptors hunt from further off than toys do.
-      const ptero = e.type === EnemyType.Ptero;
+      // Pteros and paper planes spot toys from up high and swoop down on them.
+      const ptero = e.type === EnemyType.Ptero || e.type === EnemyType.Plane;
       const aggro = ptero ? PTERO_SWOOP.range : e.type === EnemyType.Raptor ? 7 : def.flying ? 4.5 : 3.5;
       const reachY = ptero ? 9 : 2.5;
       let nearestPlayer: { id: number; x: number; y: number; z: number } | null = null;
@@ -632,6 +634,26 @@ export class CoopDirector {
           }
         }
       }
+      if (e.type === EnemyType.YoYo) {
+        // Yo-Yo Slinger: plant your feet in range of a toy you can see, fling, yank it over.
+        const eye: Vec3 = [e.x, e.y + def.height * 0.8, e.z];
+        let prey: (typeof players)[number] | null = null;
+        let best = YOYO.range;
+        for (const p of players) {
+          const d = Math.hypot(p.x - e.x, p.z - e.z);
+          if (d < best && hasLineOfSight(eye, [p.x, p.y + 1, p.z], boxes)) { best = d; prey = p; }
+        }
+        if (prey) {
+          hold = true;
+          tx = prey.x; tz = prey.z;
+          if (e.special <= 0) {
+            e.special = YOYO.every;
+            const l = best || 1;
+            host.shot({ id: ENEMY_SHOT_ID, hit: prey.id, head: false, enemy: false, kind: ShotKind.Enemy, from: eye, to: [prey.x, prey.y + 1, prey.z] });
+            host.damagePlayer(prey.id, YOYO.damage, e.type, [((e.x - prey.x) / l) * YOYO.pull, ((e.z - prey.z) / l) * YOYO.pull]);
+          }
+        }
+      }
       if (e.type === EnemyType.Raptor && e.special <= 0 && nearestPlayer && nearestD > RAPTOR_LEAP.min && nearestD < RAPTOR_LEAP.range) {
         e.special = RAPTOR_LEAP.every;
         e.kx = ((nearestPlayer.x - e.x) / nearestD) * RAPTOR_LEAP.lunge;
@@ -734,6 +756,8 @@ export class CoopDirector {
       if (attack && e.cooldown <= 0) {
         attack();
         e.cooldown = 1 / def.attackRate;
+        // Paper planes crumple into whatever they hit.
+        if (def.kamikaze) { e.hp = 0; this.emit({ type: 'crumple', x: e.x, y: e.y, z: e.z }); continue; }
       }
       // Wedged somewhere it can't get out of, and not fighting: after a while it just falls apart.
       const moving = Math.hypot(e.x - sx, e.z - sz) > def.speed * 0.15 * dt;
