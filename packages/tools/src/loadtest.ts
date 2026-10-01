@@ -2,7 +2,7 @@
  * Headless load tester: connects N fake clients that run around and fire,
  * then reports downstream bandwidth per client and snapshot rate.
  *
- *   pnpm loadtest -- --url ws://localhost:8787 --clients 4 --seconds 10 [--mode coop|pvp] [--bots N]
+ *   pnpm loadtest -- --url ws://localhost:8787 --clients 4 --seconds 10 [--mode coop|pvp|tdm|koth|cty] [--bots N] [--map ID] [--mission 0|1]
  */
 import WebSocket from 'ws';
 import { Buttons, encodeInputs, INPUT_RATE, INPUTS_PER_PACKET, MSG_SNAPSHOT, type InputCmd } from '@stitchstrike/shared';
@@ -17,6 +17,8 @@ const clients = Number(arg('clients', '4'));
 const seconds = Number(arg('seconds', '10'));
 const room = arg('room', `LOAD${Math.floor(Math.random() * 1000)}`);
 const mode = arg('mode', 'coop');
+const map = arg('map', 'bedroom');
+const mission = arg('mission', '0');
 const bots = arg('bots', '0');
 
 interface Stats { bytes: number; snapshots: number; welcomed: boolean; first: number; last: number }
@@ -24,7 +26,7 @@ interface Stats { bytes: number; snapshots: number; welcomed: boolean; first: nu
 function runClient(i: number): Promise<Stats> {
   return new Promise((resolve) => {
     const stats: Stats = { bytes: 0, snapshots: 0, welcomed: false, first: 0, last: 0 };
-    const ws = new WebSocket(`${url}/?room=${room}&bots=${bots}&mode=${mode}`);
+    const ws = new WebSocket(`${url}/?room=${room}&bots=${bots}&mode=${mode}&map=${map}&mission=${mission}`);
     ws.binaryType = 'nodebuffer';
     let seq = 0;
     let yaw = Math.random() * Math.PI * 2;

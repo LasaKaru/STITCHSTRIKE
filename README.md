@@ -1,11 +1,15 @@
 # STITCHSTRIKE
 
-**Soft toys. Hard fights.** An indie first- and third-person shooter that blends wave-based tower defence with intense action, and a love letter to 90s childhoods. You are a little amigurumi toy in a giant, cosy, hand-knitted world. Everything is wool: the toys, Baron von Ravel's Mass-Knit Army, every room, the trees, the water and the city outside the window, all in the warm look of a stop-motion knit film. Defend the glowing **Heartspools** in a messy **bedroom**, the **back garden**, the **garage**, the **bathroom**, a **toy store aisle** or an autumn **city park**: alone with bots, online with up to 4 friends, or up to four to a couch in split-screen. PvP Free-for-All, Team Deathmatch and King of the Spool are in too. It's built with Three.js and TypeScript, with server-authoritative netcode, and ships as a desktop app ready for Steam.
+**Soft toys. Hard fights.** An indie first- and third-person shooter that blends wave-based tower defence with intense action, and a love letter to 90s childhoods. You are a little amigurumi toy in a giant, cosy, hand-knitted world. Everything is wool: the toys, Baron von Ravel's Mass-Knit Army, every room, the trees, the water and the city outside the window, all in the warm look of a stop-motion knit film. Defend the glowing **Heartspools** in a messy **bedroom**, the **back garden**, the **garage**, the **bathroom**, a **toy store aisle**, an autumn **city park** or the prehistoric **Dino Den**, against Baron von Ravel's toy army or a stampede of knitted dinosaurs: alone with bots, online with up to 4 friends, or up to four to a couch in split-screen. PvP Free-for-All, Team Deathmatch, King of the Spool and Capture the Yarn are in too, and you can drive a toy safari jeep or a wind-up tank. It's built with Three.js and TypeScript, with server-authoritative netcode, and ships as a desktop app ready for Steam.
 
 ![Main menu over the live in-engine cinematic](docs/screenshots/menu.jpg)
 
-| The City Park | Wave 5 at the bandstand | The parade balloon |
+| The Dino Stampede herd | The Dino Den | Rex arrives at the park gate |
 |---|---|---|
+| ![](docs/screenshots/dinos.jpg) | ![](docs/screenshots/dinoden.jpg) | ![](docs/screenshots/stampede.jpg) |
+| **Driving the toy safari jeep** | **The wind-up tank** | **Capture the Yarn** |
+| ![](docs/screenshots/vehicles.jpg) | ![](docs/screenshots/tank.jpg) | ![](docs/screenshots/capture-the-yarn.jpg) |
+| **The City Park** | **Wave 5 at the bandstand** | **The parade balloon** |
 | ![](docs/screenshots/park.jpg) | ![](docs/screenshots/park-combat.jpg) | ![](docs/screenshots/park-balloon.jpg) |
 | **The cosy bedroom** | **The autumn Back Garden** | **The Bathroom** |
 | ![](docs/screenshots/coop-overview.jpg) | ![](docs/screenshots/garden-overview.jpg) | ![](docs/screenshots/bathroom.jpg) |
@@ -79,10 +83,10 @@ Every keyboard action can be rebound in Settings → Key bindings.
   - **Static Sock:** a chain zap that arcs to up to three more targets
 
   Every weapon is available from the start.
-- **Toys** have 150 stitches, plus up to 100 thimble armour.
+- **Toys** have 200 stitches, plus up to 150 thimble armour. Magazines are big (60 rounds on the Popper).
   - **Stitch-up:** after 4 s out of combat you knit yourself back together.
   - **Down and re-stitch (co-op):** you go down instead of out, and a teammate holds E to re-stitch you. Clearing a wave re-stitches everyone.
-  - **Pickups:** stuffing heals, thimbles armour you, and Power Poms give ×1.5 damage. Invaders sometimes drop stuffing.
+  - **Pickups:** stuffing heals, thimbles armour you, and Power Poms give ×1.5 damage, and a **Yarn Basket** refills every magazine. Invaders sometimes drop stuffing.
 - **Heartspools** (A, B, C): a thread shield absorbs damage first and regrows between waves. Lose all three and the memories are gone.
 - **Build phase:** spend the team's **buttons** on the embroidered pads. Building the same trap again upgrades it to tier 2 and then tier 3.
   - **Pom-Pom Turret:** auto-fires at the nearest invader.
@@ -106,6 +110,12 @@ Every keyboard action can be rebound in Settings → Key bindings.
   - **Tin Drummers**, whose drumming speeds up every invader nearby
   - **Jack-in-the-Boxes**, which spring their clowns at toys who get close
   - **The Unraveller**, the boss: a giant felted bear in a top hat that stomps
+- **Dino Stampede**, the second campaign (pick it under Campaign in the Play menu): a herd of knitted dinosaurs breaks out of the toy box.
+  - **Knitted Raptors** hunt in packs and leap at toys a few steps away
+  - **Woolly Trikes** lower their polka-dot frills and charge, smashing traps
+  - **Felt Pteros** circle high and swoop down on toys
+  - **Rex, the Yarnasaur**, the boss: stomps, and its roar sends every dino nearby into a rush
+- **Vehicles:** walk up to a parked **Toy Safari Jeep** or **Wind-up Tank** and press E. WASD drives, the camera swings behind you, E hops out. The jeep is fast and rams invaders (and rival toys) flat; the tank is slow but its turret lobs yarn-ball shells where you aim. Driving runs in the shared deterministic step, so it's predicted and reconciled like walking. A driver who is knocked out leaves the vehicle parked for someone else.
 - **Missions:** 10 waves with the boss, a 5-wave skirmish, or endless (every loop tougher, a boss every 10th wave).
   - Four difficulties scale invader health, numbers, damage and starting buttons.
   - Sgt. Tuft Buttonsworth briefs you and Baron von Ravel taunts you, Saturday-morning-cartoon style.
@@ -118,8 +128,9 @@ Every keyboard action can be rebound in Settings → Key bindings.
   - **The Garage:** a car you crawl under and climb onto, steel shelving, a workbench and pegboard, and a roll-up door stuck half open.
   - **The Bathroom:** a bubble-bath tub, a climbable shower curtain, the toilet tank as a sniper perch, a toilet-roll staircase.
   - **The Toy Store Aisle:** towering shelves of boxed 90s toys, SALE banners to climb, a ball pit, a trolley and the checkout.
+  - **The Dino Den:** a knitted prehistoric playset with a four-tier volcano you climb ledge by ledge to a smoking crater, a palm jungle, a river with a fallen log, a fossil skeleton whose spine is a sniper perch, a lookout tower and torch-lit gaps in the cliffs. A long-neck grazes outside and pteros wheel overhead.
   - **The City Park:** an autumn park of pom-pom trees, a knitted pond under a humped footbridge, a bandstand perch, hills, benches and lamp posts, ringed by a knitted city, with a giant turkey parade balloon overhead.
-- **Modes:** co-op defence (solo with bots, online up to 4, split-screen for 2–4), Free-for-All, Team Deathmatch and **King of the Spool** (two teams fight to stand on a Golden Spool that hops around the map; first to 100).
+- **Modes:** co-op defence (solo with bots, online up to 4, split-screen for 2–4), Free-for-All, Team Deathmatch **King of the Spool** (two teams fight to stand on a Golden Spool that hops around the map; first to 100) and **Capture the Yarn** (steal the other team's giant yarn ball and run it home while yours is safe; first to 3).
 - **Accessibility:** colour-blind palettes, subtitles and sound captions, reduced camera shake, full key rebinding.
 - **Steam:** medals unlock Steam achievements and rich presence shows what you're playing (desktop build with steamworks.js; see [docs/DESKTOP_AND_STEAM.md](docs/DESKTOP_AND_STEAM.md)).
 - **Sound:** every sound is synthesized, with no audio files. There's a music-box menu theme, a garage-rock combat score that follows the match, and weapon and invader effects.
@@ -128,7 +139,7 @@ Balance check (full simulated matches, bots only, 2-second build phases): 4 bots
 
 ### URL options
 
-`?mode=coop|pvp|tdm|koth` · `?map=bedroom|garden|garage|bathroom|toystore|park` · `?waves=5|10|0` · `?difficulty=0..3` · `?wave=N` (solo practice start) · `?room=ABCD` · `?solo=1` · `?bots=0..7` · `?lag=150` · `?name=Pip` · `?quality=low|medium|high` · `?server=ws://host:8787` · `?cam=overview|core|…` (fixed spectator camera) · `?autopilot=1` (headless smoke tests) · `?lod=0` (full-detail invaders at any distance). Split-screen: `split.html?players=2|3|4`.
+`?mode=coop|pvp|tdm|koth|cty` · `?map=bedroom|garden|garage|bathroom|toystore|park|dinoden` · `?mission=1` (Dino Stampede) · `?waves=5|10|0` · `?difficulty=0..3` · `?wave=N` (solo practice start) · `?room=ABCD` · `?solo=1` · `?bots=0..7` · `?lag=150` · `?name=Pip` · `?quality=low|medium|high` · `?server=ws://host:8787` · `?cam=overview|core|…` (fixed spectator camera) · `?autopilot=1` (headless smoke tests) · `?drive=1&vehicle=1|2` (autopilot drives) · `?lod=0` (full-detail invaders at any distance). Split-screen: `split.html?players=2|3|4`.
 
 Server env: `PORT` (8787), `FILL_BOTS` (4), `FAKE_LAG_MS` (one-way per direction), `STATIC_DIR` (also serve the built client).
 

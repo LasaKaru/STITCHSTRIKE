@@ -59,9 +59,9 @@ The checklist tracks what is in the game (✅) and what is still ahead (⬜).
 - ✅ Online co-op up to 4 (server-authoritative, lag-compensated)
 - ✅ LAN hosting from the desktop app
 - ✅ Local split-screen for 2–4 players (halves or quadrants), keyboard + mouse and gamepads
-- ✅ PvP: Free-for-All (up to 8), Team Deathmatch and King of the Spool (hold the hopping Golden Spool)
-- ✅ Missions: 10 waves with a boss, a 5-wave skirmish and Endless, at four difficulties
-- ✅ Survivability: 150 stitches, Stitch-up regeneration, spawn protection, thimble armour, down and re-stitch, pickups and drops
+- ✅ PvP: Free-for-All (up to 8), Team Deathmatch, King of the Spool (hold the hopping Golden Spool) and Capture the Yarn (steal and carry home the other team's yarn ball)
+- ✅ Missions: 10 waves with a boss, a 5-wave skirmish and Endless, at four difficulties, in two campaigns: The Unraveller and Dino Stampede
+- ✅ Survivability: 200 stitches, big magazines and Yarn Basket ammo refills, Stitch-up regeneration, spawn protection, thimble armour, down and re-stitch, pickups and drops
 - ✅ Weapons: Pom-Pom Popper, Button Buster, Needle Lance (pierces), Crochet Hook, Yarn-Ball Launcher (lobbed splash, tangle), Glue Gun (sticky globs), Static Sock (chain zap)
 - ✅ Traps: Turret, Pin Wall, Brick Barricade, Tangle Mat, Battery Zapper, Mousetrap and Spring Pad, all upgradable to tier 3
 - ✅ Dynamic mazing: flow fields re-bake whenever a blockade changes
@@ -75,7 +75,9 @@ The checklist tracks what is in the game (✅) and what is still ahead (⬜).
   - support: Tin Drummers (speed up everyone nearby)
   - ambushers: Jack-in-the-Boxes (spring out at toys)
   - boss: The Unraveller
-- ✅ Maps at toy scale: The Bedroom, The Back Garden, The Garage, The Bathroom, The Toy Store Aisle, The City Park
+- ✅ Dino Stampede herd: Knitted Raptors (pack hunters that leap), Woolly Trikes (charge and smash traps), Felt Pteros (swoop from high up), boss Rex, the Yarnasaur (stomp, and a roar that sends the herd rushing)
+- ✅ Drivable vehicles: Toy Safari Jeep (fast, rams) and Wind-up Tank (slow, turret cannon), predicted like walking, parked on five maps
+- ✅ Maps at toy scale: The Bedroom, The Back Garden, The Garage, The Bathroom, The Toy Store Aisle, The City Park, The Dino Den
 - ✅ The cosy stop-motion look: amigurumi toys, chunky knit, golden light and a film grade, autumn set dressing, a knitted city outside every window
 - ✅ Verticality: climbable fabric and bark, jump pads, book and crate steps, shelves and roofs, ledge mantle, the yarn-swing grapple
 - ✅ Collectibles: 8 secrets per map (golden thimbles, weapon parts, credit stashes)
@@ -95,9 +97,9 @@ The checklist tracks what is in the game (✅) and what is still ahead (⬜).
 **Still ahead**
 - ⬜ Steam, the rest (needs your App ID): lobbies and invites, relay networking, cloud saves
 - ⬜ More maps: kitchen counter, sewing room, attic, a seasonal Christmas living room
-- ⬜ A boss per map (only The Unraveller exists)
+- ⬜ A boss per map (The Unraveller and Rex exist)
 - ⬜ Mission variety: escort, salvage and daily challenges
-- ⬜ PvP variety: Capture the Yarn
+- ⬜ PvP variety: vehicle-only modes, a race around the Dino Den
 - ⬜ Weapon parts with stat-free variants per weapon (charms and wraps exist; per-weapon skins do not yet)
 - ⬜ Gamepad aim assist; gamepad button remapping
 - ⬜ More weapons: Stuffing Blaster, Safety-Pin Crossbow; gadgets
