@@ -15,7 +15,7 @@ export interface Box {
   climb?: boolean;
 }
 
-export type MapId = 'bedroom' | 'garden' | 'garage' | 'bathroom' | 'toystore' | 'park' | 'dinoden';
+export type MapId = 'bedroom' | 'garden' | 'garage' | 'bathroom' | 'toystore' | 'park' | 'dinoden' | 'livingroom';
 export const MAPS: { id: MapId; name: string; blurb: string }[] = [
   { id: 'bedroom', name: 'Sunbeam Bedroom', blurb: 'A messy knitted bedroom lit by one sunbeam.' },
   { id: 'garden', name: 'Back Garden', blurb: 'Lawn, trees, a house, a shed and a treehouse, all wool.' },
@@ -24,6 +24,7 @@ export const MAPS: { id: MapId; name: string; blurb: string }[] = [
   { id: 'toystore', name: 'The Toy Store Aisle', blurb: 'Towering shelves of boxed toys, a ball pit, a trolley and the checkout.' },
   { id: 'park', name: 'The City Park', blurb: 'An autumn park: pom-pom trees, a knitted pond and bridge, a bandstand and the city all around.' },
   { id: 'dinoden', name: 'The Dino Den', blurb: 'A knitted prehistoric playset: a climbable volcano, a yarn jungle, a river and a fossil skeleton.' },
+  { id: 'livingroom', name: 'The Frosty Living Room', blurb: 'A snowy evening: a climbable Christmas tree, a fireplace mantel perch, presents and a toy train.' },
 ];
 
 export interface World {
@@ -226,6 +227,7 @@ export function createWorld(map: MapId = 'bedroom'): World {
     case 'toystore': return createToyStore();
     case 'park': return createPark();
     case 'dinoden': return createDinoDen();
+    case 'livingroom': return createLivingRoom();
     default: return createBedroom();
   }
 }
@@ -235,4 +237,5 @@ import { createGarage } from './garage.ts';
 import { createToyStore } from './toystore.ts';
 import { createPark } from './park.ts';
 import { createDinoDen } from './dinoden.ts';
+import { createLivingRoom } from './livingroom.ts';
 import { createGarden } from './garden.ts';

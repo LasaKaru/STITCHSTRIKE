@@ -31,6 +31,7 @@ import { createPost, type Post } from './scene/post.ts';
 import { ViewModel } from './scene/viewModel.ts';
 import { buildWoolGarden } from './scene/woolGarden.ts';
 import { buildWoolDinoDen } from './scene/woolDinoDen.ts';
+import { buildWoolLivingRoom } from './scene/woolLivingRoom.ts';
 import { buildWoolPark } from './scene/woolPark.ts';
 import { buildWoolRoom } from './scene/woolRoom.ts';
 import { buildWoolGarage } from './scene/woolGarage.ts';
@@ -125,7 +126,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(world.outdoor ? 0xf2d9b0 : 0x3a2a22);
 scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environmentIntensity = world.outdoor ? 0.5 : 0.22;
-const room = world.id === 'dinoden' ? buildWoolDinoDen(scene, world, quality) : world.id === 'park' ? buildWoolPark(scene, world, quality) : world.outdoor ? buildWoolGarden(scene, world, quality) : world.id === 'garage' ? buildWoolGarage(scene, world) : world.id === 'bathroom' ? buildWoolBathroom(scene, world) : world.id === 'toystore' ? buildWoolToyStore(scene, world) : buildWoolRoom(scene, world);
+const room = world.id === 'livingroom' ? buildWoolLivingRoom(scene, world) : world.id === 'dinoden' ? buildWoolDinoDen(scene, world, quality) : world.id === 'park' ? buildWoolPark(scene, world, quality) : world.outdoor ? buildWoolGarden(scene, world, quality) : world.id === 'garage' ? buildWoolGarage(scene, world) : world.id === 'bathroom' ? buildWoolBathroom(scene, world) : world.id === 'toystore' ? buildWoolToyStore(scene, world) : buildWoolRoom(scene, world);
 (window as unknown as { __stitchstrike: unknown }).__stitchstrike = { net, scene, renderer, get enemyRenderer() { return enemyRenderer; } };
 
 const camera = new THREE.PerspectiveCamera(settings.fov, window.innerWidth / window.innerHeight, 0.03, world.outdoor ? 900 : 200);
@@ -1283,6 +1284,14 @@ function frame(): void {
       tank: [-33, 4.5, -2, -40, 1, -8],
       gate: [9, 7, 24, 0, 3, 40],
       coreB: [-25.5, 2.6, 7.5, -30, 0.6, 12],
+    } : world.id === 'livingroom' ? {
+      overview: [36, 30, 26, -4, 4, -8],
+      core: [6, 4, -4, -2, 1, -14],
+      tree: [8, 12, 2, 25, 12, -19],
+      fireplace: [-4, 8, 2, 0, 6, -28],
+      sofa: [-6, 7, -10, -20, 4, 10],
+      window: [-20, 16, -6, -40, 17, -6],
+      thumb: [10, 9, 10, 4, 8, -20],
     } : world.id === 'dinoden' ? {
       overview: [48, 42, -56, 0, 4, 6],
       core: [8, 5, -10, 0, 1, 0],

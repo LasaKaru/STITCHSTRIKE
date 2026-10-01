@@ -42,6 +42,11 @@ export const BRIEFINGS: Record<MapId, string[]> = {
     'Climb the SALE banners to the top shelves and rain yarn down the aisle.',
     'They are coming through the sliding doors and from behind the checkout. Hold the aisle!',
   ],
+  livingroom: [
+    "It's a snowy night in the living room, soldiers, and the Baron's toys are coming down the chimney!",
+    'Climb the Christmas tree for the star-top perch, or spring up to the mantel. The presents make handy steps.',
+    "They're crawling under the front door and out from behind the sofa too. Keep the Heartspools merry!",
+  ],
   dinoden: [
     "Welcome to the Dino Den, soldiers. A knitted prehistoric playset, and the Baron's lot are pouring through every gap in the cliffs.",
     'Climb the volcano ledge by ledge, or take the spring at its foot straight to the crater. The fossil spine makes a fine sniper perch.',

@@ -191,7 +191,7 @@ describe('toys: armour, pickups, down and re-stitch', () => {
     room.update();
     expect(p.state.mags).toEqual(WEAPONS.map((w) => w.magazine));
     expect(p.state.reload).toBe(0);
-    for (const m of ['garden', 'garage', 'bathroom', 'toystore', 'park', 'dinoden'] as const) {
+    for (const m of ['garden', 'garage', 'bathroom', 'toystore', 'park', 'dinoden', 'livingroom'] as const) {
       expect(createWorld(m).pickups.some((s) => s.kind === PickupKind.YarnBasket)).toBe(true);
     }
   });
@@ -494,7 +494,7 @@ describe('traversal', () => {
   });
 
   it('map jump pads launch toys high', () => {
-    for (const map of ['bedroom', 'garden', 'garage', 'bathroom', 'toystore', 'park', 'dinoden'] as const) {
+    for (const map of ['bedroom', 'garden', 'garage', 'bathroom', 'toystore', 'park', 'dinoden', 'livingroom'] as const) {
       const world = createWorld(map);
       for (const j of world.jumpPads) {
         const s = createPlayerState([j.x, j.y + 0.5, j.z]);
@@ -506,7 +506,7 @@ describe('traversal', () => {
   });
 
   it('every map hides collectibles', () => {
-    for (const map of ['bedroom', 'garden', 'garage', 'bathroom', 'toystore', 'park', 'dinoden'] as const) {
+    for (const map of ['bedroom', 'garden', 'garage', 'bathroom', 'toystore', 'park', 'dinoden', 'livingroom'] as const) {
       const world = createWorld(map);
       expect(world.collectibles.length).toBeGreaterThanOrEqual(8);
       expect(new Set(world.collectibles.map((c) => c.id)).size).toBe(world.collectibles.length);
