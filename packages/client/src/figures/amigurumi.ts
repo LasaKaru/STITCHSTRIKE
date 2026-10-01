@@ -38,7 +38,8 @@ export function amigurumiDef(o: HumanoidOptions): FigureDef {
   const shoulderX = 0.165 * sh;
   const shoulderY = 0.84;
   const drop = PI / 4;
-  const ua = 0.17 * arm, fa = 0.14 * arm, ha = 0.07;
+  // Stubby, but long enough to reach the blaster grip with both hands.
+  const ua = 0.2 * arm, fa = 0.17 * arm, ha = 0.07;
   const bones: BoneDef[] = [
     { name: 'hips', parent: null, head: v(0, 0.52, 0), tail: v(0, 0.62, 0), radius: 0.17 * S },
     { name: 'spine', parent: 'hips', head: v(0, 0.62, 0), tail: v(0, 0.74, 0), radius: 0.18 * S * belly },

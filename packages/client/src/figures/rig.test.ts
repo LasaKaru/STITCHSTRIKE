@@ -48,8 +48,9 @@ describe('rigged knitted figures', () => {
     f.root.updateMatrixWorld(true);
     const hand = f.bones.get('handR')!.getWorldPosition(new THREE.Vector3());
     expect(hand.distanceTo(gun.position)).toBeLessThan(0.01);
-    // Aiming up raises the grip above the chest.
-    expect(gun.position.y).toBeGreaterThan(1.1);
+    // Aiming up raises the grip above the chest joint.
+    const chest = f.poser.worldPos('chest');
+    expect(gun.position.y).toBeGreaterThan(chest.y);
   });
 
   it('merged regions collapse draw calls to one per stitch pattern', () => {
